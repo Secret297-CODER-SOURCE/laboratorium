@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Конференції — laboratorium.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/conferences.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header" id="site-header"></header>
+
+  <main class="conferences-page">
+    <div class="container">
+      <div class="conf-header">
+        <div>
+          <span class="section-tag">// конференції</span>
+          <h1>Відеоконференції <span class="accent">laboratorium.</span></h1>
+        </div>
+        <button class="btn btn--primary ico-inline" id="create-conf-btn" data-nav-icon="plus">Створити конференцію</button>
+      </div>
+
+      <div class="conf-tabs">
+        <button class="conf-tab active" data-tab="calendar" data-nav-icon="calendar">Календар</button>
+        <button class="conf-tab" data-tab="upcoming" data-nav-icon="clock">Майбутні</button>
+        <button class="conf-tab" data-tab="all" data-nav-icon="grid">Усі</button>
+      </div>
+
+      <div id="tab-calendar">
+        <div class="calendar-wrap">
+          <div class="calendar-nav">
+            <button class="btn btn--ghost btn--sm ico-inline" id="cal-prev" data-nav-icon="chevron-left">Назад</button>
+            <h2 id="cal-title"></h2>
+            <button class="btn btn--ghost btn--sm ico-inline" id="cal-next" data-nav-icon="chevron-right">Вперед</button>
+          </div>
+          <div class="calendar-grid" id="calendar-grid"></div>
+        </div>
+      </div>
+
+      <div id="tab-upcoming" hidden>
+        <div id="upcoming-list" class="conf-list"></div>
+      </div>
+
+      <div id="tab-all" hidden>
+        <div id="all-list" class="conf-list"></div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="create-modal" hidden>
+    <div class="modal">
+      <div id="create-step-choice">
+        <h2>Створити конференцію</h2>
+        <p class="modal-subtitle">Оберіть тип конференції</p>
+        <div class="conf-type-grid">
+          <button type="button" class="conf-type-card" id="choose-planned">
+            <span class="conf-type-icon" data-nav-icon="calendar"></span>
+            <span class="conf-type-title">Планова конференція</span>
+            <span class="conf-type-desc">Заплануйте дату, час і учасників</span>
+          </button>
+          <button type="button" class="conf-type-card" id="choose-quick">
+            <span class="conf-type-icon" data-nav-icon="zap"></span>
+            <span class="conf-type-title">Швидке посилання</span>
+            <span class="conf-type-desc">Створити кімнату та увійти зараз</span>
+          </button>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn--ghost" id="cancel-modal">Скасувати</button>
+        </div>
+      </div>
+
+      <div id="create-step-planned" hidden>
+        <button type="button" class="modal-back ico-inline" id="back-from-planned" data-nav-icon="chevron-left">Назад</button>
+        <h2>Нова конференція</h2>
+        <form class="modal-form" id="create-form">
+          <div id="create-error" class="form-error" hidden></div>
+          <label>
+            <span>Назва *</span>
+            <input type="text" name="title" required placeholder="Воркшоп із пентесту">
+          </label>
+          <label>
+            <span>Опис</span>
+            <textarea name="description" rows="2" placeholder="Про що буде конференція"></textarea>
+          </label>
+          <label>
+            <span>Дата й час *</span>
+            <input type="datetime-local" name="scheduledAt" required>
+          </label>
+          <div class="modal-form-row">
+            <label>
+              <span>Тривалість (хв)</span>
+              <input type="number" name="durationMinutes" value="60" min="15" max="480">
+            </label>
+            <label>
+              <span>Макс. учасників</span>
+              <input type="number" name="maxParticipants" value="30" min="2" max="100">
+            </label>
+          </div>
+          <label>
+            <span>Група *</span>
+            <select name="groupId" id="group-select" required>
+              <option value="">— оберіть групу —</option>
+            </select>
+          </label>
+          <label>
+            <span>Програма</span>
+            <select name="programId" id="program-select">
+              <option value="">— без програми —</option>
+            </select>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="recordingEnabled" checked>
+            <span>Дозволити запис</span>
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="btn btn--ghost" id="cancel-planned">Скасувати</button>
+            <button type="submit" class="btn btn--primary">Створити</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="create-step-quick" hidden>
+        <button type="button" class="modal-back ico-inline" id="back-from-quick" data-nav-icon="chevron-left">Назад</button>
+        <h2>Швидке посилання</h2>
+        <p class="modal-subtitle">Кімната створюється одразу — ви потрапите в неї після підтвердження</p>
+        <form class="modal-form" id="quick-form">
+          <div id="quick-error" class="form-error" hidden></div>
+          <label>
+            <span>Назва</span>
+            <input type="text" name="title" placeholder="Швидка конференція">
+          </label>
+          <label id="quick-group-label">
+            <span>Група *</span>
+            <select name="groupId" id="quick-group-select">
+              <option value="">— оберіть групу —</option>
+            </select>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="recordingEnabled" checked>
+            <span>Дозволити запис</span>
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="btn btn--ghost" id="cancel-quick">Скасувати</button>
+            <button type="submit" class="btn btn--primary">Створити та увійти</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/conferences.js"></script>
+</body>
+</html>

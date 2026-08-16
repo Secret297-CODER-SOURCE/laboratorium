@@ -1,0 +1,164 @@
+# Production stack — app + nginx (TLS) in Docker.
+# Usage: docker compose -f docker-compose.prod.yml up -d --build
+#
+# First run without certs: site on http://DOMAIN (port 80).
+# Set CERTBOT_EMAIL in .env and run: ./scripts/deploy.sh  (or npm run deploy)
+# to obtain Let's Encrypt certs; nginx reloads HTTPS automatically.
+
+x-app-env: &app-env
+  NODE_ENV: production
+  PORT: 3000
+  HOST: 0.0.0.0
+  APP_URL: ${APP_URL:?Set APP_URL in .env (https://your-domain)}
+  SITE_URL: ${SITE_URL:?Set SITE_URL in .env}
+  CONTACT_EMAIL: ${CONTACT_EMAIL:-hello@laboratorium.club}
+  JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+  DATABASE_PATH: /app/data/laboratorium.db
+  UPLOADS_DIR: /app/data/uploads
+  RECORDINGS_DIR: /app/data/uploads/recordings
+  CHAT_UPLOADS_DIR: /app/data/uploads/chat
+  SEED_DATABASE: ${SEED_DATABASE:-false}
+  ALLOW_PUBLIC_REGISTRATION: ${ALLOW_PUBLIC_REGISTRATION:-false}
+  OWNER_EMAIL: ${OWNER_EMAIL:-}
+  OWNER_PASSWORD: ${OWNER_PASSWORD:-}
+  TEST_STUDENT_EMAIL: ${TEST_STUDENT_EMAIL:-}
+  TEST_STUDENT_PASSWORD: ${TEST_STUDENT_PASSWORD:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  SMTP_FROM: ${SMTP_FROM:-noreply@laboratorium.club}
+  CORS_ORIGIN: ${CORS_ORIGIN:-*}
+  RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+  RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+  AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-20}
+  BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-10}
+  RESET_TOKEN_HOURS: ${RESET_TOKEN_HOURS:-24}
+  PROXMOX_ENABLED: ${PROXMOX_ENABLED:-false}
+  PROXMOX_HOST: ${PROXMOX_HOST:-}
+  PROXMOX_TOKEN_ID: ${PROXMOX_TOKEN_ID:-}
+  PROXMOX_TOKEN_SECRET: ${PROXMOX_TOKEN_SECRET:-}
+  PROXMOX_NODE: ${PROXMOX_NODE:-pve}
+  PROXMOX_TEMPLATE_VMID: ${PROXMOX_TEMPLATE_VMID:-9000}
+  PROXMOX_STORAGE: ${PROXMOX_STORAGE:-local-lvm}
+  PROXMOX_BRIDGE: ${PROXMOX_BRIDGE:-vmbr0}
+  LAB_VM_MEMORY_MB: ${LAB_VM_MEMORY_MB:-4096}
+  LAB_VM_CORES: ${LAB_VM_CORES:-2}
+  LAB_AGENT_URL: ${LAB_AGENT_URL:-}
+  LAB_AGENT_SECRET: ${LAB_AGENT_SECRET:-}
+  LAB_DOCKER_HOST_IP: ${LAB_DOCKER_HOST_IP:-127.0.0.1}
+  LAB_DOCKER_PORT_START: ${LAB_DOCKER_PORT_START:-31000}
+  LAB_DOCKER_PORT_END: ${LAB_DOCKER_PORT_END:-32000}
+  LAB_USE_LOCAL_DOCKER: ${LAB_USE_LOCAL_DOCKER:-false}
+  CTF_DOCKER_IMAGE: ${CTF_DOCKER_IMAGE:-laboratorium/ctf-lab:latest}
+  BILLING_GRACE_DAYS: ${BILLING_GRACE_DAYS:-4}
+  BILLING_DEFAULT_DAY: ${BILLING_DEFAULT_DAY:-1}
+  LAB_USE_SSLIP: ${LAB_USE_SSLIP:-true}
+  LAB_SSLIP_DOMAIN: ${LAB_SSLIP_DOMAIN:-sslip.io}
+  LAB_SECURE_TUNNEL: ${LAB_SECURE_TUNNEL:-true}
+  LAB_TUNNEL_GATEWAY_IP: ${LAB_TUNNEL_GATEWAY_IP:-}
+  LAB_TUNNEL_TOKEN_HOURS: ${LAB_TUNNEL_TOKEN_HOURS:-72}
+  LAB_PUBLIC_SCHEME: ${LAB_PUBLIC_SCHEME:-https}
+  LAB_VM_SSH_USER: ${LAB_VM_SSH_USER:-lab}
+  LAB_VM_SSH_PORT: ${LAB_VM_SSH_PORT:-22}
+  STATIC_VERSION: ${STATIC_VERSION:-}
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        STATIC_VERSION: ${STATIC_VERSION:-}
+    image: laboratorium/app:latest
+    container_name: laboratorium-app
+    env_file:
+      - .env
+    environment:
+      <<: *app-env
+    expose:
+      - "3000"
+    volumes:
+      - lab-data:/app/data
+      # CTF labs on the same host (LAB_USE_LOCAL_DOCKER=true):
+      # - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - lab
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  nginx:
+    build:
+      context: ./deploy/nginx
+      dockerfile: Dockerfile
+    image: laboratorium/nginx:latest
+    container_name: laboratorium-nginx
+    environment:
+      DOMAIN: ${DOMAIN:-laboratorium.club}
+      WWW_DOMAIN: ${WWW_DOMAIN:-www.laboratorium.club}
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-certs:/etc/letsencrypt:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - lab
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: laboratorium-certbot
+    profiles:
+      - ssl-renew
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-certs:/etc/letsencrypt
+    entrypoint: /bin/sh -c
+    command: >
+      "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h & wait $${!};
+      done"
+
+  certbot-cli:
+    image: certbot/certbot:latest
+    profiles:
+      - tools
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-certs:/etc/letsencrypt
+    entrypoint: ["certbot"]
+
+networks:
+  lab:
+    driver: bridge
+
+volumes:
+  lab-data:
+    driver: local
+  certbot-www:
+    driver: local
+  certbot-certs:
+    driver: local

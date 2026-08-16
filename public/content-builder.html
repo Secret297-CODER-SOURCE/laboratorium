@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Конструктор — laboratorium.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/icons.css">
+  <link rel="stylesheet" href="/content-builder.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <header class="builder-topbar">
+    <div class="builder-topbar-left">
+      <a href="#" id="builder-back" class="btn btn--ghost btn--sm">← Назад</a>
+      <div>
+        <span class="builder-target-tag" id="builder-target-tag">—</span>
+        <h1 id="builder-title">Конструктор</h1>
+      </div>
+    </div>
+    <div class="builder-topbar-actions">
+      <label class="builder-publish">
+        <input type="checkbox" id="builder-published">
+        <span>Опубліковано</span>
+      </label>
+      <button type="button" class="btn btn--outline btn--sm" id="builder-preview-btn">Перегляд</button>
+      <button type="button" class="btn btn--primary btn--sm" id="builder-save-btn" title="Ctrl+S">Зберегти</button>
+    </div>
+  </header>
+
+  <div class="builder-layout" id="builder-layout">
+    <aside class="builder-sidebar builder-sidebar--left">
+      <h3>Блоки</h3>
+      <div class="builder-palette" id="builder-palette"></div>
+      <hr>
+      <button type="button" class="btn btn--outline btn--sm builder-add-section" id="add-section-btn">+ Новий розділ</button>
+    </aside>
+
+    <main class="builder-canvas-wrap">
+      <div class="builder-page-meta">
+        <input class="builder-inp builder-inp--title" id="page-title" placeholder="Заголовок сторінки">
+        <input class="builder-inp" id="page-subtitle" placeholder="Підзаголовок (необов'язково)">
+        <select class="builder-inp" id="page-gradient">
+          <option value="accent">Колір обкладинки: Акцент</option>
+          <option value="purple">Фіолетовий</option>
+          <option value="blue">Синій</option>
+          <option value="green">Зелений</option>
+          <option value="orange">Помаранчевий</option>
+        </select>
+      </div>
+      <div class="builder-canvas" id="builder-canvas"></div>
+    </main>
+
+    <aside class="builder-sidebar builder-sidebar--right" id="props-panel">
+      <h3>Властивості</h3>
+      <p class="builder-props-empty" id="props-empty">Оберіть блок для редагування</p>
+      <div id="props-form" hidden></div>
+    </aside>
+  </div>
+
+  <div id="preview-modal" class="preview-modal" hidden>
+    <div class="preview-modal-inner">
+      <button type="button" class="preview-modal-close" id="preview-close">×</button>
+      <div id="preview-content" class="content-page"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/content-builder.js"></script>
+</body>
+</html>

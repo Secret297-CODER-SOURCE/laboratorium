@@ -1,0 +1,32 @@
+# Dependencies & runtime data (rebuilt/mounted in container)
+node_modules/
+data/
+.env
+.env.*
+!.env.example
+
+# Git & IDE
+.git/
+.gitignore
+.vscode/
+*.code-workspace
+
+# Docs & deploy helpers (not needed in image)
+*.md
+deploy/
+scripts/
+
+# Docker files (read from host, not COPY'd into image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# OS & logs
+.DS_Store
+Thumbs.db
+npm-debug.log*
+*.log
+
+# Dev / test
+coverage/
+.challenges/

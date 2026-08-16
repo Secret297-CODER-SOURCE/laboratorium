@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Вхід — laboratorium.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/auth-pages.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <div class="auth-page">
+    <a href="/" class="auth-logo"><span class="logo-text">laboratorium<em>.</em></span></a>
+    <div class="auth-card">
+      <div class="auth-header">
+        <span class="section-tag">// auth.login</span>
+        <h1>Вхід до лабораторії</h1>
+        <p>Єдиний вхід на платформу. Доступ надається після оплати.</p>
+        <p class="form-note" style="margin-top:8px">Тестовий учень: <code>test.student@lab.dev</code> / <code>TestLab2026!</code></p>
+      </div>
+      <form id="login-form" class="auth-form">
+        <div id="form-error" class="form-error" hidden></div>
+        <div id="form-info" class="form-note" hidden></div>
+        <label>
+          <span>Email</span>
+          <input type="email" name="email" required placeholder="you@email.com" autocomplete="email">
+        </label>
+        <label>
+          <span>Пароль</span>
+          <input type="password" name="password" required placeholder="••••••••" autocomplete="current-password">
+        </label>
+        <button type="submit" class="btn btn--primary btn--full">Увійти</button>
+      </form>
+      <p class="auth-footer">
+        <a href="/forgot-password.html">Забули пароль?</a>
+      </p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api, setSession, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
+    initTheme();
+
+    const params = new URLSearchParams(location.search);
+
+    (async () => {
+      if (await validateSession()) {
+        window.location.replace(resolveLoginRedirect(params.get('next'), getUser()?.role));
+        return;
+      }
+
+      checkServerReady().then(ok => {
+        if (!ok) {
+          const el = document.getElementById('form-error');
+          el.textContent = 'Сервер не оновлений. У терміналі: lsof -ti :3000 | xargs kill -9 && cd /Users/worker/websites/laboratorium && npm start';
+          el.hidden = false;
+        }
+      });
+
+      if (params.get('reset') === 'ok') {
+        const info = document.getElementById('form-info');
+        info.textContent = 'Пароль оновлено. Увійдіть з новим паролем.';
+        info.hidden = false;
+      }
+
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('form-error');
+        const btn = e.target.querySelector('button');
+        const fd = new FormData(e.target);
+        errEl.hidden = true;
+        btn.disabled = true;
+        btn.textContent = 'Вхід...';
+        try {
+          const data = await api('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+          });
+          setSession(data.token, data.user);
+          window.location.replace(resolveLoginRedirect(params.get('next'), data.user.role));
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.hidden = false;
+          btn.disabled = false;
+          btn.textContent = 'Увійти';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

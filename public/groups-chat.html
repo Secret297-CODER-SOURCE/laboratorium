@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Чати груп — laboratorium.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/groups-chat.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header" id="site-header"></header>
+
+  <main class="gc-page">
+    <div class="container gc-layout">
+      <aside class="gc-sidebar">
+        <div class="gc-sidebar-head">
+          <h1>Групи</h1>
+          <p class="gc-sidebar-hint" id="gc-sidebar-hint">Оберіть групу</p>
+        </div>
+        <div id="gc-groups" class="gc-list"><p class="empty-state">Завантаження...</p></div>
+      </aside>
+
+      <section class="gc-main" id="gc-main">
+        <div class="gc-empty">
+          <p>Оберіть групу зліва, щоб відкрити чат і рейтинг учнів</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/groups-chat.js"></script>
+</body>
+</html>

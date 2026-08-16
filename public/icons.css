@@ -1,0 +1,99 @@
+.ico {
+  width: 1.125em;
+  height: 1.125em;
+  display: inline-block;
+  vertical-align: -0.2em;
+  flex-shrink: 0;
+}
+
+.ico--sm { width: 14px; height: 14px; }
+.ico--xs { width: 12px; height: 12px; }
+.ico--md { width: 18px; height: 18px; }
+.ico--lg { width: 22px; height: 22px; }
+.ico--xl { width: 28px; height: 28px; }
+
+.ico--ok { color: var(--accent); }
+.ico--err { color: #ff6b7a; }
+
+.ico-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-icon-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.nav-icon-link:hover,
+.nav-icon-link.active { color: var(--accent); }
+
+.ctrl-btn .ico { width: 20px; height: 20px; }
+
+.tile-icon .ico { width: 12px; height: 12px; }
+
+.conf-tab .ico,
+.sidebar-tab .ico { width: 16px; height: 16px; margin-right: 4px; }
+
+.meta-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meta-icon .ico { width: 14px; height: 14px; opacity: 0.7; }
+
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  color: var(--accent);
+  opacity: 0.5;
+}
+
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ff4466;
+}
+
+.live-dot .ico { width: 8px; height: 8px; color: #ff4466; animation: pulse 1.5s infinite; }
+
+.ico--spin { animation: ico-spin 1s linear infinite; }
+
+@keyframes ico-spin {
+  to { transform: rotate(360deg); }
+}
+
+.lab-hint,
+.lab-status-note {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  line-height: 1.45;
+  padding: 8px 0;
+}
+
+.lab-hint .ico,
+.lab-status-note .ico {
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.lab-hint--secure .ico { color: var(--accent); }
+
+.admin-th-icon {
+  display: inline-flex;
+  justify-content: center;
+  color: var(--text-muted);
+}

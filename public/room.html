@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Кімната — laboratorium.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/room.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+
+  <div class="room-page">
+    <div class="room-topbar">
+      <div class="room-info">
+        <h1 id="room-title">Завантаження...</h1>
+        <span class="room-code" id="room-code"></span>
+      </div>
+      <div class="room-timer" id="room-timer">00:00</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn--ghost btn--sm ctrl-btn" id="sidebar-toggle" data-icon="chat" data-icon-class="ico ico--sm"></button>
+        <a href="/conferences.html" class="btn btn--ghost btn--sm" id="leave-btn">Вийти</a>
+      </div>
+    </div>
+
+    <div class="room-body">
+      <div class="room-main">
+        <div class="video-grid grid-1" id="video-grid">
+          <div class="video-tile local cam-off" id="local-tile">
+            <video id="local-video" autoplay muted playsinline hidden></video>
+            <div class="tile-avatar" id="local-avatar"></div>
+            <div class="tile-label">
+              <span id="local-label">Ви</span>
+              <div class="tile-icons">
+                <span class="tile-icon" id="local-mic-icon" data-icon="mic-off" data-icon-class="ico ico--sm"></span>
+                <span class="tile-icon" id="local-cam-icon" data-icon="camera-off" data-icon-class="ico ico--sm"></span>
+              </div>
+            </div>
+            <div class="recording-badge" id="rec-badge" style="display:none">
+              <div class="rec-dot"></div>
+              <span>REC</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="room-controls">
+          <button class="ctrl-btn" id="mic-btn" title="Увімкнути мікрофон" data-icon="mic-off"></button>
+          <button class="ctrl-btn" id="cam-btn" title="Увімкнути камеру" data-icon="camera-off"></button>
+          <button class="ctrl-btn" id="screen-btn" title="Демонстрація екрана" data-icon="screen"></button>
+          <button class="ctrl-btn" id="rec-btn" title="Запис" data-icon="record"></button>
+          <button class="ctrl-btn" id="chat-btn" title="Чат" data-icon="chat"></button>
+          <button class="ctrl-btn danger" id="leave-ctrl-btn" title="Покинути" data-icon="phone-off"></button>
+        </div>
+      </div>
+
+      <div class="room-sidebar" id="sidebar">
+        <div class="sidebar-tabs">
+          <button class="sidebar-tab active ico-inline" data-panel="chat" data-nav-icon="chat">Чат</button>
+          <button class="sidebar-tab ico-inline" data-panel="participants" data-nav-icon="users">Учасники</button>
+        </div>
+
+        <div class="sidebar-panel active" id="panel-chat">
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-wrap">
+            <input type="text" id="chat-input" placeholder="Написати повідомлення..." maxlength="1000">
+            <button class="btn btn--primary btn--sm" id="chat-send" data-icon="send" data-icon-class="ico ico--sm"></button>
+          </div>
+        </div>
+
+        <div class="sidebar-panel" id="panel-participants">
+          <div class="participants-list" id="participants-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/room.js"></script>
+</body>
+</html>

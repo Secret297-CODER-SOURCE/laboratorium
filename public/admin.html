@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Адмін-панель — laboratorium.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/icons.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header" id="site-header"></header>
+
+  <main class="admin-page">
+    <div class="container">
+      <div id="toast" class="toast" hidden></div>
+      <div class="admin-header">
+        <div>
+          <span class="section-tag">// admin</span>
+          <h1 id="admin-title">Панель керування</h1>
+        </div>
+      </div>
+      <div id="admin-content"></div>
+    </div>
+  </main>
+
+  <script type="module" src="/admin.js"></script>
+</body>
+</html>

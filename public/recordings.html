@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Записи — laboratorium.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/recordings.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header" id="site-header"></header>
+
+  <main class="recordings-page">
+    <div class="container">
+      <div class="conf-header" style="margin-bottom:24px">
+        <div>
+          <span class="section-tag">// записи</span>
+          <h1>Відеозаписи <span class="accent">конференцій</span></h1>
+        </div>
+      </div>
+
+      <div id="empty-state" class="rec-empty" hidden>
+        <div class="empty-icon" data-icon="video" data-icon-class="ico ico--lg"></div>
+        <p>Записів поки немає</p>
+        <p style="font-size:0.85rem;color:var(--text-dim);margin-top:8px">Записи з'являться після конференцій із увімкненим записом</p>
+      </div>
+
+      <div class="rec-layout" id="rec-layout" hidden>
+        <div class="rec-sidebar" id="rec-sidebar"></div>
+
+        <div class="rec-detail" id="rec-detail" hidden>
+          <div class="rec-player-wrap" id="rec-player-wrap">
+            <video class="rec-player" id="rec-player" controls playsinline></video>
+          </div>
+          <div class="rec-no-video" id="rec-no-video" hidden>
+            <div class="empty-icon" data-icon="video" data-icon-class="ico ico--lg"></div>
+            <p>Відеофайл запису недоступний</p>
+          </div>
+          <div class="rec-player-info" id="rec-info">
+            <h2 id="rec-title">Оберіть запис</h2>
+            <div class="rec-player-meta" id="rec-meta"></div>
+          </div>
+          <div class="notes-section" id="notes-section">
+            <div class="notes-header">
+              <h2 class="ico-inline" data-nav-icon="notes">Нотатки</h2>
+              <span class="section-tag" id="notes-count">0 нотаток</span>
+            </div>
+            <div class="notes-add">
+              <textarea id="note-input" placeholder="Додайте нотатку (можна з таймкодом)..." rows="2"></textarea>
+              <div class="notes-add-actions">
+                <button class="btn btn--primary btn--sm" id="add-note-btn">Додати</button>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="note-pin">
+                  <span>Закріпити</span>
+                </label>
+                <label class="checkbox-label" title="Поточна позиція відео">
+                  <input type="checkbox" id="note-timestamp" checked>
+                  <span>Таймкод</span>
+                </label>
+              </div>
+            </div>
+            <div class="notes-list" id="notes-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="/recordings.js"></script>
+</body>
+</html>

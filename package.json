@@ -1,0 +1,37 @@
+{
+  "name": "laboratorium",
+  "version": "2.0.0",
+  "description": "Школа IT и кибербезопасности — сайт с бэкендом, конференциями и личным кабинетом",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "restart": "bash scripts/restart.sh",
+    "dev": "node --watch server/index.js",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:prod:build": "docker compose -f docker-compose.prod.yml build --pull",
+    "docker:prod:up": "docker compose -f docker-compose.prod.yml up -d --build",
+    "docker:prod:down": "docker compose -f docker-compose.prod.yml down",
+    "deploy": "bash scripts/deploy.sh",
+    "ctf:build": "docker build -t laboratorium/ctf-lab:latest challenges/ctf-lab",
+    "ctf:deploy": "npm run ctf:build && docker image inspect laboratorium/ctf-lab:latest >/dev/null"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^9.0.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

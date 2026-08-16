@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Особистий кабінет — laboratorium.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/dashboard.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header" id="site-header"></header>
+
+  <main class="dashboard">
+    <div class="container">
+      <div id="toast" class="toast" hidden></div>
+
+      <nav class="dash-tabs" id="dash-tabs" hidden>
+        <button type="button" class="dash-tab active" data-tab="home">Кабінет</button>
+        <button type="button" class="dash-tab" data-tab="ctf">CTF</button>
+        <button type="button" class="dash-tab" data-tab="tests">Тести</button>
+        <button type="button" class="dash-tab" data-tab="lab">Лабораторія</button>
+        <button type="button" class="dash-tab" data-tab="article" id="tab-article-btn" hidden>Написати статтю</button>
+      </nav>
+
+      <div id="dash-panel-home">
+      <!-- Profile hero -->
+      <section class="dash-hero">
+        <div class="dash-profile">
+          <div class="avatar" id="avatar">?</div>
+          <div>
+            <h1 id="user-name">Завантаження...</h1>
+            <p class="user-handle" id="user-handle">@...</p>
+            <span class="tier-badge" id="user-tier">—</span>
+          </div>
+        </div>
+        <div class="dash-stats">
+          <div class="dash-stat">
+            <span class="dash-stat-val accent" id="stat-points">0</span>
+            <span class="dash-stat-label">bounty pts</span>
+          </div>
+          <div class="dash-stat">
+            <span class="dash-stat-val" id="stat-rank">#—</span>
+            <span class="dash-stat-label">рейтинг</span>
+          </div>
+          <div class="dash-stat">
+            <span class="dash-stat-val" id="stat-challenges">0/0</span>
+            <span class="dash-stat-label">challenges</span>
+          </div>
+          <div class="dash-stat">
+            <span class="dash-stat-val" id="stat-programs">0</span>
+            <span class="dash-stat-label">програм</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="tier-progress-wrap">
+        <div class="tier-progress-header">
+          <span id="tier-current">Script Kiddie</span>
+          <span id="tier-next-label">до Grey Hat: 500 pts</span>
+        </div>
+        <div class="tier-progress-bar">
+          <div class="tier-progress-fill" id="tier-progress"></div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <!-- Upcoming conferences -->
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2>Майбутні конференції</h2>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a href="/groups-chat.html" class="btn btn--outline btn--sm">Чати груп</a>
+              <a href="/conferences.html" class="btn btn--outline btn--sm">Усі конференції →</a>
+            </div>
+          </div>
+          <div id="upcoming-conferences">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <!-- Schedule -->
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2>Розклад занять</h2>
+          </div>
+          <div id="schedule-list">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <!-- Tasks -->
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2>Мої задачі</h2>
+            <div class="task-stats" id="task-stats"></div>
+          </div>
+          <div class="tasks-kanban" id="tasks-kanban">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <!-- Group materials -->
+        <section class="dash-panel dash-panel--wide" id="group-content-panel" hidden>
+          <div class="panel-header">
+            <h2>Матеріали груп</h2>
+          </div>
+          <div id="group-content-list" class="group-content-list"></div>
+        </section>
+
+        <!-- Enrollments -->
+        <section class="dash-panel">
+          <div class="panel-header">
+            <h2>Мої програми</h2>
+            <button class="btn btn--outline btn--sm" id="enroll-toggle">+ Записатися</button>
+          </div>
+          <div id="enroll-form" class="enroll-form" hidden>
+            <select id="program-select">
+              <option value="">Оберіть програму</option>
+            </select>
+            <button class="btn btn--primary btn--sm" id="enroll-btn">Записатися</button>
+          </div>
+          <div id="enrollments-list" class="enrollments-list">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <!-- Challenges -->
+        <section class="dash-panel">
+          <div class="panel-header">
+            <h2>Challenges</h2>
+            <span class="panel-tag">bounty lab</span>
+          </div>
+          <div id="challenges-list" class="challenges-list">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <!-- Bounty log -->
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2>Історія bounty</h2>
+          </div>
+          <div id="bounty-log" class="bounty-log">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <!-- Profile settings -->
+        <section class="dash-panel">
+          <div class="panel-header">
+            <h2>Профіль</h2>
+          </div>
+          <form id="profile-form" class="profile-form">
+            <label>
+              <span>Ім'я</span>
+              <input type="text" name="name" id="profile-name">
+            </label>
+            <label>
+              <span>Handle</span>
+              <input type="text" name="handle" id="profile-handle" pattern="[a-zA-Z0-9_]{3,20}">
+            </label>
+            <label>
+              <span>Email</span>
+              <input type="email" id="profile-email" disabled>
+            </label>
+            <button type="submit" class="btn btn--primary btn--sm">Зберегти</button>
+          </form>
+        </section>
+      </div>
+      </div>
+
+      <div id="dash-panel-tests" hidden>
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2>Тести</h2>
+            <span class="panel-tag" id="quiz-stats-tag">—</span>
+          </div>
+          <div id="quiz-list" class="quiz-list"><p class="empty-state">Завантаження...</p></div>
+        </section>
+      </div>
+
+      <div id="dash-panel-ctf" hidden>
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2>CTF</h2>
+            <span class="panel-tag" id="ctf-infra-tag">bounty lab</span>
+          </div>
+          <div id="ctf-activity-feed" class="ctf-activity-feed"></div>
+          <div class="ctf-filters">
+            <select class="ctf-filter-select" id="ctf-filter-category">
+              <option value="">Усі категорії</option>
+              <option value="web">Web</option>
+              <option value="network">Network / Pwn</option>
+              <option value="crypto">Crypto</option>
+              <option value="forensics">Forensics</option>
+              <option value="reverse">Reverse</option>
+              <option value="osint">OSINT</option>
+              <option value="misc">Misc</option>
+            </select>
+            <select class="ctf-filter-select" id="ctf-filter-difficulty">
+              <option value="">Будь-яка складність</option>
+              <option value="easy">easy</option>
+              <option value="medium">medium</option>
+              <option value="hard">hard</option>
+            </select>
+            <select class="ctf-filter-select" id="ctf-filter-status">
+              <option value="">Усі</option>
+              <option value="open">Не розв'язані</option>
+              <option value="completed">Розв'язані</option>
+            </select>
+          </div>
+          <div id="ctf-list" class="ctf-list"><p class="empty-state">Завантаження...</p></div>
+        </section>
+      </div>
+
+      <div id="dash-panel-lab" hidden>
+        <div class="lab-subtabs">
+          <button type="button" class="lab-subtab active" data-lab="vm">Моя машина</button>
+          <button type="button" class="lab-subtab" data-lab="docker">Docker</button>
+        </div>
+        <div id="lab-panel-vm">
+          <section class="dash-panel dash-panel--wide">
+            <div class="panel-header">
+              <h2>Особиста VM (Proxmox)</h2>
+              <span class="panel-tag" id="lab-vm-tag">—</span>
+            </div>
+            <div id="lab-vm-content" class="lab-vm-card"><p class="empty-state">Завантаження...</p></div>
+          </section>
+        </div>
+        <div id="lab-panel-docker" hidden>
+          <section class="dash-panel dash-panel--wide">
+            <div class="panel-header">
+              <h2>Розгорнути в Docker</h2>
+              <span class="panel-tag">спільний хост Proxmox</span>
+            </div>
+            <form id="docker-deploy-form" class="docker-deploy-form">
+              <label>
+                <span>Docker image</span>
+                <input type="text" id="docker-image" placeholder="nginx:alpine" required>
+              </label>
+              <label>
+                <span>Назва (необов'язково)</span>
+                <input type="text" id="docker-name" placeholder="my-lab">
+              </label>
+              <button type="submit" class="btn btn--primary btn--sm">Розгорнути</button>
+            </form>
+            <div id="docker-list" class="docker-list"></div>
+          </section>
+        </div>
+      </div>
+
+      <div id="dash-panel-article" hidden>
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2>Написати статтю</h2>
+            <span class="panel-tag">роль: автор</span>
+          </div>
+          <form id="article-form" class="article-form">
+            <input type="hidden" id="article-id" value="">
+            <label>
+              <span>Заголовок</span>
+              <input type="text" id="article-title" placeholder="Назва статті" required maxlength="200">
+            </label>
+            <label>
+              <span>Текст статті</span>
+              <textarea id="article-content" rows="12" placeholder="Напишіть статтю..." required></textarea>
+            </label>
+            <div class="article-form-actions">
+              <button type="submit" class="btn btn--primary btn--sm" id="article-save-btn">Зберегти чернетку</button>
+              <button type="button" class="btn btn--outline btn--sm" id="article-new-btn">Нова стаття</button>
+            </div>
+          </form>
+        </section>
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2>Мої статті</h2>
+          </div>
+          <div id="articles-list" class="articles-list">
+            <p class="empty-state">Поки немає статей</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="dash-modal" id="quiz-modal" hidden>
+    <div class="dash-modal-inner dash-modal-inner--wide">
+      <h3 id="quiz-modal-title">Тест</h3>
+      <p class="dash-modal-sub" id="quiz-modal-meta">—</p>
+      <div id="quiz-timer" class="quiz-timer" hidden></div>
+      <form id="quiz-form" class="quiz-form"></form>
+      <div class="dash-modal-actions">
+        <button type="button" class="btn btn--ghost btn--sm" id="quiz-cancel">Скасувати</button>
+        <button type="submit" form="quiz-form" class="btn btn--primary btn--sm" id="quiz-submit">Надіслати відповіді</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-modal" id="absence-modal" hidden>
+    <div class="dash-modal-inner">
+      <h3>Повідомити про відсутність</h3>
+      <p class="dash-modal-sub" id="absence-lesson-title">—</p>
+      <textarea id="absence-reason" class="dash-modal-inp" rows="4" placeholder="Причина (хвороба, сімейні обставини...)"></textarea>
+      <div class="dash-modal-actions">
+        <button type="button" class="btn btn--ghost btn--sm" id="absence-cancel">Скасувати</button>
+        <button type="button" class="btn btn--primary btn--sm" id="absence-submit">Надіслати</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/dashboard.js"></script>
+</body>
+</html>

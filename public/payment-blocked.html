@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Оплата — laboratorium.</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/auth-pages.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <div class="auth-page">
+    <a href="/portal.html" class="auth-logo"><span class="logo-text">laboratorium<em>.</em></span></a>
+    <div class="auth-card payment-blocked-card">
+      <div class="auth-header">
+        <h1>Доступ призупинено</h1>
+        <p id="payment-blocked-msg">Очікується оплата за поточний місяць.</p>
+      </div>
+      <div id="payment-blocked-details" class="payment-blocked-details"></div>
+      <div class="payment-blocked-actions">
+        <button type="button" id="payment-retry-btn" class="btn btn--outline btn--full">Перевірити знову</button>
+        <button type="button" id="payment-logout-btn" class="btn btn--ghost btn--full">Вийти</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api, clearSession, requireAuthAsync, initTheme } from '/auth.js';
+
+    initTheme();
+    if (!(await requireAuthAsync())) throw new Error('auth');
+
+    const msgEl = document.getElementById('payment-blocked-msg');
+    const detailsEl = document.getElementById('payment-blocked-details');
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    async function loadStatus() {
+      try {
+        const data = await api('/billing/status');
+        if (data.access) {
+          window.location.replace('/portal.html');
+          return;
+        }
+        msgEl.textContent = 'Оплата за поточний період не зафіксована. Грейс-період закінчився.';
+        detailsEl.innerHTML = `
+          <div class="payment-detail"><span>Період</span><strong>${data.periodLabel || '—'}</strong></div>
+          <div class="payment-detail"><span>День оплати</span><strong>${data.billingDay || 1}-е число</strong></div>
+          <div class="payment-detail"><span>Грейс до</span><strong>${formatDate(data.graceUntil)}</strong></div>
+        `;
+      } catch (err) {
+        msgEl.textContent = err.message || 'Не вдалося перевірити статус оплати';
+      }
+    }
+
+    document.getElementById('payment-retry-btn').addEventListener('click', loadStatus);
+    document.getElementById('payment-logout-btn').addEventListener('click', () => {
+      clearSession();
+      window.location.href = '/';
+    });
+
+    loadStatus();
+  </script>
+</body>
+</html>

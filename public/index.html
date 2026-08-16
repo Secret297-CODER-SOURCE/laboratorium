@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>laboratorium. — школа IT та кібербезпеки</title>
+  <meta name="description" content="Просунута школа програмування та кібербезпеки. Практика, bounty-система, реальні проєкти.">
+  <link rel="canonical" href="https://laboratorium.club/">
+  <meta property="og:title" content="laboratorium. — школа IT та кібербезпеки">
+  <meta property="og:description" content="Просунута школа програмування та кібербезпеки на laboratorium.club">
+  <meta property="og:url" content="https://laboratorium.club/">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body class="page-marketing" data-theme="flow">
+
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header" id="site-header"></header>
+  <script type="module">
+    import { isLoggedIn, validateSession } from '/auth.js';
+    import { initSiteHeader } from '/site-header.js';
+
+    (async () => {
+      if (isLoggedIn()) await validateSession();
+
+      // Маркетингова головна: завжди публічне меню, без app-nav і без редіректу в кабінет
+      initSiteHeader({
+        logoHref: '/',
+        hashAnchors: true,
+        showEnroll: !isLoggedIn(),
+        showLogout: isLoggedIn(),
+        navMode: 'marketing',
+      });
+    })();
+  </script>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-content">
+          <p class="eyebrow">
+            <span class="pulse-dot"></span>
+            space of tech &amp; security
+          </p>
+          <h1 class="hero-title">
+            Просунута школа<br>
+            <span class="accent">IT &amp; кібербезпеки</span>
+          </h1>
+          <p class="hero-desc">
+            Навчаємося на реальних завданнях: пентест, reverse engineering, 
+            розробка та захист інфраструктури. Кожен успіх — у bounty-системі.
+          </p>
+          <div class="hero-cta">
+            <a href="#programs" class="btn btn--primary">Обрати програму</a>
+            <a href="#about" class="btn btn--ghost">Дізнатися більше</a>
+          </div>
+          <div class="hero-stats">
+            <div class="stat">
+              <span class="stat-num" data-count="12">0</span>
+              <span class="stat-label">напрямків</span>
+            </div>
+            <div class="stat">
+              <span class="stat-num" data-count="340">0</span>
+              <span class="stat-label">випускників</span>
+            </div>
+            <div class="stat">
+              <span class="stat-num" data-count="89">0</span>
+              <span class="stat-label">% працевлаштування</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="icosahedron-wrap">
+            <canvas id="icosahedron" aria-hidden="true"></canvas>
+            <div class="orbit orbit--1"></div>
+            <div class="orbit orbit--2"></div>
+            <div class="orbit orbit--3"></div>
+          </div>
+          <div class="terminal-card">
+            <div class="terminal-header">
+              <span class="dot dot--r"></span>
+              <span class="dot dot--y"></span>
+              <span class="dot dot--g"></span>
+              <span class="terminal-title">lab@secure ~</span>
+            </div>
+            <div class="terminal-body" id="terminal"></div>
+          </div>
+        </div>
+      </div>
+      <div class="scroll-hint" aria-hidden="true">
+        <span>scroll</span>
+        <div class="scroll-line"></div>
+      </div>
+    </section>
+
+    <section id="about" class="section about">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">01 / про школу</span>
+          <h2 class="section-title">Лабораторія,<br>де народжуються <span class="accent">хакери з етикою</span></h2>
+        </div>
+        <div class="about-grid">
+          <div class="about-text">
+            <p>
+              <strong>laboratorium.</strong> — це не курси «для галочки». 
+              Ми будуємо середовище, де студенти працюють з реальними вразливостями, 
+              пишуть експлойти в пісочниці та захищають системи так, як це роблять 
+              у SOC і red team.
+            </p>
+            <p>
+              Ментори — практикуючі фахівці з індустрії. 
+              Кожен модуль завершується практичним завданням із нарахуванням 
+              bounty-очків і місцем у рейтингу.
+            </p>
+          </div>
+          <div class="features-grid">
+            <article class="feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3>Кібербезпека</h3>
+              <p>Пентест, OSINT, malware analysis, SOC-операції та incident response.</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              </div>
+              <h3>Програмування</h3>
+              <p>Python, C/C++, Go, Rust — від основ до low-level і системного коду.</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              </div>
+              <h3>Практика 24/7</h3>
+              <p>Лабораторії, CTF-майданчики та доступ до стендів у будь-який час.</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <h3>Спільнота</h3>
+              <p>Закритий Discord, мітапи, спільні CTF і менторство випускників.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="programs" class="section programs">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">02 / програми</span>
+          <h2 class="section-title">Обери свій <span class="accent">вектор атаки</span></h2>
+        </div>
+        <div class="track-switch-wrap">
+          <div class="track-switch" id="direction-slider" role="tablist" aria-label="Напрямки навчання"></div>
+          <div id="direction-content-links" class="direction-content-links"></div>
+        </div>
+        <p class="track-switch-desc" id="direction-active-hint"></p>
+        <div class="programs-grid" id="programs-grid">
+          <p class="empty-state">Завантаження програм...</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="bounty" class="section bounty">
+      <div class="container">
+        <div class="bounty-layout">
+          <div class="bounty-content">
+            <span class="section-tag">03 / bounty system</span>
+            <h2 class="section-title">Навчання як <span class="accent">гра з нагородами</span></h2>
+            <p class="bounty-desc">
+              Кожне виконане завдання, зданий CTF і допомога одногрупникам 
+              приносять bounty-очки. Накопичуй рейтинг, відкривай рівні й 
+              отримуй реальні призи — від мерчу до оплати сертифікацій.
+            </p>
+            <div class="bounty-tiers">
+              <div class="tier">
+                <span class="tier-rank">Script Kiddie</span>
+                <div class="tier-bar"><div class="tier-fill" style="width: 15%"></div></div>
+                <span class="tier-pts">0 – 500 pts</span>
+              </div>
+              <div class="tier">
+                <span class="tier-rank">Grey Hat</span>
+                <div class="tier-bar"><div class="tier-fill" style="width: 40%"></div></div>
+                <span class="tier-pts">500 – 2000 pts</span>
+              </div>
+              <div class="tier">
+                <span class="tier-rank">White Hat</span>
+                <div class="tier-bar"><div class="tier-fill" style="width: 70%"></div></div>
+                <span class="tier-pts">2000 – 5000 pts</span>
+              </div>
+              <div class="tier tier--active">
+                <span class="tier-rank">Elite Operator</span>
+                <div class="tier-bar"><div class="tier-fill" style="width: 100%"></div></div>
+                <span class="tier-pts">5000+ pts</span>
+              </div>
+            </div>
+          </div>
+          <div class="leaderboard">
+            <div class="leaderboard-header">
+              <span>// leaderboard</span>
+              <span class="live-badge"><span class="pulse-dot"></span> live</span>
+            </div>
+            <ol class="leaderboard-list" id="leaderboard"></ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section cta-banner">
+      <div class="container">
+        <div class="cta-inner">
+          <h2>Наступний набір відкритий</h2>
+          <p>Залишилось <strong id="spots-left">7</strong> місць. Старт — <strong>1 липня 2026</strong></p>
+          <a href="#contact" class="btn btn--primary btn--lg">Забронювати місце</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="section contact">
+      <div class="container">
+        <div class="contact-grid">
+          <div class="contact-info">
+            <span class="section-tag">04 / контакти</span>
+            <h2 class="section-title">Зв'яжись<br>з <span class="accent">лабораторією</span></h2>
+            <ul class="contact-list">
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                <a href="tel:+380000000000">+38 (000) 000-00-00</a>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <a href="mailto:hello@laboratorium.club">hello@laboratorium.club</a>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <a href="https://laboratorium.club" target="_blank" rel="noopener">laboratorium.club</a>
+              </li>
+            </ul>
+            <div class="qr-block" id="site-qr-block">
+              <a class="qr-card" id="site-qr-link" href="https://laboratorium.club" target="_blank" rel="noopener" aria-label="Відкрити laboratorium.club">
+                <div class="qr-card-glow" aria-hidden="true"></div>
+                <div class="qr-card-frame">
+                  <img class="qr-image" id="site-qr" src="/api/qr?url=https%3A%2F%2Flaboratorium.club&amp;size=280&amp;format=png" alt="QR-код laboratorium.club" width="112" height="112" loading="lazy" decoding="async">
+                  <span class="qr-card-dot" aria-hidden="true"></span>
+                </div>
+                <span class="qr-card-domain">laboratorium.club</span>
+              </a>
+              <div class="qr-copy">
+                <span class="qr-copy-label">Скануй для швидкого запису</span>
+                <strong class="qr-copy-url">laboratorium.club</strong>
+              </div>
+            </div>
+          </div>
+          <form class="contact-form" id="contact-form">
+            <div class="form-row">
+              <label>
+                <span>Ім'я</span>
+                <input type="text" name="name" required placeholder="Олекс">
+              </label>
+              <label>
+                <span>Email</span>
+                <input type="email" name="email" required placeholder="you@email.com">
+              </label>
+            </div>
+            <label>
+              <span>Напрямок</span>
+              <select name="direction_id" id="contact-direction" required>
+                <option value="" disabled selected>Оберіть напрямок</option>
+              </select>
+            </label>
+            <label>
+              <span>Повідомлення</span>
+              <textarea name="message" rows="4" placeholder="Розкажи про свій досвід і цілі..."></textarea>
+            </label>
+            <button type="submit" class="btn btn--primary btn--full">Надіслати заявку</button>
+            <p class="form-note">Натискаючи кнопку, ви погоджуєтесь з обробкою персональних даних.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-text">laboratorium<em>.</em></span>
+        <p>An Advanced IT &amp; Cybersecurity School</p>
+      </div>
+      <div class="footer-links">
+        <a href="#about">Про школу</a>
+        <a href="#programs">Програми</a>
+        <a href="#bounty">Bounty</a>
+        <a href="#contact">Контакти</a>
+      </div>
+      <p class="footer-copy">&copy; 2026 laboratorium.club — усі права захищені.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="/script.js"></script>
+  <script type="module">
+    import { initProgramsSection } from '/programs-section.js';
+    import { initSiteQr } from '/site-qr.js';
+
+    fetch('/api/site-info')
+      .then(r => r.ok ? r.json() : null)
+      .then(info => initSiteQr({ siteUrl: info?.siteUrl || window.location.origin }))
+      .catch(() => initSiteQr({ siteUrl: window.location.origin }));
+    initProgramsSection();
+  </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <title>Головна — laboratorium.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/portal.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header" id="site-header"></header>
+
+  <main class="portal">
+    <div class="container">
+      <div id="billing-banner" class="billing-banner" hidden></div>
+      <section class="portal-hero" id="portal-hero">
+        <div class="portal-hero-main">
+          <p class="portal-greeting" id="portal-greeting">Завантаження...</p>
+          <h1 class="portal-title" id="portal-name">—</h1>
+          <p class="portal-sub" id="portal-handle">@—</p>
+          <div class="portal-hero-badges">
+            <span class="portal-tier" id="portal-tier">—</span>
+            <span class="portal-rank" id="portal-rank">#—</span>
+          </div>
+        </div>
+        <div class="portal-hero-side">
+          <div class="portal-tier-card">
+            <div class="portal-tier-head">
+              <span id="tier-current">—</span>
+              <span id="tier-next-label">—</span>
+            </div>
+            <div class="portal-tier-bar">
+              <div class="portal-tier-fill" id="tier-progress"></div>
+            </div>
+          </div>
+          <a href="/dashboard.html" class="btn btn--primary portal-cta">Відкрити кабінет →</a>
+        </div>
+      </section>
+
+      <section class="portal-kpi" id="portal-kpi"></section>
+
+      <section class="portal-actions" id="portal-actions"></section>
+
+      <div class="portal-grid">
+        <section class="portal-card portal-card--wide">
+          <div class="portal-card-head">
+            <h2>Найближчі конференції</h2>
+            <a href="/conferences.html" class="portal-link">Усі →</a>
+          </div>
+          <div id="portal-conferences" class="portal-list">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <section class="portal-card portal-card--wide">
+          <div class="portal-card-head">
+            <h2>Розклад занять</h2>
+            <a href="/dashboard.html" class="portal-link">Детальніше →</a>
+          </div>
+          <div id="portal-schedule" class="portal-list">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <section class="portal-card">
+          <div class="portal-card-head">
+            <h2>Мої програми</h2>
+          </div>
+          <div id="portal-programs" class="portal-list">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+
+        <section class="portal-card">
+          <div class="portal-card-head">
+            <h2>Остання активність</h2>
+          </div>
+          <div id="portal-activity" class="portal-list">
+            <p class="empty-state">Завантаження...</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="/portal.js"></script>
+</body>
+</html>

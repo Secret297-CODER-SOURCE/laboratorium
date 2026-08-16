@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>laboratorium. — школа IT и кибербезопасности</title>
+  <meta name="description" content="Продвинутая школа программирования и кибербезопасности. Практика, bounty-система, реальные проекты.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="green">
+
+  <div class="noise" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header">
+    <nav class="nav container">
+      <a href="#" class="logo">
+        <svg class="logo-icon" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <polygon class="ico-face ico-face--1" points="20,4 35,12 35,28 20,36 5,28 5,12"/>
+          <polygon class="ico-face ico-face--2" points="20,4 35,12 20,20 5,12"/>
+          <polygon class="ico-face ico-face--3" points="20,36 35,28 20,20 5,28"/>
+          <line class="ico-edge" x1="20" y1="4" x2="20" y2="36"/>
+          <line class="ico-edge" x1="5" y1="12" x2="35" y2="28"/>
+          <line class="ico-edge" x1="35" y1="12" x2="5" y2="28"/>
+        </svg>
+        <span class="logo-text">laboratorium<em>.</em></span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#about">О школе</a></li>
+        <li><a href="#programs">Программы</a></li>
+        <li><a href="#bounty">Bounty</a></li>
+        <li><a href="#contact">Контакты</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <div class="theme-switcher" role="group" aria-label="Цветовая тема">
+          <button class="theme-btn active" data-theme="green" title="Neo Green" aria-label="Зелёная тема"></button>
+          <button class="theme-btn" data-theme="blue" title="Electric Blue" aria-label="Синяя тема"></button>
+          <button class="theme-btn" data-theme="red" title="Crimson Red" aria-label="Красная тема"></button>
+        </div>
+        <a href="#contact" class="btn btn--outline btn--sm">Записаться</a>
+        <button class="burger" aria-label="Меню" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-content">
+          <p class="eyebrow">
+            <span class="pulse-dot"></span>
+            space of tech &amp; security
+          </p>
+          <h1 class="hero-title">
+            Продвинутая школа<br>
+            <span class="accent">IT &amp; кибербезопасности</span>
+          </h1>
+          <p class="hero-desc">
+            Учимся на реальных задачах: пентест, reverse engineering, 
+            разработка и защита инфраструктуры. Каждый успех — в bounty-системе.
+          </p>
+          <div class="hero-cta">
+            <a href="#programs" class="btn btn--primary">Выбрать программу</a>
+            <a href="#about" class="btn btn--ghost">Узнать больше</a>
+          </div>
+          <div class="hero-stats">
+            <div class="stat">
+              <span class="stat-num" data-count="12">0</span>
+              <span class="stat-label">направлений</span>
+            </div>
+            <div class="stat">
+              <span class="stat-num" data-count="340">0</span>
+              <span class="stat-label">выпускников</span>
+            </div>
+            <div class="stat">
+              <span class="stat-num" data-count="89">0</span>
+              <span class="stat-label">% трудоустройство</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="icosahedron-wrap">
+            <canvas id="icosahedron" aria-hidden="true"></canvas>
+            <div class="orbit orbit--1"></div>
+            <div class="orbit orbit--2"></div>
+            <div class="orbit orbit--3"></div>
+          </div>
+          <div class="terminal-card">
+            <div class="terminal-header">
+              <span class="dot dot--r"></span>
+              <span class="dot dot--y"></span>
+              <span class="dot dot--g"></span>
+              <span class="terminal-title">lab@secure ~</span>
+            </div>
+            <div class="terminal-body" id="terminal"></div>
+          </div>
+        </div>
+      </div>
+      <div class="scroll-hint" aria-hidden="true">
+        <span>scroll</span>
+        <div class="scroll-line"></div>
+      </div>
+    </section>
+
+    <section id="about" class="section about">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">01 / о школе</span>
+          <h2 class="section-title">Лаборатория,<br>где рождаются <span class="accent">хакеры с этикой</span></h2>
+        </div>
+        <div class="about-grid">
+          <div class="about-text">
+            <p>
+              <strong>laboratorium.</strong> — это не курсы «для галочки». 
+              Мы строим среду, где студенты работают с реальными уязвимостями, 
+              пишут эксплойты в песочнице и защищают системы так, как это делают 
+              в SOC и red team.
+            </p>
+            <p>
+              Менторы — практикующие специалисты из индустрии. 
+              Каждый модуль завершается практическим заданием с начислением 
+              bounty-очков и местом в рейтинге.
+            </p>
+          </div>
+          <div class="features-grid">
+            <article class="feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3>Кибербезопасность</h3>
+              <p>Пентест, OSINT, malware analysis, SOC-операции и incident response.</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              </div>
+              <h3>Программирование</h3>
+              <p>Python, C/C++, Go, Rust — от основ до low-level и системного кода.</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              </div>
+              <h3>Практика 24/7</h3>
+              <p>Лаборатории, CTF-площадки и доступ к стендам в любое время.</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <h3>Сообщество</h3>
+              <p>Закрытый Discord, митапы, совместные CTF и менторство выпускников.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="programs" class="section programs">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">02 / программы</span>
+          <h2 class="section-title">Выбери свой <span class="accent">вектор атаки</span></h2>
+        </div>
+        <div class="programs-grid">
+          <article class="program-card program-card--featured">
+            <div class="program-badge">Популярное</div>
+            <div class="program-level">Advanced</div>
+            <h3>Offensive Security</h3>
+            <p>Полный цикл пентеста: recon → exploitation → post-exploitation → отчёт.</p>
+            <ul class="program-tags">
+              <li>Kali Linux</li>
+              <li>Burp Suite</li>
+              <li>Metasploit</li>
+              <li>OSCP prep</li>
+            </ul>
+            <div class="program-footer">
+              <span class="program-duration">6 месяцев</span>
+              <span class="program-bounty">+500 bounty</span>
+            </div>
+          </article>
+          <article class="program-card">
+            <div class="program-level">Intermediate</div>
+            <h3>Defensive Security</h3>
+            <p>Мониторинг, SIEM, форензика и реагирование на инциденты в реальном времени.</p>
+            <ul class="program-tags">
+              <li>Splunk</li>
+              <li>Wireshark</li>
+              <li>Volatility</li>
+            </ul>
+            <div class="program-footer">
+              <span class="program-duration">5 месяцев</span>
+              <span class="program-bounty">+400 bounty</span>
+            </div>
+          </article>
+          <article class="program-card">
+            <div class="program-level">Foundation</div>
+            <h3>Python для хакеров</h3>
+            <p>Автоматизация, скрипты для пентеста, парсинг и работа с API.</p>
+            <ul class="program-tags">
+              <li>Python 3</li>
+              <li>Scapy</li>
+              <li>Requests</li>
+            </ul>
+            <div class="program-footer">
+              <span class="program-duration">3 месяца</span>
+              <span class="program-bounty">+250 bounty</span>
+            </div>
+          </article>
+          <article class="program-card">
+            <div class="program-level">Advanced</div>
+            <h3>Reverse Engineering</h3>
+            <p>Дизассемблирование, анализ бинарников, unpacking и anti-debug обход.</p>
+            <ul class="program-tags">
+              <li>Ghidra</li>
+              <li>IDA</li>
+              <li>x64dbg</li>
+            </ul>
+            <div class="program-footer">
+              <span class="program-duration">4 месяца</span>
+              <span class="program-bounty">+450 bounty</span>
+            </div>
+          </article>
+          <article class="program-card">
+            <div class="program-level">Foundation</div>
+            <h3>Web Security</h3>
+            <p>OWASP Top 10, XSS, SQLi, SSRF, логические уязвимости и bug bounty.</p>
+            <ul class="program-tags">
+              <li>OWASP</li>
+              <li>PortSwigger</li>
+              <li>HackerOne</li>
+            </ul>
+            <div class="program-footer">
+              <span class="program-duration">4 месяца</span>
+              <span class="program-bounty">+350 bounty</span>
+            </div>
+          </article>
+          <article class="program-card">
+            <div class="program-level">Intermediate</div>
+            <h3>Systems Programming</h3>
+            <p>C, память, сети на низком уровне, kernel basics и exploit development.</p>
+            <ul class="program-tags">
+              <li>C/C++</li>
+              <li>Linux</li>
+              <li>ASM</li>
+            </ul>
+            <div class="program-footer">
+              <span class="program-duration">5 месяцев</span>
+              <span class="program-bounty">+400 bounty</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="bounty" class="section bounty">
+      <div class="container">
+        <div class="bounty-layout">
+          <div class="bounty-content">
+            <span class="section-tag">03 / bounty system</span>
+            <h2 class="section-title">Учёба как <span class="accent">игра с наградами</span></h2>
+            <p class="bounty-desc">
+              Каждое выполненное задание, сданный CTF и помощь одногруппникам 
+              приносит bounty-очки. Накапливай рейтинг, открывай уровни и 
+              получай реальные призы — от мерча до оплаты сертификаций.
+            </p>
+            <div class="bounty-tiers">
+              <div class="tier">
+                <span class="tier-rank">Script Kiddie</span>
+                <div class="tier-bar"><div class="tier-fill" style="width: 15%"></div></div>
+                <span class="tier-pts">0 – 500 pts</span>
+              </div>
+              <div class="tier">
+                <span class="tier-rank">Grey Hat</span>
+                <div class="tier-bar"><div class="tier-fill" style="width: 40%"></div></div>
+                <span class="tier-pts">500 – 2000 pts</span>
+              </div>
+              <div class="tier">
+                <span class="tier-rank">White Hat</span>
+                <div class="tier-bar"><div class="tier-fill" style="width: 70%"></div></div>
+                <span class="tier-pts">2000 – 5000 pts</span>
+              </div>
+              <div class="tier tier--active">
+                <span class="tier-rank">Elite Operator</span>
+                <div class="tier-bar"><div class="tier-fill" style="width: 100%"></div></div>
+                <span class="tier-pts">5000+ pts</span>
+              </div>
+            </div>
+          </div>
+          <div class="leaderboard">
+            <div class="leaderboard-header">
+              <span>// leaderboard</span>
+              <span class="live-badge"><span class="pulse-dot"></span> live</span>
+            </div>
+            <ol class="leaderboard-list" id="leaderboard">
+              <li><span class="rank">01</span><span class="name">0xdeadbeef</span><span class="pts">8 420</span></li>
+              <li><span class="rank">02</span><span class="name">n1ghtshade</span><span class="pts">7 150</span></li>
+              <li><span class="rank">03</span><span class="name">kernel_panic</span><span class="pts">6 890</span></li>
+              <li><span class="rank">04</span><span class="name">sql_wizard</span><span class="pts">5 320</span></li>
+              <li><span class="rank">05</span><span class="name">buffer_0verflow</span><span class="pts">4 780</span></li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section cta-banner">
+      <div class="container">
+        <div class="cta-inner">
+          <h2>Следующий набор открыт</h2>
+          <p>Осталось <strong id="spots-left">7</strong> мест. Старт — <strong>1 июля 2026</strong></p>
+          <a href="#contact" class="btn btn--primary btn--lg">Забронировать место</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="section contact">
+      <div class="container">
+        <div class="contact-grid">
+          <div class="contact-info">
+            <span class="section-tag">04 / контакты</span>
+            <h2 class="section-title">Свяжись<br>с <span class="accent">лабораторией</span></h2>
+            <ul class="contact-list">
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                <a href="tel:+380000000000">+38 (000) 000-00-00</a>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <a href="mailto:hello@laboratorium.dev">hello@laboratorium.dev</a>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <a href="https://laboratorium.dev" target="_blank" rel="noopener">laboratorium.dev</a>
+              </li>
+            </ul>
+            <div class="qr-block">
+              <div class="qr-placeholder" aria-label="QR-код">
+                <svg viewBox="0 0 100 100" fill="currentColor">
+                  <rect x="10" y="10" width="25" height="25"/><rect x="65" y="10" width="25" height="25"/>
+                  <rect x="10" y="65" width="25" height="25"/><rect x="40" y="40" width="8" height="8"/>
+                  <rect x="55" y="40" width="8" height="8"/><rect x="40" y="55" width="8" height="8"/>
+                  <rect x="65" y="55" width="8" height="8"/><rect x="80" y="55" width="10" height="10"/>
+                  <rect x="55" y="70" width="8" height="8"/><rect x="70" y="70" width="8" height="8"/>
+                  <rect x="85" y="70" width="5" height="5"/><rect x="70" y="85" width="10" height="10"/>
+                </svg>
+              </div>
+              <span>Сканируй для быстрой записи</span>
+            </div>
+          </div>
+          <form class="contact-form" id="contact-form">
+            <div class="form-row">
+              <label>
+                <span>Имя</span>
+                <input type="text" name="name" required placeholder="Алекс">
+              </label>
+              <label>
+                <span>Email</span>
+                <input type="email" name="email" required placeholder="you@email.com">
+              </label>
+            </div>
+            <label>
+              <span>Программа</span>
+              <select name="program" required>
+                <option value="" disabled selected>Выберите направление</option>
+                <option>Offensive Security</option>
+                <option>Defensive Security</option>
+                <option>Python для хакеров</option>
+                <option>Reverse Engineering</option>
+                <option>Web Security</option>
+                <option>Systems Programming</option>
+              </select>
+            </label>
+            <label>
+              <span>Сообщение</span>
+              <textarea name="message" rows="4" placeholder="Расскажи о своём опыте и целях..."></textarea>
+            </label>
+            <button type="submit" class="btn btn--primary btn--full">Отправить заявку</button>
+            <p class="form-note">Нажимая кнопку, вы соглашаетесь с обработкой персональных данных.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-text">laboratorium<em>.</em></span>
+        <p>An Advanced IT &amp; Cybersecurity School</p>
+      </div>
+      <div class="footer-links">
+        <a href="#about">О школе</a>
+        <a href="#programs">Программы</a>
+        <a href="#bounty">Bounty</a>
+        <a href="#contact">Контакты</a>
+      </div>
+      <p class="footer-copy">&copy; 2026 laboratorium. Все права защищены.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
