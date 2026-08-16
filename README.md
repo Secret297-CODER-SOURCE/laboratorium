@@ -1,6 +1,28 @@
 # laboratorium.
 
-Сайт школи IT та кібербезпеки з бекендом, особистим кабінетом, відеоконференціями та Docker.
+**Просунута школа IT та кібербезпеки** — бекенд, особистий кабінет, CTF-лабораторія, відеоконференції та чати, все в Docker.
+
+<p>
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-%3E%3D20-339933?logo=node.js&logoColor=white">
+  <img alt="Express" src="https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white">
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite-better--sqlite3-003B57?logo=sqlite&logoColor=white">
+  <img alt="Socket.IO" src="https://img.shields.io/badge/Socket.IO-realtime-010101?logo=socket.io&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-multi--stage-2496ED?logo=docker&logoColor=white">
+  <img alt="JWT" src="https://img.shields.io/badge/Auth-JWT%20%2B%20bcrypt-yellow?logo=jsonwebtokens&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-private-lightgrey">
+</p>
+
+![Особистий кабінет laboratorium](./docs/screenshot-dashboard.png)
+
+## Можливості
+
+- 🎯 **CTF-лабораторія** — challenges з рейтингом, tier-система (Script Kiddie → Grey Hat → White Hat)
+- 🖥️ **Особиста VM** для кожного учня через Proxmox + Docker-агент
+- 🎥 **Відеоконференції** та записи занять
+- 💬 **Груп-чати** в реальному часі на Socket.IO
+- 📊 **Адмін-панель** — користувачі, оплати, розклад, статистика, доступи
+- 🔐 **Закрита реєстрація** — доступ видається вручну після оплати
+- 📅 **Розклад занять** та прогрес по програмах
 
 ## Швидкий старт (Docker)
 
@@ -51,69 +73,69 @@ npm run dev
 
 ```
 server/
-├── index.js              # Точка входа, graceful shutdown
-├── app.js                # Express-приложение
-├── config/               # Конфигурация из .env
+├── index.js              # Точка входу, graceful shutdown
+├── app.js                # Express-застосунок
+├── config/                # Конфігурація з .env
 ├── db/
 │   ├── index.js          # SQLite + WAL
-│   ├── schema.js         # Схема БД + индексы
-│   └── seed.js           # Демо-данные
+│   ├── schema.js         # Схема БД + індекси
+│   └── seed.js           # Демо-дані
 ├── middleware/
 │   ├── auth.js           # JWT
-│   ├── errorHandler.js   # Централизованные ошибки
-│   └── logger.js         # Логирование запросов
-├── services/             # Бизнес-логика
+│   ├── errorHandler.js   # Централізовані помилки
+│   └── logger.js         # Логування запитів
+├── services/              # Бізнес-логіка
 │   ├── user.service.js
 │   ├── program.service.js
 │   ├── challenge.service.js
 │   ├── bounty.service.js
 │   └── application.service.js
-├── controllers/          # HTTP-обработчики
-├── routes/               # Маршруты
-└── utils/                # Ошибки, валидация, tier
+├── controllers/           # HTTP-обробники
+├── routes/                 # Маршрути
+└── utils/                  # Помилки, валідація, tier
 ```
 
-### Принципы
+### Принципи
 
-- **Слои**: routes → controllers → services → db
-- **Ошибки**: типизированные `AppError` с кодами
-- **Безопасность**: helmet, rate-limit, bcrypt, JWT
-- **Конфиг**: всё через `.env`
-- **БД**: SQLite с WAL, volume в Docker для персистентности
-- **Healthcheck**: `GET /api/health` с метриками
+- **Шари**: routes → controllers → services → db
+- **Помилки**: типізовані `AppError` з кодами
+- **Безпека**: helmet, rate-limit, bcrypt, JWT
+- **Конфіг**: усе через `.env`
+- **БД**: SQLite з WAL, volume у Docker для персистентності
+- **Healthcheck**: `GET /api/health` з метриками
 
 ## API
 
-| Метод | Путь | Auth | Описание |
-|-------|------|------|----------|
+| Метод | Шлях | Auth | Опис |
+|-------|------|------|------|
 | GET | `/api/health` | — | Health + статистика БД |
-| POST | `/api/auth/register` | — | Регистрация |
-| POST | `/api/auth/login` | — | Вход |
-| GET | `/api/auth/me` | ✓ | Текущий пользователь |
-| GET | `/api/programs` | — | Программы |
+| POST | `/api/auth/register` | — | Реєстрація |
+| POST | `/api/auth/login` | — | Вхід |
+| GET | `/api/auth/me` | ✓ | Поточний користувач |
+| GET | `/api/programs` | — | Програми |
 | GET | `/api/leaderboard` | — | Рейтинг |
 | POST | `/api/applications` | opt | Заявка |
-| GET | `/api/dashboard` | ✓ | Личный кабинет |
-| POST | `/api/enroll` | ✓ | Запись на программу |
-| POST | `/api/challenges/:id/complete` | ✓ | Сдать challenge |
-| PATCH | `/api/profile` | ✓ | Профиль |
-| PATCH | `/api/enrollments/:id/progress` | ✓ | Прогресс |
+| GET | `/api/dashboard` | ✓ | Особистий кабінет |
+| POST | `/api/enroll` | ✓ | Запис на програму |
+| POST | `/api/challenges/:id/complete` | ✓ | Здати challenge |
+| PATCH | `/api/profile` | ✓ | Профіль |
+| PATCH | `/api/enrollments/:id/progress` | ✓ | Прогрес |
 
-## Переменные окружения
+## Змінні оточення
 
-| Переменная | По умолчанию | Описание |
-|------------|--------------|----------|
+| Змінна | За замовчуванням | Опис |
+|--------|-------------------|------|
 | `PORT` | `3000` | Порт сервера |
-| `JWT_SECRET` | — | Секрет JWT (обязательно в prod) |
-| `DATABASE_PATH` | `./data/laboratorium.db` | Путь к SQLite |
+| `JWT_SECRET` | — | Секрет JWT (обов'язково в prod) |
+| `DATABASE_PATH` | `./data/laboratorium.db` | Шлях до SQLite |
 | `SEED_DATABASE` | `true` | Заповнити програмами та challenges |
-| `CORS_ORIGIN` | `*` | Разрешённые origin |
-| `RATE_LIMIT_MAX` | `100` | Лимит запросов / 15 мин |
-| `AUTH_RATE_LIMIT_MAX` | `20` | Лимит на auth / 15 мин |
+| `CORS_ORIGIN` | `*` | Дозволені origin |
+| `RATE_LIMIT_MAX` | `100` | Ліміт запитів / 15 хв |
+| `AUTH_RATE_LIMIT_MAX` | `20` | Ліміт на auth / 15 хв |
 
 ## Docker
 
-- **Multi-stage build** — компиляция `better-sqlite3` в builder
+- **Multi-stage build** — компіляція `better-sqlite3` у builder
 - **Non-root user** `lab` (uid 1001)
 - **Volume** `lab-data` для SQLite та uploads
 - **Healthcheck** `GET /api/health`
@@ -122,8 +144,11 @@ server/
 
 ## Стек
 
-- Frontend: HTML, CSS, vanilla JS
-- Backend: Node.js 22, Express
-- DB: SQLite (better-sqlite3)
-- Auth: JWT + bcrypt
-- Docker: Alpine, compose
+| Шар | Технології |
+|-----|------------|
+| Frontend | HTML, CSS, vanilla JS |
+| Backend | Node.js 20+, Express |
+| Realtime | Socket.IO |
+| БД | SQLite (better-sqlite3) |
+| Auth | JWT + bcrypt |
+| Інфраструктура | Docker, Proxmox (особисті VM) |
