@@ -1,10 +1,21 @@
 import * as conferenceService from '../services/conference.service.js';
 
 export async function create(req, res) {
+  const {
+    title, description, programId, groupId, scheduledAt,
+    durationMinutes, maxParticipants, recordingEnabled,
+  } = req.body;
   const conf = conferenceService.create({
     hostId: req.user.id,
     hostRole: req.user.role,
-    ...req.body,
+    title,
+    description,
+    programId,
+    groupId,
+    scheduledAt,
+    durationMinutes,
+    maxParticipants,
+    recordingEnabled,
   });
   res.status(201).json({ conference: conf });
 }

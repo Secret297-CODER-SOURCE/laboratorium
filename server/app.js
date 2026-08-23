@@ -73,10 +73,15 @@ export function createApp() {
     crossOriginEmbedderPolicy: false,
   }));
 
-  app.use(cors({
-    origin: config.cors.origin === '*' ? true : config.cors.origin.split(','),
-    credentials: true,
-  }));
+  const corsOrigins = String(config.cors.origin || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s && s !== '*');
+  app.use(cors(
+    corsOrigins.length
+      ? { origin: corsOrigins, credentials: true }
+      : { origin: false, credentials: false },
+  ));
 
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
@@ -105,7 +110,15 @@ export function createApp() {
 
   app.use('/uploads', express.static(config.uploads.dir, {
     etag: true,
-    setHeaders: setStaticCacheHeaders,
+    setHeaders: (res, filePath) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', 'attachment');
+      const name = filePath.split(/[/\\]/).pop() || '';
+      if (/\.(html?|svg|js|mjs|xml|xhtml)$/i.test(name)) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+      }
+      setStaticCacheHeaders(res, filePath);
+    },
   }));
 
   app.use(express.static(publicDir, {

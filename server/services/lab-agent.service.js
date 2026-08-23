@@ -1,6 +1,12 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import config from '../config/index.js';
 import { ValidationError } from '../utils/errors.js';
+import {
+  assertSafeContainerName,
+  assertSafeDockerImage,
+  assertSafePort,
+  dockerEnvArgs,
+} from '../utils/docker-ref.js';
 import { getLabPublicConfig } from './settings.service.js';
 import { buildDockerTargetUrl, mockLocalConfig } from '../utils/publicUrl.js';
 import { buildDemoLabUrl } from './ctf-demo.service.js';
@@ -24,28 +30,31 @@ async function agentRequest(path, body) {
   return data;
 }
 
-function dockerEnvFlags(envVars = {}) {
-  return Object.entries(envVars)
-    .filter(([k, v]) => k && v != null && /^[A-Z0-9_]+$/.test(k))
-    .map(([k, v]) => `-e ${k}=${String(v).replace(/"/g, '\\"')}`)
-    .join(' ');
-}
-
 function localDockerDeploy({ name, image, port, containerPort = 80, env: envVars = {} }) {
-  const safeName = String(name).replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 48);
-  const envFlags = dockerEnvFlags(envVars);
-  execSync(`docker rm -f ${safeName} 2>/dev/null || true`, { stdio: 'ignore' });
-  execSync(
-    `docker run -d --name ${safeName} -p ${port}:${containerPort} ${envFlags} --restart unless-stopped ${image}`,
-    { stdio: 'pipe' },
-  );
+  const safeName = assertSafeContainerName(name);
+  const safeImage = assertSafeDockerImage(image);
+  const hostPort = assertSafePort(port);
+  const cPort = assertSafePort(containerPort);
+  try {
+    execFileSync('docker', ['rm', '-f', safeName], { stdio: 'ignore' });
+  } catch {
+    /* already gone */
+  }
+  execFileSync('docker', [
+    'run', '-d',
+    '--name', safeName,
+    '-p', `${hostPort}:${cPort}`,
+    ...dockerEnvArgs(envVars || {}),
+    '--restart', 'unless-stopped',
+    safeImage,
+  ], { stdio: 'pipe' });
   const cfg = getLabPublicConfig();
   const hostIp = cfg.dockerHostIp || config.labAgent.hostIp || '127.0.0.1';
   return {
     containerId: safeName,
-    targetUrl: buildDockerTargetUrl(hostIp, port, cfg),
-    hostPort: port,
-    containerPort,
+    targetUrl: buildDockerTargetUrl(hostIp, hostPort, cfg),
+    hostPort,
+    containerPort: cPort,
     publicHost: hostIp,
     mock: false,
     localDocker: true,
@@ -83,10 +92,10 @@ export function isAgentEnabled() {
 export async function deployContainer({
   name, image, port, containerPort = 80, demoMeta = null, env: envVars = null,
 }) {
-  if (!image?.trim()) throw new ValidationError('Вкажіть Docker image');
+  const safeImage = assertSafeDockerImage(image);
 
   const agentResult = await agentRequest('/deploy', {
-    name, image, port, containerPort, env: envVars || undefined,
+    name, image: safeImage, port, containerPort, env: envVars || undefined,
   });
   const cfg = getLabPublicConfig();
   const hostIp = cfg.dockerHostIp || config.labAgent.hostIp;
@@ -104,13 +113,15 @@ export async function deployContainer({
 
   if (config.labAgent.useLocalDocker) {
     try {
-      return localDockerDeploy({ name, image, port, containerPort, env: envVars });
+      return localDockerDeploy({
+        name, image: safeImage, port, containerPort, env: envVars || {},
+      });
     } catch (err) {
       throw new ValidationError(err.message || 'Local Docker deploy failed');
     }
   }
 
-  return mockDeploy({ name, image, port, containerPort, demoMeta });
+  return mockDeploy({ name, image: safeImage, port, containerPort, demoMeta });
 }
 
 export async function stopContainer(containerId) {
@@ -119,7 +130,7 @@ export async function stopContainer(containerId) {
   if (result) return result;
   if (config.labAgent.useLocalDocker) {
     try {
-      execSync(`docker rm -f ${containerId}`, { stdio: 'pipe' });
+      execFileSync('docker', ['rm', '-f', assertSafeContainerName(containerId)], { stdio: 'pipe' });
     } catch {
       /* already gone */
     }

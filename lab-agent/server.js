@@ -10,8 +10,30 @@
  */
 import express from 'express';
 import http from 'http';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { randomBytes } from 'crypto';
+
+const UNSAFE_IMAGE = /[\s;|&$`<>(){}\\!#'"\n\r\t]/;
+
+function assertSafeDockerImage(image) {
+  const s = String(image || '').trim();
+  if (!s || s.length > 256 || UNSAFE_IMAGE.test(s) || !/^[A-Za-z0-9][A-Za-z0-9._/@:+-]*$/.test(s)) {
+    const err = new Error('Invalid Docker image');
+    err.statusCode = 400;
+    throw err;
+  }
+  return s;
+}
+
+function assertSafePort(port) {
+  const n = Number.parseInt(port, 10);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    const err = new Error('Invalid port');
+    err.statusCode = 400;
+    throw err;
+  }
+  return n;
+}
 
 const app = express();
 const PORT = parseInt(process.env.LAB_AGENT_PORT || '3099', 10);
@@ -53,23 +75,41 @@ app.post('/deploy', auth, (req, res) => {
     return res.status(400).json({ error: 'name, image, port required' });
   }
 
-  const safeName = String(name).replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 48);
-  const containerPort = parseInt(req.body.containerPort, 10) || 80;
-  const envFlags = Object.entries(envVars || {})
-    .filter(([k, v]) => k && v != null && String(k).match(/^[A-Z0-9_]+$/))
-    .map(([k, v]) => `-e ${k}=${String(v).replace(/"/g, '\\"')}`)
-    .join(' ');
+  const safeName = String(name).replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 48) || 'lab';
+  let safeImage;
+  let hostPort;
+  let containerPort;
+  try {
+    safeImage = assertSafeDockerImage(image);
+    hostPort = assertSafePort(port);
+    containerPort = assertSafePort(req.body.containerPort || 80);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  const envArgs = [];
+  for (const [k, v] of Object.entries(envVars || {})) {
+    if (!k || v == null || !/^[A-Z0-9_]+$/.test(k)) continue;
+    envArgs.push('-e', `${k}=${String(v)}`);
+  }
 
   try {
-    execSync(`docker rm -f ${safeName} 2>/dev/null || true`, { stdio: 'ignore' });
-    execSync(
-      `docker run -d --name ${safeName} -p ${port}:${containerPort} ${envFlags} --restart unless-stopped ${image}`,
-      { stdio: 'pipe' },
-    );
+    try {
+      execFileSync('docker', ['rm', '-f', safeName], { stdio: 'ignore' });
+    } catch {
+      /* already gone */
+    }
+    execFileSync('docker', [
+      'run', '-d',
+      '--name', safeName,
+      '-p', `${hostPort}:${containerPort}`,
+      ...envArgs,
+      '--restart', 'unless-stopped',
+      safeImage,
+    ], { stdio: 'pipe' });
     res.json({
       containerId: safeName,
-      targetUrl: buildTargetUrl(port),
-      hostPort: port,
+      targetUrl: buildTargetUrl(hostPort),
+      hostPort,
       publicHost: ipToPublicHost(HOST_IP),
     });
   } catch (err) {
@@ -79,9 +119,10 @@ app.post('/deploy', auth, (req, res) => {
 
 app.post('/stop', auth, (req, res) => {
   const { containerId } = req.body;
-  if (!containerId) return res.status(400).json({ error: 'containerId required' });
+  const safeId = String(containerId || '').replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 48);
+  if (!safeId) return res.status(400).json({ error: 'containerId required' });
   try {
-    execSync(`docker rm -f ${containerId}`, { stdio: 'pipe' });
+    execFileSync('docker', ['rm', '-f', safeId], { stdio: 'pipe' });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

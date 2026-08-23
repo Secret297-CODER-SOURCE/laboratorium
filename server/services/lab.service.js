@@ -3,6 +3,7 @@ import * as proxmox from './proxmox.service.js';
 import * as settings from './settings.service.js';
 import * as labAgent from './lab-agent.service.js';
 import { NotFoundError, ConflictError, ValidationError } from '../utils/errors.js';
+import { assertSafeDockerImage } from '../utils/docker-ref.js';
 import { buildVmAccess, enrichDeploymentUrl } from '../utils/publicUrl.js';
 import { getLabPublicConfig } from './settings.service.js';
 
@@ -147,8 +148,7 @@ export async function resetVm(userId, handle) {
 }
 
 export async function deployDocker(userId, { image, name }) {
-  const imageName = image?.trim();
-  if (!imageName) throw new ValidationError('Вкажіть Docker image (напр. nginx:alpine)');
+  const imageName = assertSafeDockerImage(image);
 
   const deployName = (name?.trim() || `user-${userId}-${Date.now()}`).replace(/[^a-zA-Z0-9-_]/g, '-');
   const port = labAgent.allocatePort(userId + Date.now());

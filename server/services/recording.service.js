@@ -5,6 +5,7 @@ import config from '../config/index.js';
 import db from '../db/index.js';
 import * as storageService from './storage.service.js';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors.js';
+import { userHasGroupAccess } from './chat.service.js';
 
 if (!existsSync(config.uploads.recordingsDir)) {
   mkdirSync(config.uploads.recordingsDir, { recursive: true });
@@ -24,7 +25,31 @@ function enrichRecording(row) {
   return { ...row, has_file: hasPlayableFile(row) };
 }
 
-export function list({ userId, conferenceId } = {}) {
+function canAccessRecording(rec, userId, userRole) {
+  if (!rec || !userId) return false;
+  if (['owner', 'developer'].includes(userRole)) return true;
+  if (rec.uploaded_by === userId) return true;
+  if (!rec.conference_id) return false;
+  const participant = db.prepare(
+    'SELECT 1 FROM conference_participants WHERE conference_id = ? AND user_id = ?',
+  ).get(rec.conference_id, userId);
+  if (participant) return true;
+  const conf = db.prepare('SELECT host_user_id, group_id FROM conferences WHERE id = ?').get(rec.conference_id);
+  if (!conf) return false;
+  if (conf.host_user_id === userId) return true;
+  if (conf.group_id && userHasGroupAccess(conf.group_id, userId, userRole)) return true;
+  return false;
+}
+
+export function assertCanAccessRecording(id, userId, userRole) {
+  const rec = getById(id);
+  if (!rec || !canAccessRecording(rec, userId, userRole)) {
+    throw new NotFoundError('Запис не знайдено');
+  }
+  return rec;
+}
+
+export function list({ userId, userRole, conferenceId } = {}) {
   let sql = `
     SELECT r.*, u.name as uploader_name, u.handle as uploader_handle,
       c.title as conference_title, c.room_code,
@@ -36,6 +61,30 @@ export function list({ userId, conferenceId } = {}) {
   `;
   const params = [];
   if (conferenceId) { sql += ' AND r.conference_id = ?'; params.push(conferenceId); }
+  if (userId && !['owner', 'developer'].includes(userRole)) {
+    sql += ` AND (
+      r.uploaded_by = ?
+      OR EXISTS (
+        SELECT 1 FROM conference_participants cp
+        WHERE cp.conference_id = r.conference_id AND cp.user_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM conferences c2
+        WHERE c2.id = r.conference_id AND c2.host_user_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM conferences c2
+        JOIN study_group_members gm ON gm.group_id = c2.group_id
+        WHERE c2.id = r.conference_id AND gm.user_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM conferences c2
+        JOIN study_groups g ON g.id = c2.group_id
+        WHERE c2.id = r.conference_id AND g.teacher_id = ?
+      )
+    )`;
+    params.push(userId, userId, userId, userId, userId);
+  }
   sql += ' ORDER BY r.created_at DESC';
   return db.prepare(sql).all(...params).map(enrichRecording);
 }

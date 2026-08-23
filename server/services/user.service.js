@@ -92,13 +92,16 @@ export async function adminCreateUser({ name, email, role = 'student', handle, p
   return { user, password: sendEmail ? undefined : plainPassword };
 }
 
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('laboratorium-timing-dummy', config.bcryptRounds);
+
 export function login({ email, password }) {
   if (!email || !password) {
     throw new ValidationError('Введіть email і пароль');
   }
 
   const user = findByEmail(email);
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+  const matches = bcrypt.compareSync(password, user?.password_hash || DUMMY_PASSWORD_HASH);
+  if (!user || !matches) {
     throw new UnauthorizedError('Невірний email або пароль');
   }
 

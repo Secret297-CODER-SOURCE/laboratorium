@@ -35,13 +35,34 @@ function envBool(key, fallback) {
   return ['1', 'true', 'yes'].includes(val.toLowerCase());
 }
 
+const INSECURE_JWT_SECRETS = new Set([
+  'lab-dev-secret-change-in-production',
+  'your-super-secret-jwt-key-min-32-chars',
+]);
+
+function resolveJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || INSECURE_JWT_SECRETS.has(secret)) {
+    throw new Error(
+      '[config] JWT_SECRET is required and must not be a published default. Set a unique secret (≥32 characters).',
+    );
+  }
+  return secret;
+}
+
+const isProd = env('NODE_ENV', 'development') === 'production';
+const jwtSecret = resolveJwtSecret();
+if (isProd && jwtSecret.length < 32) {
+  throw new Error('[config] JWT_SECRET must be at least 32 characters in production.');
+}
+
 export const config = {
   env: env('NODE_ENV', 'development'),
   port: envInt('PORT', 3000),
   host: env('HOST', '0.0.0.0'),
 
   jwt: {
-    secret: env('JWT_SECRET', 'lab-dev-secret-change-in-production'),
+    secret: jwtSecret,
     expiresIn: env('JWT_EXPIRES_IN', '7d'),
   },
 
@@ -51,7 +72,7 @@ export const config = {
   },
 
   cors: {
-    origin: env('CORS_ORIGIN', '*'),
+    origin: env('CORS_ORIGIN', ''),
   },
 
   rateLimit: {
@@ -61,7 +82,7 @@ export const config = {
   },
 
   bcryptRounds: envInt('BCRYPT_ROUNDS', 10),
-  isProd: env('NODE_ENV', 'development') === 'production',
+  isProd,
 
   appUrl: env('APP_URL', 'https://laboratorium.club'),
   siteUrl: env('SITE_URL', 'https://laboratorium.club'),
@@ -135,8 +156,11 @@ export const config = {
   staticVersion: env('STATIC_VERSION', readPackageVersion()),
 };
 
-if (config.isProd && config.jwt.secret === 'lab-dev-secret-change-in-production') {
-  console.warn('[config] WARNING: Using default JWT_SECRET in production!');
+if (config.isProd) {
+  const corsRaw = String(config.cors.origin || '').trim();
+  if (!corsRaw || corsRaw === '*' || corsRaw.split(',').map((s) => s.trim()).includes('*')) {
+    throw new Error('[config] CORS_ORIGIN must be an explicit origin list in production (not *).');
+  }
 }
 
 export default config;

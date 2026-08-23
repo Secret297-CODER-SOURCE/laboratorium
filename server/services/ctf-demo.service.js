@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
 import db from '../db/index.js';
 import * as labAgent from './lab-agent.service.js';
-import { DEFAULT_FLAGS } from './ctf-demo-flags.js';
+import { DEFAULT_FLAGS, DEMO_FLAGS } from './ctf-demo-flags.js';
 
 const demoSessions = new Map();
 
@@ -104,5 +104,5 @@ export function getDemoSession(ctx) {
 }
 
 export function getExpectedFlag(slug) {
-  return DEFAULT_FLAGS[slug] || null;
+  return DEMO_FLAGS[slug] || null;
 }

@@ -5,12 +5,21 @@ import { NotFoundError } from '../utils/errors.js';
 
 export async function list(req, res) {
   const { conferenceId } = req.query;
-  res.json({ recordings: recordingService.list({ userId: req.user.id, conferenceId }) });
+  res.json({
+    recordings: recordingService.list({
+      userId: req.user.id,
+      userRole: req.user.role,
+      conferenceId,
+    }),
+  });
 }
 
 export async function getById(req, res) {
-  const rec = recordingService.getById(parseInt(req.params.id, 10));
-  if (!rec) throw new NotFoundError('Запис не знайдено');
+  const rec = recordingService.assertCanAccessRecording(
+    parseInt(req.params.id, 10),
+    req.user.id,
+    req.user.role,
+  );
   const notes = recordingService.getNotes(rec.id);
   res.json({ recording: rec, notes });
 }
@@ -36,8 +45,11 @@ export async function upload(req, res) {
 }
 
 export async function stream(req, res) {
-  const rec = recordingService.getById(parseInt(req.params.id, 10));
-  if (!rec) throw new NotFoundError('Запис не знайдено');
+  const rec = recordingService.assertCanAccessRecording(
+    parseInt(req.params.id, 10),
+    req.user.id,
+    req.user.role,
+  );
 
   const filePath = recordingService.getFilePath(rec);
   if (!existsSync(filePath)) throw new NotFoundError('Файл запису не знайдено');
@@ -71,15 +83,27 @@ export async function remove(req, res) {
 }
 
 export async function getNotes(req, res) {
-  const notes = recordingService.getNotes(parseInt(req.params.id, 10));
-  res.json({ notes });
+  const rec = recordingService.assertCanAccessRecording(
+    parseInt(req.params.id, 10),
+    req.user.id,
+    req.user.role,
+  );
+  res.json({ notes: recordingService.getNotes(rec.id) });
 }
 
 export async function addNote(req, res) {
+  const rec = recordingService.assertCanAccessRecording(
+    parseInt(req.params.id, 10),
+    req.user.id,
+    req.user.role,
+  );
+  const { content, timestampSeconds, isPinned } = req.body;
   const note = recordingService.addNote({
-    recordingId: parseInt(req.params.id, 10),
+    recordingId: rec.id,
     userId: req.user.id,
-    ...req.body,
+    content,
+    timestampSeconds,
+    isPinned,
   });
   res.status(201).json({ note });
 }

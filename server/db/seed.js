@@ -24,14 +24,10 @@ const CHALLENGES = [
   { slug: 'priv-esc-linux', title: 'Linux Privilege Escalation', description: 'Підвищ привілеї з www-data до root.', bounty_reward: 250, difficulty: 'hard', program_id: 1 },
 ];
 
-const DEFAULT_OWNER_EMAIL = 'maks.47.turbo@gmail.com';
-const DEFAULT_OWNER_PASSWORD = 'LaboratoriumOwner2026';
-
-const TEST_STUDENT_EMAIL = 'test.student@lab.dev';
-const TEST_STUDENT_PASSWORD = 'TestLab2026!';
-
-const TEST_TEACHER_EMAIL = 'test.teacher@lab.dev';
-const TEST_TEACHER_PASSWORD = 'TestTeacher2026!';
+function explicitEnv(key) {
+  const val = process.env[key];
+  return val !== undefined && val !== '' ? val : '';
+}
 
 const TRACKS = [
   { slug: 'cybersecurity', name: 'Cybersecurity', description: 'Пентест, захист, web security та reverse engineering', sort_order: 1 },
@@ -110,88 +106,65 @@ function ensureExtraPrograms(db) {
 }
 
 function ensureOwner(db) {
-  const email = (process.env.OWNER_EMAIL || DEFAULT_OWNER_EMAIL).toLowerCase();
-  const password = process.env.OWNER_PASSWORD || DEFAULT_OWNER_PASSWORD;
-  const hash = bcrypt.hashSync(password, config.bcryptRounds);
-  const handle = 'lab_owner';
+  const email = explicitEnv('OWNER_EMAIL').toLowerCase();
+  const password = explicitEnv('OWNER_PASSWORD');
+  if (!email || !password) return;
 
+  const handle = 'lab_owner';
   const byEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   const byHandle = db.prepare('SELECT id FROM users WHERE handle = ?').get(handle);
   const byRole = db.prepare("SELECT id FROM users WHERE role = 'owner' LIMIT 1").get();
-  const ownerId = byEmail?.id || byHandle?.id || byRole?.id;
+  if (byEmail || byHandle || byRole) return;
 
-  if (ownerId) {
-    db.prepare(`
-      UPDATE users SET email = ?, password_hash = ?, role = 'owner', name = 'Адміністратор', handle = ?,
-        updated_at = datetime('now') WHERE id = ?
-    `).run(email, hash, handle, ownerId);
-    db.prepare(`UPDATE users SET role = 'student' WHERE role = 'owner' AND id != ?`).run(ownerId);
-  } else {
-    db.prepare(`
-      INSERT INTO users (email, password_hash, name, handle, role, bounty_points)
-      VALUES (?, ?, 'Адміністратор', ?, 'owner', 0)
-    `).run(email, hash, handle);
-  }
-
-  console.log(`[db] Owner account: ${email}`);
+  const hash = bcrypt.hashSync(password, config.bcryptRounds);
+  db.prepare(`
+    INSERT INTO users (email, password_hash, name, handle, role, bounty_points)
+    VALUES (?, ?, 'Адміністратор', ?, 'owner', 0)
+  `).run(email, hash, handle);
+  console.log(`[db] Owner account created: ${email}`);
 }
 
 function ensureTestStudent(db) {
-  const email = (process.env.TEST_STUDENT_EMAIL || TEST_STUDENT_EMAIL).toLowerCase();
-  const password = process.env.TEST_STUDENT_PASSWORD || TEST_STUDENT_PASSWORD;
-  const hash = bcrypt.hashSync(password, config.bcryptRounds);
+  if (config.isProd || !config.db.seed) return;
+  const email = (explicitEnv('TEST_STUDENT_EMAIL') || 'test.student@lab.dev').toLowerCase();
+  const password = explicitEnv('TEST_STUDENT_PASSWORD');
+  if (!password) return;
+
   const handle = 'test_student';
-  const name = 'Тестовий Учень';
-
   const existing = db.prepare('SELECT id FROM users WHERE email = ? OR handle = ?').get(email, handle);
-  let userId;
+  if (existing) return;
 
-  if (existing) {
-    userId = existing.id;
-    db.prepare(`
-      UPDATE users SET email = ?, password_hash = ?, name = ?, handle = ?, role = 'student',
-        billing_exempt = 1, updated_at = datetime('now') WHERE id = ?
-    `).run(email, hash, name, handle, userId);
-  } else {
-    const result = db.prepare(`
-      INSERT INTO users (email, password_hash, name, handle, role, bounty_points, billing_exempt)
-      VALUES (?, ?, ?, ?, 'student', 120, 1)
-    `).run(email, hash, name, handle);
-    userId = result.lastInsertRowid;
-  }
+  const hash = bcrypt.hashSync(password, config.bcryptRounds);
+  const result = db.prepare(`
+    INSERT INTO users (email, password_hash, name, handle, role, bounty_points, billing_exempt)
+    VALUES (?, ?, 'Тестовий Учень', ?, 'student', 120, 1)
+  `).run(email, hash, handle);
 
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
   db.prepare(`
     INSERT OR IGNORE INTO payment_records (user_id, period_year, period_month, note)
     VALUES (?, ?, ?, 'Тестовий акаунт')
-  `).run(userId, year, month);
+  `).run(result.lastInsertRowid, now.getFullYear(), now.getMonth() + 1);
 
-  console.log(`[db] Test student: ${email} / ${password}`);
+  console.log(`[db] Test student created: ${email}`);
 }
 
 function ensureTestTeacher(db) {
-  const email = (process.env.TEST_TEACHER_EMAIL || TEST_TEACHER_EMAIL).toLowerCase();
-  const password = process.env.TEST_TEACHER_PASSWORD || TEST_TEACHER_PASSWORD;
-  const hash = bcrypt.hashSync(password, config.bcryptRounds);
+  if (config.isProd || !config.db.seed) return;
+  const email = (explicitEnv('TEST_TEACHER_EMAIL') || 'test.teacher@lab.dev').toLowerCase();
+  const password = explicitEnv('TEST_TEACHER_PASSWORD');
+  if (!password) return;
+
   const handle = 'test_teacher';
-  const name = 'Тестовий Викладач';
-
   const existing = db.prepare('SELECT id FROM users WHERE email = ? OR handle = ?').get(email, handle);
-  if (existing) {
-    db.prepare(`
-      UPDATE users SET email = ?, password_hash = ?, name = ?, handle = ?, role = 'teacher',
-        updated_at = datetime('now') WHERE id = ?
-    `).run(email, hash, name, handle, existing.id);
-  } else {
-    db.prepare(`
-      INSERT INTO users (email, password_hash, name, handle, role, bounty_points)
-      VALUES (?, ?, ?, ?, 'teacher', 0)
-    `).run(email, hash, name, handle);
-  }
+  if (existing) return;
 
-  console.log(`[db] Test teacher: ${email} / ${password}`);
+  const hash = bcrypt.hashSync(password, config.bcryptRounds);
+  db.prepare(`
+    INSERT INTO users (email, password_hash, name, handle, role, bounty_points)
+    VALUES (?, ?, 'Тестовий Викладач', ?, 'teacher', 0)
+  `).run(email, hash, handle);
+  console.log(`[db] Test teacher created: ${email}`);
 }
 
 function bootstrapAdmin(db) {
@@ -217,9 +190,6 @@ function bootstrapAdmin(db) {
 export function syncCatalog(db) {
   ensureAllPrograms(db);
   ensureDirections(db);
-  ensureOwner(db);
-  ensureTestStudent(db);
-  ensureTestTeacher(db);
 }
 
 export function seedDatabase(db) {
@@ -242,4 +212,7 @@ export function seedDatabase(db) {
 
   bootstrapAdmin(db);
   syncCatalog(db);
+  ensureOwner(db);
+  ensureTestStudent(db);
+  ensureTestTeacher(db);
 }

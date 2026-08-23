@@ -27,6 +27,19 @@ export const uploadRecording = multer({
   },
 }).single('recording');
 
+const CHAT_MIME_EXT = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'video/webm': '.webm',
+  'video/mp4': '.mp4',
+  'video/ogg': '.ogv',
+  'video/quicktime': '.mov',
+};
+
+const DANGEROUS_UPLOAD_EXT = ['.html', '.htm', '.svg', '.js', '.mjs', '.xml', '.xhtml', '.php'];
+
 const chatStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     try {
@@ -36,7 +49,7 @@ const chatStorage = multer.diskStorage({
     }
   },
   filename: (_req, file, cb) => {
-    const ext = extname(file.originalname || '') || '.bin';
+    const ext = CHAT_MIME_EXT[file.mimetype] || '.bin';
     cb(null, `${Date.now()}-${randomBytes(6).toString('hex')}${ext}`);
   },
 });
@@ -45,11 +58,11 @@ export const uploadChatMedia = multer({
   storage: chatStorage,
   limits: { fileSize: config.uploads.maxChatFileSize },
   fileFilter: (_req, file, cb) => {
-    const allowed = [
-      'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-      'video/webm', 'video/mp4', 'video/ogg', 'video/quicktime',
-    ];
-    if (allowed.includes(file.mimetype)) cb(null, true);
+    const origExt = extname(file.originalname || '').toLowerCase();
+    if (DANGEROUS_UPLOAD_EXT.includes(origExt)) {
+      return cb(new Error('Недопустиме розширення файлу'));
+    }
+    if (CHAT_MIME_EXT[file.mimetype]) cb(null, true);
     else cb(new Error('Допустимі формати: jpg, png, webp, gif, webm, mp4'));
   },
 }).single('file');

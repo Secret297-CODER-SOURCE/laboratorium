@@ -23,7 +23,6 @@ runMigrations(db);
 if (config.db.seed) {
   seedDatabase(db);
 } else {
-  // Production: оновлюємо каталог і тестові акаунти без повного re-seed
   syncCatalog(db);
 }
 ensureCtfMetadata(db);
