@@ -70,7 +70,7 @@ app.get('/health', (_req, res) => res.json({
 }));
 
 app.post('/deploy', auth, (req, res) => {
-  const { name, image, port, env: envVars } = req.body;
+  const { name, image, port, env: envVars, extraPorts } = req.body;
   if (!name || !image || !port) {
     return res.status(400).json({ error: 'name, image, port required' });
   }
@@ -79,10 +79,18 @@ app.post('/deploy', auth, (req, res) => {
   let safeImage;
   let hostPort;
   let containerPort;
+  let safeExtraPorts = [];
   try {
     safeImage = assertSafeDockerImage(image);
     hostPort = assertSafePort(port);
     containerPort = assertSafePort(req.body.containerPort || 80);
+    const extraList = Array.isArray(extraPorts) ? extraPorts : [];
+    if (extraList.length > 4) throw new Error('Too many extra ports');
+    safeExtraPorts = extraList.map((ep) => ({
+      hostPort: assertSafePort(ep.hostPort),
+      containerPort: assertSafePort(ep.containerPort),
+      label: ep.label != null ? String(ep.label).slice(0, 32) : undefined,
+    }));
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -91,6 +99,7 @@ app.post('/deploy', auth, (req, res) => {
     if (!k || v == null || !/^[A-Z0-9_]+$/.test(k)) continue;
     envArgs.push('-e', `${k}=${String(v)}`);
   }
+  const extraPortArgs = safeExtraPorts.flatMap((ep) => ['-p', `${ep.hostPort}:${ep.containerPort}`]);
 
   try {
     try {
@@ -102,6 +111,7 @@ app.post('/deploy', auth, (req, res) => {
       'run', '-d',
       '--name', safeName,
       '-p', `${hostPort}:${containerPort}`,
+      ...extraPortArgs,
       ...envArgs,
       '--restart', 'unless-stopped',
       safeImage,
@@ -110,6 +120,7 @@ app.post('/deploy', auth, (req, res) => {
       containerId: safeName,
       targetUrl: buildTargetUrl(hostPort),
       hostPort,
+      extraPorts: safeExtraPorts,
       publicHost: ipToPublicHost(HOST_IP),
     });
   } catch (err) {

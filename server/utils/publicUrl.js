@@ -87,6 +87,47 @@ export function buildVmAccess(ip, cfg, meta = {}) {
   return base;
 }
 
+function parseExtraPorts(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * SSH/raw-TCP targets can never go through the HTTP-only tunnel — they're always
+ * shown as a direct host:port. For nmap-scan/python-port-scanner the port is
+ * deliberately withheld from the hint: finding it is the point of the challenge.
+ */
+function attachNetworkExtras(base, row, c, meta) {
+  if (meta.mock) return base;
+  const extras = parseExtraPorts(row.extra_ports);
+  if (!extras.length) return base;
+
+  const publicHost = ipToPublicHost(c.dockerHostIp, c);
+
+  if (meta.slug === 'priv-esc-linux') {
+    const sshEntry = extras.find((e) => e.label === 'ssh');
+    if (sshEntry) {
+      base.ssh_command = `ssh lab@${publicHost} -p ${sshEntry.hostPort}`;
+      base.ssh_password = sshEntry.sshPassword || null;
+    }
+    return base;
+  }
+
+  base.network_targets = extras.map((e) => ({
+    label: e.label,
+    host: publicHost,
+    hint: meta.slug === 'nmap-scan'
+      ? `nmap -sV -p1-65535 ${publicHost}`
+      : `python3 -c "import socket; s=socket.socket(); s.connect(('${publicHost}', PORT)); print(s.recv(1024).decode())"`,
+  }));
+  return base;
+}
+
 export function enrichDeploymentUrl(row, cfg, meta = {}) {
   if (!row) return row;
   const c = meta.mock ? mockLocalConfig(cfg) : (cfg || getLabPublicConfig());
@@ -105,13 +146,15 @@ export function enrichDeploymentUrl(row, cfg, meta = {}) {
   } else {
     directUrl = buildDockerTargetUrl(hostIp, port, c);
   }
-  const base = {
+  let base = {
     ...row,
     target_url: directUrl,
     direct_url: directUrl,
     public_host: ipToPublicHost(c.tunnelGatewayIp || hostIp, c),
     mock: !!meta.mock,
   };
+
+  base = attachNetworkExtras(base, row, c, meta);
 
   if (!c.useSecureTunnel || !meta.userId) return base;
 

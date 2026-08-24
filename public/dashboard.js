@@ -1009,7 +1009,22 @@ function renderCtfList() {
                 <a href="${escapeHtml(c.deployment.target_url)}" target="_blank" rel="noopener" class="btn btn--primary btn--sm ico-inline">${icon('play', 'ico ico--sm')}Відкрити demo-стенд</a>
               </div>`
             : (c.deployment?.target_url
-              ? `<div class="ctf-target"><a href="${escapeHtml(c.deployment.target_url)}" target="_blank" rel="noopener">${escapeHtml(c.deployment.target_url)}</a>${c.deployment.access_mode === 'secure_tunnel' ? `<span class="ctf-target-host ico-inline">${icon('lock', 'ico ico--sm')}HTTPS тунель</span>` : (c.deployment.public_host ? `<span class="ctf-target-host">${escapeHtml(c.deployment.public_host)}</span>` : '')}</div>`
+              ? `<div class="ctf-target"><a href="${escapeHtml(c.deployment.target_url)}" target="_blank" rel="noopener">${escapeHtml(c.deployment.target_url)}</a>${c.deployment.access_mode === 'secure_tunnel' ? `<span class="ctf-target-host ico-inline">${icon('lock', 'ico ico--sm')}HTTPS тунель</span>` : (c.deployment.public_host ? `<span class="ctf-target-host">${escapeHtml(c.deployment.public_host)}</span>` : '')}</div>
+                 ${(c.deployment.network_targets || []).map(t => `
+                   <div class="lab-access-box">
+                     <span class="lab-vm-label">${escapeHtml(t.label)}</span>
+                     <code class="lab-ssh-cmd">${escapeHtml(t.hint)}</code>
+                   </div>`).join('')}
+                 ${c.deployment.ssh_command ? `
+                   <div class="lab-access-box">
+                     <span class="lab-vm-label">SSH</span>
+                     <code class="lab-ssh-cmd">${escapeHtml(c.deployment.ssh_command)}</code>
+                   </div>` : ''}
+                 ${c.deployment.ssh_password ? `
+                   <div class="lab-access-box">
+                     <span class="lab-vm-label">Пароль</span>
+                     <code class="lab-ssh-cmd">${escapeHtml(c.deployment.ssh_password)}</code>
+                   </div>` : ''}`
               : `<div class="ctf-actions">
                   ${!c.deployment || c.deployment.status !== 'running'
                     ? `<button type="button" class="btn btn--outline btn--sm ctf-start-btn" data-id="${c.id}">Запустити стенд</button>`

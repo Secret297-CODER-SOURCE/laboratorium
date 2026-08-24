@@ -49,49 +49,54 @@ function page(title, body) {
 
 const comments = [];
 
+const RET_ADDR_MARKER = 'deadbeef';
+const CRACKME_PASSWORD = 'hackme2026';
+
+function sqlEcho(user, pass) {
+  return `SELECT * FROM users WHERE username='${user}' AND password='${pass}'`;
+}
+
 const handlers = {
   'nmap-scan': {
     title: 'Nmap Recon',
     index: () => page('Nmap Recon', `
       <div class="card">
-        <p>Ціль: <code>target.lab.internal</code></p>
-        <p style="margin-top:12px;color:#888">Проскануйте порти — flag у банері сервісу 31337.</p>
-        <a class="btn" href="/scan" style="margin-top:16px">Запустити nmap</a>
-      </div>`),
-    scan: () => page('Результат nmap', `
-      <div class="card">
-        <p class="ok">Сканування завершено</p>
-        <pre>PORT      STATE SERVICE
-22/tcp    open  ssh
-80/tcp    open  http
-31337/tcp open  elite
-|_banner: ${esc(FLAG)}</pre>
-        <div class="flag-box"><code>${esc(FLAG)}</code></div>
+        <p>Ціль показана у вашому кабінеті (вкладка CTF) — лише адреса, без порту.</p>
+        <p style="margin-top:12px;color:#888">Запустіть <code>nmap -sV -p1-65535 &lt;host&gt;</code> зі свого термінала, знайдіть нестандартний відкритий порт і прочитайте банер сервісу (наприклад <code>nc &lt;host&gt; &lt;port&gt;</code>). Прапор — прямо в банері.</p>
       </div>`),
   },
 
   'sql-injection': {
     title: 'SQL Injection Lab',
     index: (req, res) => {
-      const err = req.query.err;
-      const body = err
-        ? `<div class="card"><p class="err">${esc(err)}</p><a class="btn btn--ghost" href="/">Назад</a></div>`
-        : `<div class="card">
-            <form method="POST" action="/login">
-              <label>Username</label><input name="username" placeholder="admin" autocomplete="off">
-              <label>Password</label><input name="password" type="password">
-              <button type="submit">Увійти</button>
-            </form>
-          </div>`;
-      res.type('html').send(page('SQL Injection Lab', body));
+      res.type('html').send(page('SQL Injection Lab', `
+        <div class="card">
+          <p style="margin-bottom:12px;color:#888">Сервер виконує:</p>
+          <pre>SELECT * FROM users WHERE username='&lt;username&gt;' AND password='&lt;password&gt;'</pre>
+          <form method="POST" action="/login">
+            <label>Username</label><input name="username" placeholder="username" autocomplete="off">
+            <label>Password</label><input name="password" type="password">
+            <button type="submit">Увійти</button>
+          </form>
+        </div>`));
     },
     login: (req, res) => {
       const user = String(req.body?.username || '');
-      const bypass = /'\s*or\s*'1'\s*=\s*'1/i.test(user) || user.includes("' OR 1=1") || (user === 'admin' && req.body?.password === 'admin');
-      if (bypass) {
-        return res.type('html').send(page('Успіх!', `<div class="card"><p class="ok">SQL injection успішний!</p><div class="flag-box"><code>${esc(FLAG)}</code></div></div>`));
+      const pass = String(req.body?.password || '');
+      const query = sqlEcho(user, pass);
+      const commentsOutRest = /'\s*(--|#)/.test(user) || /'\s*(--|#)/.test(pass);
+      const tautology = /'\s*or\s*'?1'?\s*=\s*'?1/i.test(user) || /'\s*or\s*'?1'?\s*=\s*'?1/i.test(pass);
+      const unionBypass = /'\s*union\s+select/i.test(user);
+      if (commentsOutRest || tautology || unionBypass) {
+        return res.type('html').send(page('Успіх!', `<div class="card"><p class="ok">SQL injection успішний — авторизацію обійдено!</p><div class="flag-box"><code>${esc(FLAG)}</code></div></div>`));
       }
-      res.redirect('/?err=' + encodeURIComponent('Невірний логін або пароль'));
+      res.type('html').send(page('Login failed', `
+        <div class="card">
+          <p class="err">Невірний логін або пароль.</p>
+          <p style="margin-top:12px;color:#888">Виконаний запит:</p>
+          <pre>${esc(query)}</pre>
+          <a class="btn btn--ghost" href="/">Назад</a>
+        </div>`));
     },
   },
 
@@ -124,22 +129,30 @@ const handlers = {
 
   'buffer-overflow': {
     title: 'Stack Overflow 101',
-    index: (req, res) => {
-      const len = req.query.len;
-      const body = len != null
-        ? `<div class="card"><p>Буфер: ${esc(len)}/32 байт.</p><a class="btn btn--ghost" href="/">Спробувати ще</a></div>`
-        : `<div class="card"><form method="POST" action="/overflow">
-            <label>Ім'я (буфер 32 байти)</label><input name="name" autocomplete="off">
-            <button type="submit">Надіслати</button>
-          </form></div>`;
-      res.type('html').send(page('Stack Overflow 101', body));
-    },
+    index: () => page('Stack Overflow 101', `
+      <div class="card">
+        <pre>void vuln(char *input) {
+  char buf[32];
+  strcpy(buf, input);   // без перевірки довжини
+}
+// Пам'ять: [ 32B buf ][ 8B saved EBP ][ 8B return addr ]</pre>
+        <form method="POST" action="/overflow">
+          <label>Ім'я (payload)</label>
+          <input name="name" placeholder="AAAAAAAA...AAAA + DEADBEEF" autocomplete="off">
+          <button type="submit">Надіслати</button>
+        </form>
+      </div>`),
     overflow: (req, res) => {
       const name = String(req.body?.name || '');
-      if (name.length > 32) {
-        return res.type('html').send(page('Успіх!', `<div class="card"><p class="ok">Stack smashing!</p><div class="flag-box"><code>${esc(FLAG)}</code></div></div>`));
+      const retSlot = name.slice(32, 40).toLowerCase();
+      const overwritesReturnAddr = name.length >= 40 && retSlot === RET_ADDR_MARKER;
+      if (overwritesReturnAddr) {
+        return res.type('html').send(page('Успіх!', `<div class="card"><p class="ok">Stack smashing detected — EIP перезаписано на 0xDEADBEEF!</p><div class="flag-box"><code>${esc(FLAG)}</code></div></div>`));
       }
-      res.redirect('/?len=' + name.length);
+      const note = name.length > 32
+        ? `Буфер переповнено (${name.length} байт), але return address (байти 33-40) не перезаписана значенням DEADBEEF.`
+        : `Буфер вміщує ${name.length}/32 байт — переповнення не сталось.`;
+      res.type('html').send(page('Buffer', `<div class="card"><p>${esc(note)}</p><a class="btn btn--ghost" href="/">Спробувати ще</a></div>`));
     },
   },
 
@@ -151,7 +164,15 @@ const handlers = {
         <a class="btn" href="/download" style="margin-top:12px">Завантажити зразок</a>
       </div>`),
     download: (_req, res) => {
-      const content = `MZ FAKE BINARY\nFLAG_STRING=${FLAG}\nC2=10.0.0.66\nEND`;
+      const flagB64 = Buffer.from(FLAG, 'utf8').toString('base64');
+      const content = `MZ FAKE BINARY DEMO
+IOC: evil-domain.lab
+C2: 10.0.0.66
+MUTEX: Global\\a8f3c1
+FAKE_FLAG=lab{not_this_one}
+FAKE_FLAG=lab{decoy_string}
+DEBUG_STR=${flagB64}
+END`;
       res.setHeader('Content-Disposition', 'attachment; filename="sample_malware.bin"');
       res.type('text/plain').send(content);
     },
@@ -159,43 +180,41 @@ const handlers = {
 
   'python-port-scanner': {
     title: 'Port Scanner Script',
-    index: (req, res) => {
-      const port = req.query.port;
-      const body = port != null
-        ? `<div class="card"><p class="err">Порт ${esc(port)} закритий.</p><a class="btn btn--ghost" href="/">Назад</a></div>`
-        : `<div class="card"><form method="POST" action="/scan">
-            <label>Хост</label><input name="host" value="127.0.0.1">
-            <label>Порт</label><input name="port" value="31337">
-            <button type="submit">Сканувати</button>
-          </form></div>`;
-      res.type('html').send(page('Port Scanner', body));
-    },
-    scan: (req, res) => {
-      const port = parseInt(req.body?.port, 10);
-      if (port === 31337) {
-        return res.type('html').send(page('Успіх!', `<div class="card"><p class="ok">Порт відкритий!</p><div class="flag-box"><code>${esc(FLAG)}</code></div></div>`));
-      }
-      res.redirect('/?port=' + port);
-    },
+    index: () => page('Port Scanner Script', `
+      <div class="card">
+        <p>Ціль показана у вашому кабінеті (вкладка CTF) — лише адреса, без порту.</p>
+        <p style="margin-top:12px;color:#888">Напишіть власний Python-скрипт на <code>socket</code>, який перебирає порти цілі, знаходить відкритий і читає банер — прапор у ньому.</p>
+      </div>`),
   },
 
   'ghidra-crackme': {
     title: 'Crackme in Ghidra',
     index: (req, res) => {
       const err = req.query.err;
+      const key = 0x13;
+      const encoded = CRACKME_PASSWORD.split('')
+        .map(c => '0x' + (c.charCodeAt(0) ^ key).toString(16).padStart(2, '0'))
+        .join(', ');
       const body = err
         ? `<div class="card"><p class="err">${esc(err)}</p><a class="btn btn--ghost" href="/">Назад</a></div>`
-        : `<div class="card"><pre>void check_password(char *input) {
-  if (strcmp(input, "???") == 0)
-    print_flag();
-}</pre><form method="POST" action="/check">
-            <label>Пароль</label><input name="password" autocomplete="off">
-            <button type="submit">Перевірити</button>
-          </form></div>`;
+        : `<div class="card">
+            <pre>#define KEY 0x${key.toString(16)}
+
+void check_password(char *input) {
+  unsigned char expected[] = { ${encoded} };
+  for (int i = 0; i < sizeof(expected); i++)
+    if ((input[i] ^ KEY) != expected[i]) return;
+  print_flag();
+}</pre>
+            <form method="POST" action="/check">
+              <label>Пароль</label><input name="password" autocomplete="off">
+              <button type="submit">Перевірити</button>
+            </form>
+          </div>`;
       res.type('html').send(page('Crackme', body));
     },
     check: (req, res) => {
-      if (String(req.body?.password || '') === 'hackme2026') {
+      if (String(req.body?.password || '') === CRACKME_PASSWORD) {
         return res.type('html').send(page('Успіх!', `<div class="card"><p class="ok">Password correct!</p><div class="flag-box"><code>${esc(FLAG)}</code></div></div>`));
       }
       res.redirect('/?err=' + encodeURIComponent('Невірний пароль'));
@@ -204,26 +223,11 @@ const handlers = {
 
   'priv-esc-linux': {
     title: 'Linux Privilege Escalation',
-    index: (req, res) => {
-      const err = req.query.err;
-      const body = err
-        ? `<div class="card"><p class="err">${esc(err)}</p><a class="btn btn--ghost" href="/">Назад</a></div>`
-        : `<div class="card terminal"><div>$ whoami</div><div>lab</div>
-          <div style="margin-top:8px">$ ls -la /usr/local/bin/</div>
-          <div>-rwsr-xr-x 1 root root backup.sh</div></div>
-          <div class="card" style="margin-top:16px"><form method="POST" action="/escalate">
-            <label>Команда для backup.sh</label><input name="cmd" placeholder="./backup.sh" autocomplete="off">
-            <button type="submit">Виконати</button>
-          </form></div>`;
-      res.type('html').send(page('Priv Esc', body));
-    },
-    escalate: (req, res) => {
-      const cmd = String(req.body?.cmd || '').toLowerCase();
-      if (cmd.includes('root') || cmd.includes('sudo') || cmd.includes('id')) {
-        return res.type('html').send(page('Успіх!', `<div class="card"><p class="ok">Privilege escalation!</p><div class="flag-box"><code>${esc(FLAG)}</code></div></div>`));
-      }
-      res.redirect('/?err=' + encodeURIComponent('Недостатньо прав'));
-    },
+    index: () => page('Linux Privilege Escalation', `
+      <div class="card">
+        <p>SSH-доступ (команда та пароль) показано у вашому кабінеті (вкладка CTF).</p>
+        <p style="margin-top:12px;color:#888">Підключіться як <code>lab</code>, знайдіть SUID-бінарник (<code>find / -perm -4000 2&gt;/dev/null</code>) і подивіться, які зовнішні програми він викликає — чи завжди повним шляхом?</p>
+      </div>`),
   },
 };
 
@@ -232,10 +236,19 @@ if (!handler) {
   app.get('*', (_req, res) => res.status(404).send(page('Unknown challenge', '<div class="card"><p class="err">Невідомий CTF slug</p></div>')));
 } else {
   app.get('/', (req, res) => {
-    if (typeof handler.index === 'function') return handler.index(req, res);
-    res.type('html').send(handler.index());
+    const result = handler.index(req, res);
+    if (result !== undefined) res.type('html').send(result);
   });
-  app.get('/scan', (_req, res) => res.type('html').send(handler.scan?.()));
+  app.get('/hosts', (_req, res) => {
+    const html = handler.hosts?.();
+    if (!html) return res.status(404).end();
+    res.type('html').send(html);
+  });
+  app.get('/scan', (req, res) => {
+    const result = handler.scan?.(req, res);
+    if (result !== undefined) return res.type('html').send(result);
+    if (!res.headersSent) res.status(404).end();
+  });
   app.get('/admin', (_req, res) => res.type('html').send(handler.admin?.()));
   app.get('/download', (req, res) => handler.download?.(req, res));
   app.post('/login', (req, res) => handler.login?.(req, res));

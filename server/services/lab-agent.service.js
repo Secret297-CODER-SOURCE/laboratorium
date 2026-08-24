@@ -1,5 +1,6 @@
 import { execFileSync } from 'child_process';
 import config from '../config/index.js';
+import db from '../db/index.js';
 import { ValidationError } from '../utils/errors.js';
 import {
   assertSafeContainerName,
@@ -30,20 +31,28 @@ async function agentRequest(path, body) {
   return data;
 }
 
-function localDockerDeploy({ name, image, port, containerPort = 80, env: envVars = {} }) {
+function localDockerDeploy({
+  name, image, port, containerPort = 80, env: envVars = {}, extraPorts = [],
+}) {
   const safeName = assertSafeContainerName(name);
   const safeImage = assertSafeDockerImage(image);
   const hostPort = assertSafePort(port);
   const cPort = assertSafePort(containerPort);
+  const safeExtraPorts = extraPorts.map((ep) => ({
+    hostPort: assertSafePort(ep.hostPort),
+    containerPort: assertSafePort(ep.containerPort),
+  }));
   try {
     execFileSync('docker', ['rm', '-f', safeName], { stdio: 'ignore' });
   } catch {
     /* already gone */
   }
+  const extraPortArgs = safeExtraPorts.flatMap((ep) => ['-p', `${ep.hostPort}:${ep.containerPort}`]);
   execFileSync('docker', [
     'run', '-d',
     '--name', safeName,
     '-p', `${hostPort}:${cPort}`,
+    ...extraPortArgs,
     ...dockerEnvArgs(envVars || {}),
     '--restart', 'unless-stopped',
     safeImage,
@@ -55,6 +64,7 @@ function localDockerDeploy({ name, image, port, containerPort = 80, env: envVars
     targetUrl: buildDockerTargetUrl(hostIp, hostPort, cfg),
     hostPort,
     containerPort: cPort,
+    extraPorts: safeExtraPorts,
     publicHost: hostIp,
     mock: false,
     localDocker: true,
@@ -68,6 +78,7 @@ function mockDeploy({ name, image, port, containerPort = 80, demoMeta }) {
       targetUrl: buildDemoLabUrl(demoMeta),
       hostPort: port,
       containerPort,
+      extraPorts: [],
       publicHost: 'demo',
       mock: true,
       demo: true,
@@ -80,6 +91,7 @@ function mockDeploy({ name, image, port, containerPort = 80, demoMeta }) {
     targetUrl: buildDockerTargetUrl(hostIp, port, cfg),
     hostPort: port,
     containerPort,
+    extraPorts: [],
     publicHost: hostIp,
     mock: true,
   };
@@ -90,12 +102,13 @@ export function isAgentEnabled() {
 }
 
 export async function deployContainer({
-  name, image, port, containerPort = 80, demoMeta = null, env: envVars = null,
+  name, image, port, containerPort = 80, demoMeta = null, env: envVars = null, extraPorts = [],
 }) {
   const safeImage = assertSafeDockerImage(image);
 
   const agentResult = await agentRequest('/deploy', {
     name, image: safeImage, port, containerPort, env: envVars || undefined,
+    extraPorts: extraPorts.length ? extraPorts : undefined,
   });
   const cfg = getLabPublicConfig();
   const hostIp = cfg.dockerHostIp || config.labAgent.hostIp;
@@ -106,6 +119,7 @@ export async function deployContainer({
       targetUrl: buildDockerTargetUrl(hostIp, agentResult.hostPort || port, cfg),
       hostPort: agentResult.hostPort || port,
       containerPort,
+      extraPorts: agentResult.extraPorts || [],
       publicHost: hostIp,
       mock: false,
     };
@@ -114,7 +128,7 @@ export async function deployContainer({
   if (config.labAgent.useLocalDocker) {
     try {
       return localDockerDeploy({
-        name, image: safeImage, port, containerPort, env: envVars || {},
+        name, image: safeImage, port, containerPort, env: envVars || {}, extraPorts,
       });
     } catch (err) {
       throw new ValidationError(err.message || 'Local Docker deploy failed');
@@ -138,11 +152,54 @@ export async function stopContainer(containerId) {
   return { ok: true, mock: !config.labAgent.useLocalDocker };
 }
 
-export function allocatePort(seed) {
+function collectUsedPorts() {
+  const used = new Set();
+  const ctfRows = db.prepare(`
+    SELECT host_port, extra_ports FROM ctf_deployments WHERE status IN ('running', 'deploying')
+  `).all();
+  for (const row of ctfRows) {
+    if (row.host_port) used.add(row.host_port);
+    if (row.extra_ports) {
+      try {
+        const parsed = JSON.parse(row.extra_ports);
+        if (Array.isArray(parsed)) {
+          for (const p of parsed) if (p?.hostPort) used.add(p.hostPort);
+        }
+      } catch {
+        /* malformed, ignore */
+      }
+    }
+  }
+  const dockerRows = db.prepare(`
+    SELECT host_port FROM docker_deployments WHERE status IN ('running', 'deploying')
+  `).all();
+  for (const row of dockerRows) {
+    if (row.host_port) used.add(row.host_port);
+  }
+  return used;
+}
+
+export function allocatePorts(count, seed) {
   const start = config.labAgent.portRangeStart;
   const end = config.labAgent.portRangeEnd;
   const range = end - start;
-  return start + (seed % range);
+  if (count > range) throw new ValidationError('Немає вільних портів у діапазоні');
+
+  const used = collectUsedPorts();
+  const offset = ((seed % range) + range) % range;
+  const picked = [];
+  for (let i = 0; i < range && picked.length < count; i++) {
+    const port = start + ((offset + i) % range);
+    if (!used.has(port)) picked.push(port);
+  }
+  if (picked.length < count) {
+    throw new ValidationError('Немає вільних портів у діапазоні');
+  }
+  return picked;
+}
+
+export function allocatePort(seed) {
+  return allocatePorts(1, seed)[0];
 }
 
 export function getPublicInfra() {

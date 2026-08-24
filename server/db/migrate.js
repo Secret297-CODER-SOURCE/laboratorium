@@ -258,6 +258,11 @@ export function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_docker_deployments_user ON docker_deployments(user_id);
   `);
 
+  const ctfDepCols = db.prepare('PRAGMA table_info(ctf_deployments)').all().map(c => c.name);
+  if (!ctfDepCols.includes('extra_ports')) {
+    db.exec(`ALTER TABLE ctf_deployments ADD COLUMN extra_ports TEXT`);
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS platform_settings (
       key TEXT PRIMARY KEY,

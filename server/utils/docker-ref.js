@@ -22,6 +22,12 @@ export function assertSafePort(port) {
   return n;
 }
 
+export function assertSafePortList(ports) {
+  const list = Array.isArray(ports) ? ports : [];
+  if (list.length > 4) throw new ValidationError('Забагато портів');
+  return list.map((p) => assertSafePort(p));
+}
+
 export function dockerEnvArgs(envVars = {}) {
   const args = [];
   for (const [k, v] of Object.entries(envVars || {})) {

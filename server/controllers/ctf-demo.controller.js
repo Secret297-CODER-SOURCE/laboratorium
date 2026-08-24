@@ -107,41 +107,24 @@ function pageLayout({ title, slug, token, body, hint }) {
 </html>`;
 }
 
+const REQUIRES_REAL_DEPLOY = new Set(['nmap-scan', 'python-port-scanner', 'priv-esc-linux']);
+
 function renderChallengePage(ctx) {
   const { slug, title } = ctx.deployment;
   const token = ctx.token;
   const flag = getExpectedFlag(slug);
 
-  switch (slug) {
-    case 'nmap-scan': {
-      const hostsFound = getDemoSession(ctx).nmapHostsFound;
-      return pageLayout({
-        title,
-        slug,
-        token,
-        hint: hostsFound
-          ? 'Стандартний скан бачить лише типові порти. Хто ще ховається на нестандартному порту? Додайте діапазон портів (наприклад -p-) в опції.'
-          : 'Спершу знайдіть, які хости взагалі відповідають у мережі 10.13.37.0/28 — запустіть ping sweep.',
-        body: `
-          <div class="card">
-            <p>Мережа лабораторії: <code>10.13.37.0/28</code>. Спершу з'ясуйте, які хости живі.</p>
-            <a class="btn btn--ghost ico-inline" href="/lab/demo/nmap-scan/hosts?token=${encodeURIComponent(token)}">${icon('play', 'ico ico--sm')}nmap -sn 10.13.37.0/28 (ping sweep)</a>
-          </div>
-          <div class="card">
-            <p>${hostsFound ? 'Ціль знайдено. Тепер проскануйте її порти.' : 'Опція нижче стане корисною після ping sweep.'}</p>
-            <form method="GET" action="/lab/demo/nmap-scan/scan">
-              <input type="hidden" name="token" value="${esc(token)}">
-              <label>Адреса цілі (host/IP)</label>
-              <input name="target" placeholder="10.13.37.x або hostname" autocomplete="off">
-              <label>Опції nmap</label>
-              <input name="options" placeholder="-sV (типові порти)" autocomplete="off">
-              <button type="submit" class="ico-inline">${icon('play', 'ico ico--sm')}Запустити nmap</button>
-            </form>
-          </div>
-        `,
-      });
-    }
+  if (REQUIRES_REAL_DEPLOY.has(slug)) {
+    return pageLayout({
+      title: title || slug,
+      slug,
+      token,
+      hint: '',
+      body: `<div class="card"><p class="err">Це завдання вимагає реального Docker-стенду (потрібен LAB_USE_LOCAL_DOCKER=true або підключений lab-agent) — зверніться до адміністратора платформи.</p></div>`,
+    });
+  }
 
+  switch (slug) {
     case 'sql-injection':
       return pageLayout({
         title,
@@ -221,25 +204,6 @@ function renderChallengePage(ctx) {
         `,
       });
 
-    case 'python-port-scanner':
-      return pageLayout({
-        title,
-        slug,
-        token,
-        hint: 'Скористайтесь портом сервісу «elite», який ви знайшли під час повного nmap-сканування цілі.',
-        body: `
-          <div class="card">
-            <form method="POST" action="/lab/demo/python-port-scanner/scan?token=${encodeURIComponent(token)}">
-              <label>Хост</label>
-              <input name="host" placeholder="127.0.0.1" autocomplete="off">
-              <label>Порт</label>
-              <input name="port" placeholder="?" autocomplete="off">
-              <button type="submit">Сканувати</button>
-            </form>
-          </div>
-        `,
-      });
-
     case 'ghidra-crackme': {
       const key = 0x13;
       const encoded = CRACKME_PASSWORD.split('')
@@ -269,32 +233,6 @@ void check_password(char *input) {
         `,
       });
     }
-
-    case 'priv-esc-linux':
-      return pageLayout({
-        title,
-        slug,
-        token,
-        hint: 'backup.sh (SUID, root) внутрішньо викликає <code>tar czf /backup/&lt;ваш ввід&gt;.tar.gz /home/lab</code> без екранування. Ін\'єктуйте команду через метасимвол шелла (<code>;</code>, <code>|</code>, <code>` `</code> або <code>$( )</code>).',
-        body: `
-          <div class="card terminal">
-            <div>$ whoami</div>
-            <div>lab</div>
-            <div style="margin-top:8px">$ ls -la /usr/local/bin/</div>
-            <div>-rwsr-xr-x 1 root root  ...  backup.sh</div>
-            <div style="margin-top:8px">$ cat backup.sh</div>
-            <div>#!/bin/bash</div>
-            <div>tar czf /backup/"$1".tar.gz /home/lab</div>
-          </div>
-          <div class="card" style="margin-top:16px">
-            <form method="POST" action="/lab/demo/priv-esc-linux/escalate?token=${encodeURIComponent(token)}">
-              <label>Аргумент для backup.sh (ім'я архіву)</label>
-              <input name="cmd" placeholder="назва архіву" autocomplete="off">
-              <button type="submit">Виконати</button>
-            </form>
-          </div>
-        `,
-      });
 
     default:
       return pageLayout({
@@ -361,122 +299,7 @@ export function renderDemoPage(req, res) {
   res.type('html').send(renderChallengePage(ctx));
 }
 
-const NMAP_TARGETS = ['target.lab.internal', 'target.lab.internal.', '10.13.37.7'];
 const CRACKME_PASSWORD = 'hackme2026';
-
-export function nmapHosts(req, res) {
-  const ctx = getDemoCtx(req, res);
-  if (!ctx) return;
-  getDemoSession(ctx).nmapHostsFound = true;
-  const backLink = `<a class="btn btn--ghost ico-inline" href="/lab/demo/nmap-scan?token=${encodeURIComponent(ctx.token)}" style="margin-top:12px">${icon('chevron-left', 'ico ico--sm')}Назад до сканера</a>`;
-  res.type('html').send(pageLayout({
-    title: 'Ping sweep',
-    slug: ctx.slug,
-    token: ctx.token,
-    body: `
-      <div class="card">
-        <pre>Starting Nmap 7.94 ( https://nmap.org )
-Nmap scan report for 10.13.37.1
-Host is up (router).
-Nmap scan report for 10.13.37.4
-Host is up (idle).
-Nmap scan report for 10.13.37.7
-Host is up.
-Nmap done: 14 IP addresses (3 hosts up) scanned</pre>
-        <p style="color:#888">Три хости живі. Проскануйте кожен портами, щоб знайти той, що вартий уваги.</p>
-        ${backLink}
-      </div>
-    `,
-  }));
-}
-
-export function nmapScan(req, res) {
-  const ctx = getDemoCtx(req, res);
-  if (!ctx) return;
-  const target = String(req.query?.target || '').trim().toLowerCase();
-  const options = String(req.query?.options || '').trim().toLowerCase();
-  const flag = getExpectedFlag('nmap-scan');
-  const session = getDemoSession(ctx);
-  const backLink = `<a class="btn btn--ghost ico-inline" href="/lab/demo/nmap-scan?token=${encodeURIComponent(ctx.token)}" style="margin-top:12px">${icon('chevron-left', 'ico ico--sm')}Назад</a>`;
-
-  if (!session.nmapHostsFound) {
-    return res.type('html').send(pageLayout({
-      title: 'Результат nmap',
-      slug: ctx.slug,
-      token: ctx.token,
-      body: `<div class="card"><p class="err">Спершу виконайте ping sweep, щоб дізнатись, які хости живі.</p>${backLink}</div>`,
-    }));
-  }
-
-  if (!target) {
-    return res.type('html').send(pageLayout({
-      title: 'Результат nmap',
-      slug: ctx.slug,
-      token: ctx.token,
-      body: `<div class="card"><p class="err">Вкажіть адресу цілі для сканування.</p>${backLink}</div>`,
-    }));
-  }
-
-  if (!NMAP_TARGETS.includes(target)) {
-    return res.type('html').send(pageLayout({
-      title: 'Результат nmap',
-      slug: ctx.slug,
-      token: ctx.token,
-      body: `
-        <div class="card">
-          <pre>Starting Nmap...
-Note: Host seems down. If it is really up, but blocking our ping probes, try -Pn
-Nmap done: 1 IP address (0 hosts up)</pre>
-          <p class="err">Ціль «${esc(target)}» не відповідає. Перевірте адресу серед хостів з ping sweep.</p>
-          ${backLink}
-        </div>
-      `,
-    }));
-  }
-
-  const fullRangeScan = /-p-|\b1-65535\b|\b0-65535\b|\b31337\b/.test(options);
-
-  if (!fullRangeScan) {
-    return res.type('html').send(pageLayout({
-      title: 'Результат nmap',
-      slug: ctx.slug,
-      token: ctx.token,
-      body: `
-        <div class="card">
-          <p class="ok">Сканування ${esc(target)} завершено (типові порти)</p>
-          <ul class="ports">
-            <li>22/tcp open ssh</li>
-            <li>80/tcp open http</li>
-            <li>443/tcp open https</li>
-          </ul>
-          <p style="color:#888">Nmap за замовчуванням сканує лише ~1000 популярних портів. Сервіс може ховатись поза цим діапазоном — вкажіть у опціях повний діапазон портів.</p>
-          ${backLink}
-        </div>
-      `,
-    }));
-  }
-
-  res.type('html').send(pageLayout({
-    title: 'Результат nmap',
-    slug: ctx.slug,
-    token: ctx.token,
-    body: `
-      <div class="card">
-        <p class="ok">Сканування ${esc(target)} завершено (усі порти)</p>
-        <ul class="ports">
-          <li>22/tcp open ssh</li>
-          <li>80/tcp open http</li>
-          <li>443/tcp open https</li>
-          <li>31337/tcp open elite — <strong>FLAG в банері сервісу</strong></li>
-        </ul>
-        <pre>PORT      STATE SERVICE
-31337/tcp open  elite
-|_banner: ${esc(flag)}</pre>
-        <div class="flag-box"><code>${esc(flag)}</code></div>
-      </div>
-    `,
-  }));
-}
 
 function sqlEcho(user, pass) {
   return `SELECT * FROM users WHERE username='${user}' AND password='${pass}'`;
@@ -582,22 +405,6 @@ END`;
   res.type('text/plain').send(content);
 }
 
-export function portScanner(req, res) {
-  const ctx = getDemoCtx(req, res);
-  if (!ctx) return;
-  const port = parseInt(req.body?.port, 10);
-  const flag = getExpectedFlag('python-port-scanner');
-  if (port === 31337) {
-    return res.type('html').send(flagRevealPage(ctx, 'Порт 31337 відкритий!', flag));
-  }
-  res.type('html').send(pageLayout({
-    title: 'Сканер',
-    slug: ctx.slug,
-    token: ctx.token,
-    body: `<div class="card"><p class="err">Порт ${esc(String(port))} закритий. Спробуйте інший.</p><a class="btn btn--ghost ico-inline" href="/lab/demo/python-port-scanner?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Назад</a></div>`,
-  }));
-}
-
 export function crackmeCheck(req, res) {
   const ctx = getDemoCtx(req, res);
   if (!ctx) return;
@@ -614,27 +421,3 @@ export function crackmeCheck(req, res) {
   }));
 }
 
-const CMD_INJECTION = /(;|\||`|\$\()\s*(id|whoami|sh|bash|cat\s+\/etc\/shadow)\b/i;
-
-export function privEsc(req, res) {
-  const ctx = getDemoCtx(req, res);
-  if (!ctx) return;
-  const cmd = String(req.body?.cmd || '');
-  const flag = getExpectedFlag('priv-esc-linux');
-  if (CMD_INJECTION.test(cmd)) {
-    const output = `<pre>$ ./backup.sh '${esc(cmd)}'\nuid=0(root) gid=0(root) groups=0(root)</pre>`;
-    return res.type('html').send(flagRevealPage(
-      ctx,
-      'Command injection успішна — backup.sh виконав ваш код від root!',
-      flag,
-      output,
-    ));
-  }
-  res.type('html').send(pageLayout({
-    title: 'Access denied',
-    slug: ctx.slug,
-    token: ctx.token,
-    body: `<div class="card"><pre>$ ./backup.sh '${esc(cmd)}'
-tar: /home/lab: Cannot open: Permission denied</pre><p class="err">Аргумент передається у команду без екранування — але простих слів «root»/«sudo» тут недостатньо, потрібен метасимвол шелла.</p><a class="btn btn--ghost ico-inline" href="/lab/demo/priv-esc-linux?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Назад</a></div>`,
-  }));
-}

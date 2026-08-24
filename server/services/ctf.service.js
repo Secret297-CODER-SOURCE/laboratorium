@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import db from '../db/index.js';
 import * as labAgent from './lab-agent.service.js';
 import * as challengeService from './challenge.service.js';
@@ -12,6 +13,13 @@ import { MULTISTAGE_EXAMPLES } from './ctf-examples.js';
 import config from '../config/index.js';
 
 const CTF_IMAGE = () => config.labAgent.ctfImage || 'laboratorium/ctf-lab:latest';
+
+/** Extra real TCP ports a challenge's container needs beyond the primary HTTP port 80. */
+const EXTRA_PORT_SPECS = {
+  'nmap-scan': [{ containerPort: 31337, label: 'elite' }],
+  'python-port-scanner': [{ containerPort: 31337, label: 'elite' }],
+  'priv-esc-linux': [{ containerPort: 22, label: 'ssh' }],
+};
 
 const LEGACY_IMAGES = {
   'vulnerables/web-dvwa:latest': true,
@@ -96,7 +104,7 @@ function ensureExampleChallenges(dbConn) {
 export function listCtfForUser(userId) {
   const challenges = db.prepare(`
     SELECT c.*, p.name as program_name,
-      cd.id as deployment_id, cd.target_url, cd.status as deploy_status, cd.host_port
+      cd.id as deployment_id, cd.target_url, cd.status as deploy_status, cd.host_port, cd.extra_ports
     FROM challenges c
     LEFT JOIN programs p ON p.id = c.program_id
     LEFT JOIN ctf_deployments cd ON cd.challenge_id = c.id AND cd.user_id = ?
@@ -137,6 +145,7 @@ export function listCtfForUser(userId) {
       target_url: c.target_url,
       status: c.deploy_status,
       host_port: c.host_port,
+      extra_ports: c.extra_ports,
     }, cfg, {
       userId,
       resourceType: 'ctf',
@@ -167,19 +176,33 @@ export async function startChallenge(userId, challengeId) {
     });
   }
 
-  const port = labAgent.allocatePort(userId * 1000 + challengeId);
+  const extraSpecs = EXTRA_PORT_SPECS[challenge.slug] || [];
+  const seed = userId * 1000 + challengeId;
+  const [port, ...extraHostPorts] = labAgent.allocatePorts(1 + extraSpecs.length, seed);
   const name = `ctf-u${userId}-c${challengeId}`;
+
+  const sshPassword = realDeploy && challenge.slug === 'priv-esc-linux'
+    ? randomBytes(9).toString('base64url')
+    : null;
+
+  const extraPorts = extraSpecs.map((spec, i) => ({
+    containerPort: spec.containerPort,
+    hostPort: extraHostPorts[i],
+    label: spec.label,
+    ...(spec.label === 'ssh' && sshPassword ? { sshPassword } : {}),
+  }));
+  const extraPortsJson = extraPorts.length ? JSON.stringify(extraPorts) : null;
 
   if (existing) {
     db.prepare(`
-      UPDATE ctf_deployments SET status = 'deploying', error_message = NULL, host_port = ?
+      UPDATE ctf_deployments SET status = 'deploying', error_message = NULL, host_port = ?, extra_ports = ?
       WHERE id = ?
-    `).run(port, existing.id);
+    `).run(port, extraPortsJson, existing.id);
   } else {
     db.prepare(`
-      INSERT INTO ctf_deployments (user_id, challenge_id, host_port, status)
-      VALUES (?, ?, ?, 'deploying')
-    `).run(userId, challengeId, port);
+      INSERT INTO ctf_deployments (user_id, challenge_id, host_port, extra_ports, status)
+      VALUES (?, ?, ?, ?, 'deploying')
+    `).run(userId, challengeId, port, extraPortsJson);
   }
 
   const deployRow = db.prepare('SELECT * FROM ctf_deployments WHERE user_id = ? AND challenge_id = ?').get(userId, challengeId);
@@ -199,7 +222,12 @@ export async function startChallenge(userId, challengeId) {
         deploymentId: deployRow.id,
         slug: challenge.slug,
       } : null,
-      env: realDeploy && flag ? { CTF_SLUG: challenge.slug, CTF_FLAG: flag } : null,
+      env: realDeploy && flag ? {
+        CTF_SLUG: challenge.slug,
+        CTF_FLAG: flag,
+        ...(sshPassword ? { LAB_SSH_PASSWORD: sshPassword } : {}),
+      } : null,
+      extraPorts: extraPorts.map((p) => ({ hostPort: p.hostPort, containerPort: p.containerPort })),
     });
 
     db.prepare(`
