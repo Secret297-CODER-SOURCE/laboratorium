@@ -99,7 +99,7 @@ export function getDemoSessionKey(ctx) {
 
 export function getDemoSession(ctx) {
   const key = getDemoSessionKey(ctx);
-  if (!demoSessions.has(key)) demoSessions.set(key, { comments: [] });
+  if (!demoSessions.has(key)) demoSessions.set(key, { comments: [], nmapHostsFound: false });
   return demoSessions.get(key);
 }
 

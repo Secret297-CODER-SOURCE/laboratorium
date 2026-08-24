@@ -113,36 +113,48 @@ function renderChallengePage(ctx) {
   const flag = getExpectedFlag(slug);
 
   switch (slug) {
-    case 'nmap-scan':
+    case 'nmap-scan': {
+      const hostsFound = getDemoSession(ctx).nmapHostsFound;
       return pageLayout({
         title,
         slug,
         token,
-        hint: 'Введіть адресу цілі та запустіть скан. Придивіться до банерів відкритих портів.',
+        hint: hostsFound
+          ? 'Стандартний скан бачить лише типові порти. Хто ще ховається на нестандартному порту? Додайте діапазон портів (наприклад -p-) в опції.'
+          : 'Спершу знайдіть, які хости взагалі відповідають у мережі 10.13.37.0/28 — запустіть ping sweep.',
         body: `
           <div class="card">
-            <p>Знайдіть ціль у мережі лабораторії та проскануйте її порти.</p>
+            <p>Мережа лабораторії: <code>10.13.37.0/28</code>. Спершу з'ясуйте, які хости живі.</p>
+            <a class="btn btn--ghost ico-inline" href="/lab/demo/nmap-scan/hosts?token=${encodeURIComponent(token)}">${icon('play', 'ico ico--sm')}nmap -sn 10.13.37.0/28 (ping sweep)</a>
+          </div>
+          <div class="card">
+            <p>${hostsFound ? 'Ціль знайдено. Тепер проскануйте її порти.' : 'Опція нижче стане корисною після ping sweep.'}</p>
             <form method="GET" action="/lab/demo/nmap-scan/scan">
               <input type="hidden" name="token" value="${esc(token)}">
               <label>Адреса цілі (host/IP)</label>
-              <input name="target" placeholder="target.lab.internal" autocomplete="off">
+              <input name="target" placeholder="10.13.37.x або hostname" autocomplete="off">
+              <label>Опції nmap</label>
+              <input name="options" placeholder="-sV (типові порти)" autocomplete="off">
               <button type="submit" class="ico-inline">${icon('play', 'ico ico--sm')}Запустити nmap</button>
             </form>
           </div>
         `,
       });
+    }
 
     case 'sql-injection':
       return pageLayout({
         title,
         slug,
         token,
-        hint: 'Класичний login bypass: спробуйте <code>\' OR \'1\'=\'1</code> у полі логіна.',
+        hint: 'Бекенд підставляє ваш ввід прямо у SQL-запит нижче. Подумайте, як завершити рядок і змінити логіку WHERE.',
         body: `
           <div class="card">
+            <p style="margin-bottom:12px;color:#888">Сервер виконує:</p>
+            <pre>SELECT * FROM users WHERE username='&lt;username&gt;' AND password='&lt;password&gt;'</pre>
             <form method="POST" action="/lab/demo/sql-injection/login?token=${encodeURIComponent(token)}">
               <label>Username</label>
-              <input name="username" placeholder="admin" autocomplete="off">
+              <input name="username" placeholder="username" autocomplete="off">
               <label>Password</label>
               <input name="password" type="password" placeholder="••••••">
               <button type="submit">Увійти</button>
@@ -178,12 +190,17 @@ function renderChallengePage(ctx) {
         title,
         slug,
         token,
-        hint: 'Переповніть буфер — надішліть рядок довший за 32 символи.',
+        hint: 'Стек: [buffer 32B][saved EBP 8B][return address 8B]. Заповніть буфер, а потім перезапишіть адресу повернення значенням <code>DEADBEEF</code> (hex).',
         body: `
           <div class="card">
+            <pre>void vuln(char *input) {
+  char buf[32];
+  strcpy(buf, input);   // без перевірки довжини
+}
+// Пам'ять: [ 32B buf ][ 8B saved EBP ][ 8B return addr ]</pre>
             <form method="POST" action="/lab/demo/buffer-overflow/overflow?token=${encodeURIComponent(token)}">
-              <label>Ім'я (буфер 32 байти)</label>
-              <input name="name" placeholder="AAAA..." autocomplete="off">
+              <label>Ім'я (payload)</label>
+              <input name="name" placeholder="AAAAAAAA...AAAA + DEADBEEF" autocomplete="off">
               <button type="submit">Надіслати</button>
             </form>
           </div>
@@ -195,7 +212,7 @@ function renderChallengePage(ctx) {
         title,
         slug,
         token,
-        hint: 'Завантажте «зразок» і знайдіть IOC / flag у рядках (strings).',
+        hint: 'Запустіть <code>strings sample_malware.bin</code>. Не всі рядки — те, чим здаються; один із них закодовано.',
         body: `
           <div class="card">
             <p>Файл: <code>sample_malware.bin</code> (текстовий demo)</p>
@@ -209,31 +226,39 @@ function renderChallengePage(ctx) {
         title,
         slug,
         token,
-        hint: 'Запустіть сканер — flag з\'явиться після успішного скану порту 31337.',
+        hint: 'Скористайтесь портом сервісу «elite», який ви знайшли під час повного nmap-сканування цілі.',
         body: `
           <div class="card">
             <form method="POST" action="/lab/demo/python-port-scanner/scan?token=${encodeURIComponent(token)}">
               <label>Хост</label>
-              <input name="host" value="127.0.0.1">
+              <input name="host" placeholder="127.0.0.1" autocomplete="off">
               <label>Порт</label>
-              <input name="port" value="31337">
+              <input name="port" placeholder="?" autocomplete="off">
               <button type="submit">Сканувати</button>
             </form>
           </div>
         `,
       });
 
-    case 'ghidra-crackme':
+    case 'ghidra-crackme': {
+      const key = 0x13;
+      const encoded = CRACKME_PASSWORD.split('')
+        .map(c => '0x' + (c.charCodeAt(0) ^ key).toString(16).padStart(2, '0'))
+        .join(', ');
       return pageLayout({
         title,
         slug,
         token,
-        hint: 'Пароль до crackme: <code>hackme2026</code> — введіть його нижче.',
+        hint: `Це XOR — той самий байт-ключ застосований до кожного символу пароля. Розшифруйте масив (ключ виведено у декомпіляції), потім переведіть коди в ASCII.`,
         body: `
           <div class="card">
-            <pre>void check_password(char *input) {
-  if (strcmp(input, "???") == 0)
-    print_flag();
+            <pre>#define KEY 0x${key.toString(16)}
+
+void check_password(char *input) {
+  unsigned char expected[] = { ${encoded} };
+  for (int i = 0; i < sizeof(expected); i++)
+    if ((input[i] ^ KEY) != expected[i]) return;
+  print_flag();
 }</pre>
             <form method="POST" action="/lab/demo/ghidra-crackme/check?token=${encodeURIComponent(token)}">
               <label>Пароль</label>
@@ -243,25 +268,28 @@ function renderChallengePage(ctx) {
           </div>
         `,
       });
+    }
 
     case 'priv-esc-linux':
       return pageLayout({
         title,
         slug,
         token,
-        hint: 'Ви — user <code>lab</code>. Знайдіть SUID-бінарник і «підніміться» до root.',
+        hint: 'backup.sh (SUID, root) внутрішньо викликає <code>tar czf /backup/&lt;ваш ввід&gt;.tar.gz /home/lab</code> без екранування. Ін\'єктуйте команду через метасимвол шелла (<code>;</code>, <code>|</code>, <code>` `</code> або <code>$( )</code>).',
         body: `
           <div class="card terminal">
             <div>$ whoami</div>
             <div>lab</div>
             <div style="margin-top:8px">$ ls -la /usr/local/bin/</div>
             <div>-rwsr-xr-x 1 root root  ...  backup.sh</div>
-            <div style="margin-top:8px;color:#888"># backup.sh запускається від root (demo)</div>
+            <div style="margin-top:8px">$ cat backup.sh</div>
+            <div>#!/bin/bash</div>
+            <div>tar czf /backup/"$1".tar.gz /home/lab</div>
           </div>
           <div class="card" style="margin-top:16px">
             <form method="POST" action="/lab/demo/priv-esc-linux/escalate?token=${encodeURIComponent(token)}">
-              <label>Команда для backup.sh</label>
-              <input name="cmd" placeholder="./backup.sh $(whoami)" autocomplete="off">
+              <label>Аргумент для backup.sh (ім'я архіву)</label>
+              <input name="cmd" placeholder="назва архіву" autocomplete="off">
               <button type="submit">Виконати</button>
             </form>
           </div>
@@ -279,7 +307,7 @@ function renderChallengePage(ctx) {
   }
 }
 
-function flagRevealPage(ctx, message, flag) {
+function flagRevealPage(ctx, message, flag, extra = '') {
   return pageLayout({
     title: 'Успіх!',
     slug: ctx.slug,
@@ -287,6 +315,7 @@ function flagRevealPage(ctx, message, flag) {
     body: `
       <div class="card">
         <p class="ok">${esc(message)}</p>
+        ${extra}
         <div class="flag-box">
           <p style="margin-bottom:8px;color:#888">Скопіюйте flag у вкладку CTF:</p>
           <code>${esc(flag)}</code>
@@ -332,14 +361,52 @@ export function renderDemoPage(req, res) {
   res.type('html').send(renderChallengePage(ctx));
 }
 
-const NMAP_TARGETS = ['target.lab.internal', 'target.lab.internal.'];
+const NMAP_TARGETS = ['target.lab.internal', 'target.lab.internal.', '10.13.37.7'];
+const CRACKME_PASSWORD = 'hackme2026';
+
+export function nmapHosts(req, res) {
+  const ctx = getDemoCtx(req, res);
+  if (!ctx) return;
+  getDemoSession(ctx).nmapHostsFound = true;
+  const backLink = `<a class="btn btn--ghost ico-inline" href="/lab/demo/nmap-scan?token=${encodeURIComponent(ctx.token)}" style="margin-top:12px">${icon('chevron-left', 'ico ico--sm')}Назад до сканера</a>`;
+  res.type('html').send(pageLayout({
+    title: 'Ping sweep',
+    slug: ctx.slug,
+    token: ctx.token,
+    body: `
+      <div class="card">
+        <pre>Starting Nmap 7.94 ( https://nmap.org )
+Nmap scan report for 10.13.37.1
+Host is up (router).
+Nmap scan report for 10.13.37.4
+Host is up (idle).
+Nmap scan report for 10.13.37.7
+Host is up.
+Nmap done: 14 IP addresses (3 hosts up) scanned</pre>
+        <p style="color:#888">Три хости живі. Проскануйте кожен портами, щоб знайти той, що вартий уваги.</p>
+        ${backLink}
+      </div>
+    `,
+  }));
+}
 
 export function nmapScan(req, res) {
   const ctx = getDemoCtx(req, res);
   if (!ctx) return;
   const target = String(req.query?.target || '').trim().toLowerCase();
+  const options = String(req.query?.options || '').trim().toLowerCase();
   const flag = getExpectedFlag('nmap-scan');
+  const session = getDemoSession(ctx);
   const backLink = `<a class="btn btn--ghost ico-inline" href="/lab/demo/nmap-scan?token=${encodeURIComponent(ctx.token)}" style="margin-top:12px">${icon('chevron-left', 'ico ico--sm')}Назад</a>`;
+
+  if (!session.nmapHostsFound) {
+    return res.type('html').send(pageLayout({
+      title: 'Результат nmap',
+      slug: ctx.slug,
+      token: ctx.token,
+      body: `<div class="card"><p class="err">Спершу виконайте ping sweep, щоб дізнатись, які хости живі.</p>${backLink}</div>`,
+    }));
+  }
 
   if (!target) {
     return res.type('html').send(pageLayout({
@@ -360,7 +427,29 @@ export function nmapScan(req, res) {
           <pre>Starting Nmap...
 Note: Host seems down. If it is really up, but blocking our ping probes, try -Pn
 Nmap done: 1 IP address (0 hosts up)</pre>
-          <p class="err">Ціль «${esc(target)}» не відповідає. Перевірте адресу лабораторії.</p>
+          <p class="err">Ціль «${esc(target)}» не відповідає. Перевірте адресу серед хостів з ping sweep.</p>
+          ${backLink}
+        </div>
+      `,
+    }));
+  }
+
+  const fullRangeScan = /-p-|\b1-65535\b|\b0-65535\b|\b31337\b/.test(options);
+
+  if (!fullRangeScan) {
+    return res.type('html').send(pageLayout({
+      title: 'Результат nmap',
+      slug: ctx.slug,
+      token: ctx.token,
+      body: `
+        <div class="card">
+          <p class="ok">Сканування ${esc(target)} завершено (типові порти)</p>
+          <ul class="ports">
+            <li>22/tcp open ssh</li>
+            <li>80/tcp open http</li>
+            <li>443/tcp open https</li>
+          </ul>
+          <p style="color:#888">Nmap за замовчуванням сканує лише ~1000 популярних портів. Сервіс може ховатись поза цим діапазоном — вкажіть у опціях повний діапазон портів.</p>
           ${backLink}
         </div>
       `,
@@ -373,7 +462,7 @@ Nmap done: 1 IP address (0 hosts up)</pre>
     token: ctx.token,
     body: `
       <div class="card">
-        <p class="ok">Сканування ${esc(target)} завершено</p>
+        <p class="ok">Сканування ${esc(target)} завершено (усі порти)</p>
         <ul class="ports">
           <li>22/tcp open ssh</li>
           <li>80/tcp open http</li>
@@ -389,21 +478,36 @@ Nmap done: 1 IP address (0 hosts up)</pre>
   }));
 }
 
+function sqlEcho(user, pass) {
+  return `SELECT * FROM users WHERE username='${user}' AND password='${pass}'`;
+}
+
 export function sqliLogin(req, res) {
   const ctx = getDemoCtx(req, res);
   if (!ctx) return;
   const user = String(req.body?.username || '');
   const pass = String(req.body?.password || '');
   const flag = getExpectedFlag('sql-injection');
-  const bypass = /'\s*or\s*'1'\s*=\s*'1/i.test(user) || user.includes("' OR 1=1");
-  if (bypass || (user === 'admin' && pass === 'admin')) {
+  const query = sqlEcho(user, pass);
+  const commentsOutRest = /'\s*(--|#)/.test(user) || /'\s*(--|#)/.test(pass);
+  const tautology = /'\s*or\s*'?1'?\s*=\s*'?1/i.test(user) || /'\s*or\s*'?1'?\s*=\s*'?1/i.test(pass);
+  const unionBypass = /'\s*union\s+select/i.test(user);
+  const bypass = commentsOutRest || tautology || unionBypass;
+  if (bypass) {
     return res.type('html').send(flagRevealPage(ctx, 'SQL injection успішний — авторизацію обійдено!', flag));
   }
   res.type('html').send(pageLayout({
     title: 'Login failed',
     slug: ctx.slug,
     token: ctx.token,
-    body: `<div class="card"><p class="err">Невірний логін або пароль.</p><a class="btn btn--ghost ico-inline" href="/lab/demo/sql-injection?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Назад</a></div>`,
+    body: `
+      <div class="card">
+        <p class="err">Невірний логін або пароль.</p>
+        <p style="margin-top:12px;color:#888">Виконаний запит:</p>
+        <pre>${esc(query)}</pre>
+        <a class="btn btn--ghost ico-inline" href="/lab/demo/sql-injection?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Назад</a>
+      </div>
+    `,
   }));
 }
 
@@ -429,19 +533,34 @@ export function xssAdmin(req, res) {
   res.type('html').send(pageLayout({ title: 'Admin panel', slug: ctx.slug, token: ctx.token, body }));
 }
 
+const RET_ADDR_MARKER = 'deadbeef';
+
 export function bufferOverflow(req, res) {
   const ctx = getDemoCtx(req, res);
   if (!ctx) return;
   const name = String(req.body?.name || '');
   const flag = getExpectedFlag('buffer-overflow');
-  if (name.length > 32) {
-    return res.type('html').send(flagRevealPage(ctx, 'Stack smashing detected — EIP перезаписано!', flag));
+  const padding = name.slice(0, 32);
+  const retSlot = name.slice(32, 40).toLowerCase();
+  const overflowsBuffer = name.length > 32;
+  const overwritesReturnAddr = name.length >= 40 && retSlot === RET_ADDR_MARKER;
+
+  if (overwritesReturnAddr) {
+    return res.type('html').send(flagRevealPage(ctx, 'Stack smashing detected — EIP перезаписано на 0xDEADBEEF!', flag));
+  }
+  if (overflowsBuffer) {
+    return res.type('html').send(pageLayout({
+      title: 'Overflow, but no EIP control',
+      slug: ctx.slug,
+      token: ctx.token,
+      body: `<div class="card"><p class="err">Буфер переповнено (${name.length} байт), але адреса повернення (байти 33-40) не перезаписана правильним значенням.</p><p style="color:#888;margin-top:8px">padding: ${esc(padding)} (${padding.length}/32) · return slot: ${esc(retSlot || '(порожньо)')}</p><a class="btn btn--ghost ico-inline" href="/lab/demo/buffer-overflow?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Спробувати ще</a></div>`,
+    }));
   }
   res.type('html').send(pageLayout({
     title: 'Buffer OK',
     slug: ctx.slug,
     token: ctx.token,
-    body: `<div class="card"><p>Буфер вміщує ${name.length}/32 байт.</p><a class="btn btn--ghost ico-inline" href="/lab/demo/buffer-overflow?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Спробувати ще</a></div>`,
+    body: `<div class="card"><p>Буфер вміщує ${name.length}/32 байт — переповнення не сталось.</p><a class="btn btn--ghost ico-inline" href="/lab/demo/buffer-overflow?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Спробувати ще</a></div>`,
   }));
 }
 
@@ -449,11 +568,15 @@ export function malwareDownload(req, res) {
   const ctx = getDemoCtx(req, res);
   if (!ctx) return;
   const flag = getExpectedFlag('malware-static');
+  const flagB64 = Buffer.from(flag, 'utf8').toString('base64');
   const content = `MZ FAKE BINARY DEMO
 PATH: C:\\Users\\Admin\\secret.exe
 IOC: evil-domain.lab
 C2: 10.0.0.66
-FLAG_STRING=${flag}
+MUTEX: Global\\a8f3c1
+FAKE_FLAG=demo{not_this_one}
+FAKE_FLAG=demo{decoy_string}
+DEBUG_STR=${flagB64}
 END`;
   res.setHeader('Content-Disposition', 'attachment; filename="sample_malware.bin"');
   res.type('text/plain').send(content);
@@ -480,7 +603,7 @@ export function crackmeCheck(req, res) {
   if (!ctx) return;
   const pass = String(req.body?.password || '');
   const flag = getExpectedFlag('ghidra-crackme');
-  if (pass === 'hackme2026') {
+  if (pass === CRACKME_PASSWORD) {
     return res.type('html').send(flagRevealPage(ctx, 'Password correct!', flag));
   }
   res.type('html').send(pageLayout({
@@ -491,18 +614,27 @@ export function crackmeCheck(req, res) {
   }));
 }
 
+const CMD_INJECTION = /(;|\||`|\$\()\s*(id|whoami|sh|bash|cat\s+\/etc\/shadow)\b/i;
+
 export function privEsc(req, res) {
   const ctx = getDemoCtx(req, res);
   if (!ctx) return;
-  const cmd = String(req.body?.cmd || '').toLowerCase();
+  const cmd = String(req.body?.cmd || '');
   const flag = getExpectedFlag('priv-esc-linux');
-  if (cmd.includes('root') || cmd.includes('sudo') || cmd.includes('id')) {
-    return res.type('html').send(flagRevealPage(ctx, 'Privilege escalation успішна — ви root!', flag));
+  if (CMD_INJECTION.test(cmd)) {
+    const output = `<pre>$ ./backup.sh '${esc(cmd)}'\nuid=0(root) gid=0(root) groups=0(root)</pre>`;
+    return res.type('html').send(flagRevealPage(
+      ctx,
+      'Command injection успішна — backup.sh виконав ваш код від root!',
+      flag,
+      output,
+    ));
   }
   res.type('html').send(pageLayout({
     title: 'Access denied',
     slug: ctx.slug,
     token: ctx.token,
-    body: `<div class="card"><p class="err">Недостатньо прав. Підказка: backup.sh виконується як root.</p><a class="btn btn--ghost ico-inline" href="/lab/demo/priv-esc-linux?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Назад</a></div>`,
+    body: `<div class="card"><pre>$ ./backup.sh '${esc(cmd)}'
+tar: /home/lab: Cannot open: Permission denied</pre><p class="err">Аргумент передається у команду без екранування — але простих слів «root»/«sudo» тут недостатньо, потрібен метасимвол шелла.</p><a class="btn btn--ghost ico-inline" href="/lab/demo/priv-esc-linux?token=${encodeURIComponent(ctx.token)}">${icon('chevron-left', 'ico ico--sm')}Назад</a></div>`,
   }));
 }

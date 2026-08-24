@@ -6,6 +6,7 @@ import * as demoCtrl from '../controllers/ctf-demo.controller.js';
 const router = Router();
 const form = express.urlencoded({ extended: false });
 
+router.get('/nmap-scan/hosts', asyncHandler(demoCtrl.nmapHosts));
 router.get('/nmap-scan/scan', asyncHandler(demoCtrl.nmapScan));
 router.post('/sql-injection/login', form, asyncHandler(demoCtrl.sqliLogin));
 router.post('/xss-stored/comment', form, asyncHandler(demoCtrl.xssComment));
