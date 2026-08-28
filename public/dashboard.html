@@ -24,11 +24,11 @@
       <div id="toast" class="toast" hidden></div>
 
       <nav class="dash-tabs" id="dash-tabs" hidden>
-        <button type="button" class="dash-tab active" data-tab="home">Кабінет</button>
+        <button type="button" class="dash-tab active" data-tab="home" data-i18n="Кабінет">Кабінет</button>
         <button type="button" class="dash-tab" data-tab="ctf">CTF</button>
-        <button type="button" class="dash-tab" data-tab="tests">Тести</button>
-        <button type="button" class="dash-tab" data-tab="lab">Лабораторія</button>
-        <button type="button" class="dash-tab" data-tab="article" id="tab-article-btn" hidden>Написати статтю</button>
+        <button type="button" class="dash-tab" data-tab="tests" data-i18n="Тести">Тести</button>
+        <button type="button" class="dash-tab" data-tab="lab" data-i18n="Лабораторія">Лабораторія</button>
+        <button type="button" class="dash-tab" data-tab="article" id="tab-article-btn" hidden data-i18n="Написати статтю">Написати статтю</button>
       </nav>
 
       <div id="dash-panel-home">
@@ -37,7 +37,7 @@
         <div class="dash-profile">
           <div class="avatar" id="avatar">?</div>
           <div>
-            <h1 id="user-name">Завантаження...</h1>
+            <h1 id="user-name" data-i18n="Завантаження...">Завантаження...</h1>
             <p class="user-handle" id="user-handle">@...</p>
             <span class="tier-badge" id="user-tier">—</span>
           </div>
@@ -49,7 +49,7 @@
           </div>
           <div class="dash-stat">
             <span class="dash-stat-val" id="stat-rank">#—</span>
-            <span class="dash-stat-label">рейтинг</span>
+            <span class="dash-stat-label" data-i18n="рейтинг">рейтинг</span>
           </div>
           <div class="dash-stat">
             <span class="dash-stat-val" id="stat-challenges">0/0</span>
@@ -57,7 +57,7 @@
           </div>
           <div class="dash-stat">
             <span class="dash-stat-val" id="stat-programs">0</span>
-            <span class="dash-stat-label">програм</span>
+            <span class="dash-stat-label" data-i18n="програм">програм</span>
           </div>
         </div>
       </section>
@@ -76,42 +76,42 @@
         <!-- Upcoming conferences -->
         <section class="dash-panel dash-panel--wide">
           <div class="panel-header">
-            <h2>Майбутні конференції</h2>
+            <h2 data-i18n="Майбутні конференції">Майбутні конференції</h2>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <a href="/groups-chat.html" class="btn btn--outline btn--sm">Чати груп</a>
-              <a href="/conferences.html" class="btn btn--outline btn--sm">Усі конференції →</a>
+              <a href="/groups-chat.html" class="btn btn--outline btn--sm" data-i18n="Чати груп">Чати груп</a>
+              <a href="/conferences.html" class="btn btn--outline btn--sm" data-i18n="Усі конференції →">Усі конференції →</a>
             </div>
           </div>
           <div id="upcoming-conferences">
-            <p class="empty-state">Завантаження...</p>
+            <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
           </div>
         </section>
 
         <!-- Schedule -->
         <section class="dash-panel dash-panel--wide">
           <div class="panel-header">
-            <h2>Розклад занять</h2>
+            <h2 data-i18n="Розклад занять">Розклад занять</h2>
           </div>
           <div id="schedule-list">
-            <p class="empty-state">Завантаження...</p>
+            <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
           </div>
         </section>
 
         <!-- Tasks -->
         <section class="dash-panel dash-panel--wide">
           <div class="panel-header">
-            <h2>Мої задачі</h2>
+            <h2 data-i18n="Мої задачі">Мої задачі</h2>
             <div class="task-stats" id="task-stats"></div>
           </div>
           <div class="tasks-kanban" id="tasks-kanban">
-            <p class="empty-state">Завантаження...</p>
+            <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
           </div>
         </section>
 
         <!-- Group materials -->
         <section class="dash-panel dash-panel--wide" id="group-content-panel" hidden>
           <div class="panel-header">
-            <h2>Матеріали груп</h2>
+            <h2 data-i18n="Матеріали груп">Матеріали груп</h2>
           </div>
           <div id="group-content-list" class="group-content-list"></div>
         </section>
@@ -119,17 +119,17 @@
         <!-- Enrollments -->
         <section class="dash-panel">
           <div class="panel-header">
-            <h2>Мої програми</h2>
-            <button class="btn btn--outline btn--sm" id="enroll-toggle">+ Записатися</button>
+            <h2 data-i18n="Мої програми">Мої програми</h2>
+            <button class="btn btn--outline btn--sm" id="enroll-toggle" data-i18n="+ Записатися">+ Записатися</button>
           </div>
           <div id="enroll-form" class="enroll-form" hidden>
             <select id="program-select">
-              <option value="">Оберіть програму</option>
+              <option value="" data-i18n="Оберіть програму">Оберіть програму</option>
             </select>
-            <button class="btn btn--primary btn--sm" id="enroll-btn">Записатися</button>
+            <button class="btn btn--primary btn--sm" id="enroll-btn" data-i18n="Записатися">Записатися</button>
           </div>
           <div id="enrollments-list" class="enrollments-list">
-            <p class="empty-state">Завантаження...</p>
+            <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
           </div>
         </section>
 
@@ -140,28 +140,28 @@
             <span class="panel-tag">bounty lab</span>
           </div>
           <div id="challenges-list" class="challenges-list">
-            <p class="empty-state">Завантаження...</p>
+            <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
           </div>
         </section>
 
         <!-- Bounty log -->
         <section class="dash-panel dash-panel--wide">
           <div class="panel-header">
-            <h2>Історія bounty</h2>
+            <h2 data-i18n="Історія bounty">Історія bounty</h2>
           </div>
           <div id="bounty-log" class="bounty-log">
-            <p class="empty-state">Завантаження...</p>
+            <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
           </div>
         </section>
 
         <!-- Profile settings -->
         <section class="dash-panel">
           <div class="panel-header">
-            <h2>Профіль</h2>
+            <h2 data-i18n="Профіль">Профіль</h2>
           </div>
           <form id="profile-form" class="profile-form">
             <label>
-              <span>Ім'я</span>
+              <span data-i18n="Ім'я">Ім'я</span>
               <input type="text" name="name" id="profile-name">
             </label>
             <label>
@@ -172,7 +172,7 @@
               <span>Email</span>
               <input type="email" id="profile-email" disabled>
             </label>
-            <button type="submit" class="btn btn--primary btn--sm">Зберегти</button>
+            <button type="submit" class="btn btn--primary btn--sm" data-i18n="Зберегти">Зберегти</button>
           </form>
         </section>
       </div>
@@ -181,10 +181,10 @@
       <div id="dash-panel-tests" hidden>
         <section class="dash-panel dash-panel--wide">
           <div class="panel-header">
-            <h2>Тести</h2>
+            <h2 data-i18n="Тести">Тести</h2>
             <span class="panel-tag" id="quiz-stats-tag">—</span>
           </div>
-          <div id="quiz-list" class="quiz-list"><p class="empty-state">Завантаження...</p></div>
+          <div id="quiz-list" class="quiz-list"><p class="empty-state" data-i18n="Завантаження...">Завантаження...</p></div>
         </section>
       </div>
 
@@ -196,8 +196,9 @@
           </div>
           <div id="ctf-activity-feed" class="ctf-activity-feed"></div>
           <div class="ctf-filters">
+            <input type="search" class="ctf-filter-select ctf-filter-search" id="ctf-filter-search" data-i18n-placeholder="Пошук за назвою чи описом..." placeholder="Пошук за назвою чи описом...">
             <select class="ctf-filter-select" id="ctf-filter-category">
-              <option value="">Усі категорії</option>
+              <option value="" data-i18n="Усі категорії">Усі категорії</option>
               <option value="web">Web</option>
               <option value="network">Network / Pwn</option>
               <option value="crypto">Crypto</option>
@@ -207,40 +208,40 @@
               <option value="misc">Misc</option>
             </select>
             <select class="ctf-filter-select" id="ctf-filter-difficulty">
-              <option value="">Будь-яка складність</option>
+              <option value="" data-i18n="Будь-яка складність">Будь-яка складність</option>
               <option value="easy">easy</option>
               <option value="medium">medium</option>
               <option value="hard">hard</option>
             </select>
             <select class="ctf-filter-select" id="ctf-filter-status">
-              <option value="">Усі</option>
-              <option value="open">Не розв'язані</option>
-              <option value="completed">Розв'язані</option>
+              <option value="" data-i18n="Усі">Усі</option>
+              <option value="open" data-i18n="Не розв'язані">Не розв'язані</option>
+              <option value="completed" data-i18n="Розв'язані">Розв'язані</option>
             </select>
           </div>
-          <div id="ctf-list" class="ctf-list"><p class="empty-state">Завантаження...</p></div>
+          <div id="ctf-list" class="ctf-list"><p class="empty-state" data-i18n="Завантаження...">Завантаження...</p></div>
         </section>
       </div>
 
       <div id="dash-panel-lab" hidden>
         <div class="lab-subtabs">
-          <button type="button" class="lab-subtab active" data-lab="vm">Моя машина</button>
+          <button type="button" class="lab-subtab active" data-lab="vm" data-i18n="Моя машина">Моя машина</button>
           <button type="button" class="lab-subtab" data-lab="docker">Docker</button>
         </div>
         <div id="lab-panel-vm">
           <section class="dash-panel dash-panel--wide">
             <div class="panel-header">
-              <h2>Особиста VM (Proxmox)</h2>
+              <h2 data-i18n="Особиста VM (Proxmox)">Особиста VM (Proxmox)</h2>
               <span class="panel-tag" id="lab-vm-tag">—</span>
             </div>
-            <div id="lab-vm-content" class="lab-vm-card"><p class="empty-state">Завантаження...</p></div>
+            <div id="lab-vm-content" class="lab-vm-card"><p class="empty-state" data-i18n="Завантаження...">Завантаження...</p></div>
           </section>
         </div>
         <div id="lab-panel-docker" hidden>
           <section class="dash-panel dash-panel--wide">
             <div class="panel-header">
-              <h2>Розгорнути в Docker</h2>
-              <span class="panel-tag">спільний хост Proxmox</span>
+              <h2 data-i18n="Розгорнути в Docker">Розгорнути в Docker</h2>
+              <span class="panel-tag" data-i18n="спільний хост Proxmox">спільний хост Proxmox</span>
             </div>
             <form id="docker-deploy-form" class="docker-deploy-form">
               <label>
@@ -248,10 +249,10 @@
                 <input type="text" id="docker-image" placeholder="nginx:alpine" required>
               </label>
               <label>
-                <span>Назва (необов'язково)</span>
+                <span data-i18n="Назва (необов'язково)">Назва (необов'язково)</span>
                 <input type="text" id="docker-name" placeholder="my-lab">
               </label>
-              <button type="submit" class="btn btn--primary btn--sm">Розгорнути</button>
+              <button type="submit" class="btn btn--primary btn--sm" data-i18n="Розгорнути">Розгорнути</button>
             </form>
             <div id="docker-list" class="docker-list"></div>
           </section>
@@ -261,31 +262,31 @@
       <div id="dash-panel-article" hidden>
         <section class="dash-panel dash-panel--wide">
           <div class="panel-header">
-            <h2>Написати статтю</h2>
-            <span class="panel-tag">роль: автор</span>
+            <h2 data-i18n="Написати статтю">Написати статтю</h2>
+            <span class="panel-tag" data-i18n="роль: автор">роль: автор</span>
           </div>
           <form id="article-form" class="article-form">
             <input type="hidden" id="article-id" value="">
             <label>
-              <span>Заголовок</span>
-              <input type="text" id="article-title" placeholder="Назва статті" required maxlength="200">
+              <span data-i18n="Заголовок">Заголовок</span>
+              <input type="text" id="article-title" data-i18n-placeholder="Назва статті" placeholder="Назва статті" required maxlength="200">
             </label>
             <label>
-              <span>Текст статті</span>
-              <textarea id="article-content" rows="12" placeholder="Напишіть статтю..." required></textarea>
+              <span data-i18n="Текст статті">Текст статті</span>
+              <textarea id="article-content" rows="12" data-i18n-placeholder="Напишіть статтю..." placeholder="Напишіть статтю..." required></textarea>
             </label>
             <div class="article-form-actions">
-              <button type="submit" class="btn btn--primary btn--sm" id="article-save-btn">Зберегти чернетку</button>
-              <button type="button" class="btn btn--outline btn--sm" id="article-new-btn">Нова стаття</button>
+              <button type="submit" class="btn btn--primary btn--sm" id="article-save-btn" data-i18n="Зберегти чернетку">Зберегти чернетку</button>
+              <button type="button" class="btn btn--outline btn--sm" id="article-new-btn" data-i18n="Нова стаття">Нова стаття</button>
             </div>
           </form>
         </section>
         <section class="dash-panel dash-panel--wide">
           <div class="panel-header">
-            <h2>Мої статті</h2>
+            <h2 data-i18n="Мої статті">Мої статті</h2>
           </div>
           <div id="articles-list" class="articles-list">
-            <p class="empty-state">Поки немає статей</p>
+            <p class="empty-state" data-i18n="Поки немає статей">Поки немає статей</p>
           </div>
         </section>
       </div>
@@ -294,25 +295,25 @@
 
   <div class="dash-modal" id="quiz-modal" hidden>
     <div class="dash-modal-inner dash-modal-inner--wide">
-      <h3 id="quiz-modal-title">Тест</h3>
+      <h3 id="quiz-modal-title" data-i18n="Тест">Тест</h3>
       <p class="dash-modal-sub" id="quiz-modal-meta">—</p>
       <div id="quiz-timer" class="quiz-timer" hidden></div>
       <form id="quiz-form" class="quiz-form"></form>
       <div class="dash-modal-actions">
-        <button type="button" class="btn btn--ghost btn--sm" id="quiz-cancel">Скасувати</button>
-        <button type="submit" form="quiz-form" class="btn btn--primary btn--sm" id="quiz-submit">Надіслати відповіді</button>
+        <button type="button" class="btn btn--ghost btn--sm" id="quiz-cancel" data-i18n="Скасувати">Скасувати</button>
+        <button type="submit" form="quiz-form" class="btn btn--primary btn--sm" id="quiz-submit" data-i18n="Надіслати відповіді">Надіслати відповіді</button>
       </div>
     </div>
   </div>
 
   <div class="dash-modal" id="absence-modal" hidden>
     <div class="dash-modal-inner">
-      <h3>Повідомити про відсутність</h3>
+      <h3 data-i18n="Повідомити про відсутність">Повідомити про відсутність</h3>
       <p class="dash-modal-sub" id="absence-lesson-title">—</p>
-      <textarea id="absence-reason" class="dash-modal-inp" rows="4" placeholder="Причина (хвороба, сімейні обставини...)"></textarea>
+      <textarea id="absence-reason" class="dash-modal-inp" rows="4" data-i18n-placeholder="Причина (хвороба, сімейні обставини...)" placeholder="Причина (хвороба, сімейні обставини...)"></textarea>
       <div class="dash-modal-actions">
-        <button type="button" class="btn btn--ghost btn--sm" id="absence-cancel">Скасувати</button>
-        <button type="button" class="btn btn--primary btn--sm" id="absence-submit">Надіслати</button>
+        <button type="button" class="btn btn--ghost btn--sm" id="absence-cancel" data-i18n="Скасувати">Скасувати</button>
+        <button type="button" class="btn btn--primary btn--sm" id="absence-submit" data-i18n="Надіслати">Надіслати</button>
       </div>
     </div>
   </div>

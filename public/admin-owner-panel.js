@@ -92,10 +92,11 @@ export function renderUsersPanelExtended(users, role) {
       <select class="admin-inp" id="new-user-role">${roles.map(r => `<option value="${r}">${ROLE_LABELS[r]}</option>`).join('')}</select>
       <button type="button" class="btn btn--primary btn--sm" id="create-user-submit">Створити і надіслати пароль</button>
     </div>
+    <input type="search" class="admin-inp admin-search" id="users-search" placeholder="Пошук за handle, ім'ям чи email...">
     <table class="admin-table">
       <thead><tr><th>Handle</th><th>Ім'я</th><th>Email</th><th>Роль</th><th>Дії</th></tr></thead>
       <tbody>${(users || []).map(u => `
-        <tr>
+        <tr data-search="${esc(`${u.handle} ${u.name} ${u.email}`.toLowerCase())}">
           <td>@${u.handle}</td>
           <td>${esc(u.name)}</td>
           <td>${esc(u.email)}</td>
@@ -235,6 +236,13 @@ function rowData(row) {
 }
 
 export function bindOwnerPanelEvents(showToast, reload) {
+  document.getElementById('users-search')?.addEventListener('input', (e) => {
+    const query = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('tr[data-search]').forEach(row => {
+      row.hidden = !!query && !row.dataset.search.includes(query);
+    });
+  });
+
   document.getElementById('add-direction-btn')?.addEventListener('click', async () => {
     const name = prompt('Назва напрямку:');
     if (!name?.trim()) return;

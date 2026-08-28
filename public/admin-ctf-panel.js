@@ -63,6 +63,8 @@ export function renderCtfPanel(challenges = [], programs = []) {
 
     ${helpPanelHtml()}
 
+    <input type="search" class="admin-inp admin-search" id="ctf-admin-search" placeholder="Пошук за назвою, описом, категорією...">
+
     <div id="ctf-create-form" class="admin-inline-form ctf-create-form" hidden>
       <input type="hidden" id="ctf-edit-id">
       <input class="admin-inp" id="ctf-title" placeholder="Назва">
@@ -117,6 +119,15 @@ export function bindCtfPanelEvents(challenges = [], showToast, reload) {
   const form = document.getElementById('ctf-create-form');
   const stagesContainer = document.getElementById('ctf-stages');
   const totalEl = document.getElementById('ctf-stages-total');
+
+  document.getElementById('ctf-admin-search')?.addEventListener('input', (e) => {
+    const query = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.ctf-admin-item').forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.hidden = !!query && !text.includes(query);
+    });
+  });
+
   if (!form || !stagesContainer) return;
 
   function recalcTotal() {

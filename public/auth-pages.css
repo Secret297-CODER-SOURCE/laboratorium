@@ -9,8 +9,17 @@
   z-index: 1;
 }
 
-.auth-logo {
+.auth-topbar {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 32px;
+}
+
+.auth-logo {
+  margin-bottom: 0;
 }
 
 .auth-logo .logo-text {

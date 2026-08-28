@@ -1,5 +1,6 @@
 import { initTheme as startThemes, getAccentColor } from '/theme-engine.js';
 import { isAdminUser } from '/roles.js';
+import { t, getLocale } from '/i18n.js';
 
 const TOKEN_KEY = 'lab_token';
 const USER_KEY = 'lab_user';
@@ -206,9 +207,10 @@ export function updateNavAuth() {
     const onAdminPage = window.location.pathname.endsWith('/admin.html');
     if (logo) logo.setAttribute('href', marketingHome ? '/' : getSiteHome());
     const adminHtml = isAdmin && !onAdminPage
-      ? '<a href="/admin.html" class="btn btn--ghost btn--sm nav-admin-link">Адмін</a>'
+      ? `<a href="/admin.html" class="btn btn--ghost btn--sm nav-admin-link">${t('Адмін')}</a>`
       : '';
-    const pts = (user.bounty_points ?? 0).toLocaleString('uk-UA');
+    const localeTag = { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' }[getLocale()] || 'uk-UA';
+    const pts = (user.bounty_points ?? 0).toLocaleString(localeTag);
     slot.innerHTML = `
       ${adminHtml}
       <a href="${home}" class="btn btn--outline btn--sm nav-user" title="@${user.handle} · ${pts} pts">
@@ -219,7 +221,7 @@ export function updateNavAuth() {
   } else {
     if (logo) logo.setAttribute('href', '/');
     slot.innerHTML = `
-      <a href="/login.html" class="btn btn--ghost btn--sm nav-login-btn">Увійти</a>
+      <a href="/login.html" class="btn btn--ghost btn--sm nav-login-btn">${t('Увійти')}</a>
     `;
   }
 }

@@ -263,6 +263,7 @@
 
 .admin-inp--sm { max-width: 120px; }
 .admin-inp--xs { max-width: 72px; }
+.admin-search { margin-bottom: 14px; }
 
 .admin-inp[type="number"] {
   font-variant-numeric: tabular-nums;

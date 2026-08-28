@@ -958,6 +958,11 @@
   color: var(--text);
 }
 
+.ctf-filter-search {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
 .ctf-activity-feed {
   margin-bottom: 14px;
 }

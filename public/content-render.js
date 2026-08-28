@@ -97,7 +97,7 @@ export function renderBlock(block, { preview = false } = {}) {
   }
 }
 
-export function renderPage(page, { preview = false } = {}) {
+export function renderPage(page, { preview = false, hero = true } = {}) {
   if (!page) return '<p class="empty-state">Немає контенту</p>';
   const gradient = page.cover_gradient || 'accent';
   const sections = (page.sections || []).map(section => `
@@ -111,13 +111,15 @@ export function renderPage(page, { preview = false } = {}) {
       </div>
     </section>`).join('');
 
-  return `
+  const heroHtml = hero ? `
     <header class="cb-hero cb-hero--${esc(gradient)}">
       <div class="cb-hero-inner">
         <h1>${esc(page.title || '')}</h1>
         ${page.subtitle ? `<p class="cb-hero-sub">${esc(page.subtitle)}</p>` : ''}
       </div>
-    </header>
+    </header>` : '';
+
+  return `${heroHtml}
     <div class="cb-body">${sections || '<p class="empty-state">Додайте розділи та блоки</p>'}</div>`;
 }
 

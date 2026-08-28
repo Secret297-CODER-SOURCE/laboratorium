@@ -1,6 +1,7 @@
 import { updateNavAuth, initBurger, clearSession } from '/auth.js';
 import { LOGO_SVG, renderLogo } from '/logo.js';
 import { renderAppNavLinks, setAppNavActive, refreshAppNav } from '/app-nav.js';
+import { t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
 
 export { LOGO_SVG, renderLogo, setAppNavActive, refreshAppNav };
 
@@ -14,7 +15,7 @@ const MAIN_LINKS = [
 export function renderMainNavLinks({ hashAnchors = false } = {}) {
   const prefix = hashAnchors ? '#' : '/#';
   return `<ul class="nav-links">
-    ${MAIN_LINKS.map(l => `<li><a href="${prefix}${l.anchor}">${l.label}</a></li>`).join('')}
+    ${MAIN_LINKS.map(l => `<li><a href="${prefix}${l.anchor}">${t(l.label)}</a></li>`).join('')}
   </ul>`;
 }
 
@@ -46,12 +47,13 @@ export function renderSiteHeader({
     ${navBlock}
     <div class="nav-actions">
       <span class="nav-extra-slot">${extraActions}</span>
+      ${renderLangSwitch()}
       <div id="auth-nav" class="auth-nav"></div>
-      ${showEnroll ? `<a href="${hashAnchors ? '#contact' : '/#contact'}" class="btn btn--outline btn--sm hide-mobile nav-enroll-btn">Записатися</a>` : '<span class="nav-enroll-slot hide-mobile" aria-hidden="true"></span>'}
+      ${showEnroll ? `<a href="${hashAnchors ? '#contact' : '/#contact'}" class="btn btn--outline btn--sm hide-mobile nav-enroll-btn">${t('Записатися')}</a>` : '<span class="nav-enroll-slot hide-mobile" aria-hidden="true"></span>'}
       ${showLogout
-    ? '<button type="button" id="logout-btn" class="btn btn--ghost btn--sm ico-inline nav-logout-btn" data-nav-icon="logout">Вийти</button>'
+    ? `<button type="button" id="logout-btn" class="btn btn--ghost btn--sm ico-inline nav-logout-btn" data-nav-icon="logout">${t('Вийти')}</button>`
     : '<span class="nav-logout-slot" aria-hidden="true"></span>'}
-      <button type="button" class="burger" aria-label="Меню" aria-expanded="false">
+      <button type="button" class="burger" aria-label="${t('Меню')}" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
     </div>
@@ -64,6 +66,7 @@ export function initSiteHeader(options = {}) {
   el.innerHTML = renderSiteHeader(options);
   updateNavAuth();
   initBurger();
+  bindLangSwitch(document);
   el.classList.add('is-ready');
 
   const logoutBtn = document.getElementById('logout-btn');
@@ -74,4 +77,19 @@ export function initSiteHeader(options = {}) {
       window.location.href = '/';
     });
   }
+
+  window.addEventListener('localechange', () => {
+    el.innerHTML = renderSiteHeader(options);
+    updateNavAuth();
+    initBurger();
+    bindLangSwitch(document);
+    const btn = document.getElementById('logout-btn');
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => {
+        clearSession();
+        window.location.href = '/';
+      });
+    }
+  });
 }

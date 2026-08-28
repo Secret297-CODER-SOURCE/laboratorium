@@ -2,6 +2,7 @@ import { getUser } from '/auth.js';
 import { icon } from '/icons.js';
 import { isAdminUser } from '/roles.js';
 import { canAccessTab, pageAllowed } from '/tab-access.js';
+import { t } from '/i18n.js';
 
 const ADMIN_LINKS = [
   { href: '/portal.html', label: 'Головна', icon: 'home' },
@@ -45,7 +46,7 @@ export function renderAppNavLinks({ activePath = '', user = getUser() } = {}) {
   return `<ul class="nav-links app-nav-links">
     ${links.map(link => {
       const active = path === link.href ? ' active' : '';
-      return `<li><a href="${link.href}" class="app-nav-link${active}">${icon(link.icon, 'ico ico--sm')}${link.label}</a></li>`;
+      return `<li><a href="${link.href}" class="app-nav-link${active}">${icon(link.icon, 'ico ico--sm')}${t(link.label)}</a></li>`;
     }).join('')}
   </ul>`;
 }

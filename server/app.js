@@ -18,6 +18,7 @@ import chatRoutes from './routes/chat.routes.js';
 import labRoutes from './routes/lab.routes.js';
 import ctfDemoRoutes from './routes/ctf-demo.routes.js';
 import tunnelRoutes from './routes/tunnel.routes.js';
+import sitemapRoutes from './routes/sitemap.routes.js';
 import { trySslipHostTunnel } from './services/tunnel.service.js';
 import './db/index.js';
 
@@ -103,6 +104,7 @@ export function createApp() {
   app.use('/api/admin', adminRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/lab', labRoutes);
+  app.use(sitemapRoutes);
 
   app.use(trySslipHostTunnel);
   app.use('/lab/t', tunnelRoutes);

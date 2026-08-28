@@ -10,6 +10,7 @@ router.get('/leaderboard', asyncHandler(apiCtrl.getLeaderboard));
 router.get('/site-info', asyncHandler(apiCtrl.getSiteInfo));
 router.get('/qr', asyncHandler(apiCtrl.getSiteQr));
 router.get('/directions', asyncHandler(apiCtrl.getDirections));
+router.get('/programs/:id/page', asyncHandler(apiCtrl.getPublicProgramPage));
 router.post('/applications', optionalAuth, asyncHandler(apiCtrl.submitApplication));
 
 export default router;

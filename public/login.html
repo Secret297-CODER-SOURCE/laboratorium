@@ -15,12 +15,15 @@
   <div class="grid-bg" aria-hidden="true"></div>
 
   <div class="auth-page">
-    <a href="/" class="auth-logo"><span class="logo-text">laboratorium<em>.</em></span></a>
+    <div class="auth-topbar">
+      <a href="/" class="auth-logo"><span class="logo-text">laboratorium<em>.</em></span></a>
+      <span id="auth-lang-switch"></span>
+    </div>
     <div class="auth-card">
       <div class="auth-header">
         <span class="section-tag">// auth.login</span>
-        <h1>Вхід до лабораторії</h1>
-        <p>Єдиний вхід на платформу. Доступ надається після оплати.</p>
+        <h1 data-i18n="Вхід до лабораторії">Вхід до лабораторії</h1>
+        <p data-i18n="Єдиний вхід на платформу. Доступ надається після оплати.">Єдиний вхід на платформу. Доступ надається після оплати.</p>
       </div>
       <form id="login-form" class="auth-form">
         <div id="form-error" class="form-error" hidden></div>
@@ -30,20 +33,28 @@
           <input type="email" name="email" required placeholder="you@email.com" autocomplete="email">
         </label>
         <label>
-          <span>Пароль</span>
+          <span data-i18n="Пароль">Пароль</span>
           <input type="password" name="password" required placeholder="••••••••" autocomplete="current-password">
         </label>
-        <button type="submit" class="btn btn--primary btn--full">Увійти</button>
+        <button type="submit" class="btn btn--primary btn--full" data-i18n="Увійти">Увійти</button>
       </form>
       <p class="auth-footer">
-        <a href="/forgot-password.html">Забули пароль?</a>
+        <a href="/forgot-password.html" data-i18n="Забули пароль?">Забули пароль?</a>
       </p>
     </div>
   </div>
 
   <script type="module">
     import { api, setSession, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
+    import { initI18n, t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
     initTheme();
+    initI18n();
+    document.getElementById('auth-lang-switch').innerHTML = renderLangSwitch();
+    bindLangSwitch(document);
+    window.addEventListener('localechange', () => {
+      document.getElementById('auth-lang-switch').innerHTML = renderLangSwitch();
+      bindLangSwitch(document);
+    });
 
     const params = new URLSearchParams(location.search);
 
@@ -63,7 +74,7 @@
 
       if (params.get('reset') === 'ok') {
         const info = document.getElementById('form-info');
-        info.textContent = 'Пароль оновлено. Увійдіть з новим паролем.';
+        info.textContent = t('Пароль оновлено. Увійдіть з новим паролем.');
         info.hidden = false;
       }
 
@@ -74,7 +85,7 @@
         const fd = new FormData(e.target);
         errEl.hidden = true;
         btn.disabled = true;
-        btn.textContent = 'Вхід...';
+        btn.textContent = t('Вхід...');
         try {
           const data = await api('/auth/login', {
             method: 'POST',
@@ -86,7 +97,7 @@
           errEl.textContent = err.message;
           errEl.hidden = false;
           btn.disabled = false;
-          btn.textContent = 'Увійти';
+          btn.textContent = t('Увійти');
         }
       });
     })();

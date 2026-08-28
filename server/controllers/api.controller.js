@@ -37,6 +37,40 @@ export async function getDirections(_req, res) {
   res.json({ directions: directionService.getPublicWithPrograms() });
 }
 
+export async function getSitemap(_req, res) {
+  const base = config.siteUrl.replace(/\/+$/, '');
+  const programs = programService.getAll();
+
+  const urls = [
+    { loc: `${base}/`, priority: '1.0' },
+    { loc: `${base}/login.html`, priority: '0.3' },
+    ...programs.map(p => ({ loc: `${base}/course.html?id=${p.id}`, priority: '0.7' })),
+  ];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n`
+    + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`
+    + urls.map(u => `  <url><loc>${u.loc}</loc><priority>${u.priority}</priority></url>`).join('\n')
+    + `\n</urlset>\n`;
+
+  res.set('Content-Type', 'application/xml; charset=utf-8');
+  res.send(xml);
+}
+
+export async function getPublicProgramPage(req, res) {
+  const programId = parseInt(req.params.id, 10);
+  const program = programService.getById(programId);
+  if (!program || !program.is_active) throw new NotFoundError('Курс не знайдено');
+
+  const direction = program.direction_id ? directionService.getById(program.direction_id) : null;
+
+  let page = null;
+  try {
+    page = contentService.getPageForViewer('program', programId, null, 'guest').page;
+  } catch { /* адмін ще не опублікував розширену сторінку курсу */ }
+
+  res.json({ program, direction, page });
+}
+
 export async function getLeaderboard(_req, res) {
   const users = applicationService.getLeaderboard();
   res.json({

@@ -100,7 +100,7 @@ function animateCounters() {
   });
 }
 
-document.querySelectorAll('.feature-card,.program-card,.section-header,.about-text,.bounty-content,.leaderboard,.contact-info,.contact-form,.cta-inner').forEach(el => {
+document.querySelectorAll('.feature-card,.section-header,.about-text,.bounty-content,.leaderboard,.contact-info,.contact-form,.cta-inner').forEach(el => {
   el.classList.add('reveal');
   new IntersectionObserver(([e]) => { if (e.isIntersecting) e.target.classList.add('visible'); }, { threshold: 0.15 }).observe(el);
 });

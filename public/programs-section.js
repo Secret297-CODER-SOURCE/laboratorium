@@ -1,9 +1,16 @@
 import { api, isLoggedIn } from '/auth.js';
 import { icon } from '/icons.js';
+import { t } from '/i18n.js';
 
 let directionsData = [];
+let activeDirectionId = null;
+let searchQuery = '';
 
-const DIR_ACCENTS = {
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+export const DIR_ACCENTS = {
   cybersecurity: '#00e5ff',
   cpp: '#4da6ff',
   python: '#00ff88',
@@ -16,7 +23,7 @@ const DIR_ACCENTS = {
   web: '#ffaa00',
 };
 
-const DIR_ICONS = {
+export const DIR_ICONS = {
   cybersecurity: 'shield',
   cpp: 'code',
   python: 'code',
@@ -29,64 +36,102 @@ const DIR_ICONS = {
   web: 'grid',
 };
 
-function dirAccent(dir) {
+export function dirAccent(dir) {
   return DIR_ACCENTS[dir?.slug] || 'var(--accent)';
 }
 
-function dirIcon(dir) {
+export function dirIcon(dir) {
   return DIR_ICONS[dir?.slug] || 'book';
 }
 
-function levelClass(level) {
+export function levelSegments(level) {
   const l = String(level || '').toLowerCase();
-  if (l.includes('advanced')) return 'program-level--hard';
-  if (l.includes('intermediate')) return 'program-level--mid';
-  return 'program-level--easy';
+  if (l.includes('advanced')) return 3;
+  if (l.includes('intermediate')) return 2;
+  return 1;
 }
 
-function renderProgramCard(p, dir) {
-  const tags = (p.tags || []).map(t => `<li>${t}</li>`).join('');
-  const accent = dirAccent(dir);
-  const featured = p.is_featured ? '<span class="program-badge">Популярне</span>' : '';
-  const ctaHref = isLoggedIn() ? '/dashboard.html' : '/login.html';
-  const ctaLabel = isLoggedIn() ? 'Записатися' : 'Увійти та записатися';
+function renderLevelMeter(level) {
+  const segs = levelSegments(level);
+  return `<span class="dossier-level" title="${t('Рівень: {level}', { level })}">
+    ${[1, 2, 3].map(n => `<span class="dossier-level-seg${n <= segs ? ' is-on' : ''}"></span>`).join('')}
+  </span>`;
+}
 
-  return `<article class="program-card${p.is_featured ? ' program-card--featured' : ''}" style="--prog-accent:${accent}">
-    <div class="program-card-glow" aria-hidden="true"></div>
-    <div class="program-card-top">
-      <div class="program-icon">${icon(dirIcon(dir), 'ico ico--lg')}</div>
-      <div class="program-meta-badges">
-        ${featured}
-        <span class="program-level ${levelClass(p.level)}">${p.level}</span>
+function renderProgramRow(p, dir) {
+  const accent = dirAccent(dir);
+  const tags = p.tags || [];
+  const ctaHref = isLoggedIn() ? '/dashboard.html' : '/login.html';
+  const ctaLabel = isLoggedIn() ? t('Записатися') : t('Увійти та записатися');
+  const bodyId = `dossier-body-${p.id}`;
+
+  return `<li class="dossier-row${p.is_featured ? ' dossier-row--featured' : ''}" style="--prog-accent:${accent}">
+    <button type="button" class="dossier-row-head" data-id="${p.id}" aria-expanded="false" aria-controls="${bodyId}">
+      ${renderLevelMeter(p.level)}
+      <span class="dossier-id">TGT://${p.slug}</span>
+      <span class="dossier-title">
+        ${p.name}
+        ${p.is_featured ? `<span class="dossier-flag">${t('[!] пріоритетний набір')}</span>` : ''}
+      </span>
+      <span class="dossier-meta">
+        <span class="ico-inline">${icon('calendar', 'ico ico--xs')}${p.duration}</span>
+        <span class="ico-inline">${icon('chart', 'ico ico--xs')}+${p.bounty_reward}</span>
+      </span>
+      <span class="dossier-chevron">${icon('chevron-down', 'ico ico--sm')}</span>
+    </button>
+    <div class="dossier-body" id="${bodyId}">
+      <div class="dossier-body-inner">
+        <p class="dossier-desc">${p.description || ''}</p>
+        ${tags.length ? `
+          <div class="dossier-arsenal">
+            <span class="dossier-arsenal-label">${t('Арсенал')}</span>
+            <ul>${tags.map(tag => `<li>${tag}</li>`).join('')}</ul>
+          </div>` : ''}
+        <div class="dossier-actions">
+          <a href="/course.html?id=${p.id}" class="btn btn--outline btn--sm">${t('Відкрити повну програму →')}</a>
+          <a href="${ctaHref}" class="btn btn--primary btn--sm">${ctaLabel}</a>
+        </div>
       </div>
     </div>
-    <h3>${p.name}</h3>
-    <p>${p.description || ''}</p>
-    <ul class="program-tags">${tags}</ul>
-    ${p.has_content ? `<a href="/content.html?type=program&id=${p.id}" class="program-details-link">Детальніше про курс →</a>` : ''}
-    <div class="program-footer">
-      <div class="program-meta">
-        <span class="program-duration">${icon('calendar', 'ico ico--sm')}${p.duration}</span>
-        <span class="program-bounty">${icon('chart', 'ico ico--sm')}+${p.bounty_reward} bounty</span>
-      </div>
-      <a href="${ctaHref}" class="btn btn--outline btn--sm program-cta">${ctaLabel}</a>
-    </div>
-  </article>`;
+  </li>`;
+}
+
+function bindDossierToggles(list) {
+  list.querySelectorAll('.dossier-row-head').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('.dossier-row');
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!open));
+      row.classList.toggle('is-open', !open);
+    });
+  });
 }
 
 function renderPrograms(directionId) {
   const grid = document.getElementById('programs-grid');
   if (!grid) return;
   const dir = directionsData.find(d => d.id === directionId);
-  const programs = dir?.programs || [];
-  if (!programs.length) {
-    grid.innerHTML = '<p class="empty-state">Програми для цього напрямку ще не додані</p>';
+  const allPrograms = dir?.programs || [];
+  if (!allPrograms.length) {
+    grid.innerHTML = `<p class="empty-state">${t('Програми для цього напрямку ще не додані')}</p>`;
     return;
   }
-  grid.innerHTML = programs.map(p => renderProgramCard(p, dir)).join('');
-  grid.querySelectorAll('.program-card').forEach(el => {
+
+  const query = searchQuery.trim().toLowerCase();
+  const programs = query
+    ? allPrograms.filter(p => `${p.name} ${p.description || ''} ${(p.tags || []).join(' ')}`.toLowerCase().includes(query))
+    : allPrograms;
+
+  if (!programs.length) {
+    grid.innerHTML = `<p class="empty-state">${t('Нічого не знайдено за запитом «{query}»', { query: esc(searchQuery.trim()) })}</p>`;
+    return;
+  }
+
+  grid.innerHTML = `<ul class="dossier-list">${programs.map(p => renderProgramRow(p, dir)).join('')}</ul>`;
+  bindDossierToggles(grid);
+  grid.querySelectorAll('.dossier-row').forEach(el => {
     el.classList.add('reveal');
-    new IntersectionObserver(([e]) => { if (e.isIntersecting) e.target.classList.add('visible'); }, { threshold: 0.15 }).observe(el);
+    new IntersectionObserver(([e]) => { if (e.isIntersecting) e.target.classList.add('visible'); }, { threshold: 0.1 }).observe(el);
   });
 }
 
@@ -108,6 +153,7 @@ function updateTrackIndicator(activeBtn) {
 }
 
 function selectDirection(id) {
+  activeDirectionId = id;
   let activeBtn = null;
   document.querySelectorAll('.track-switch-btn').forEach(btn => {
     const active = parseInt(btn.dataset.id, 10) === id;
@@ -134,7 +180,7 @@ export async function initProgramsSection() {
     const { directions } = await api('/directions');
     directionsData = directions || [];
     if (!directionsData.length) {
-      slider.innerHTML = '<p class="empty-state">Напрямки скоро з\'являться</p>';
+      slider.innerHTML = `<p class="empty-state">${t("Напрямки скоро з'являться")}</p>`;
       return;
     }
 
@@ -155,7 +201,7 @@ export async function initProgramsSection() {
     if (contentLinks) {
       contentLinks.innerHTML = directionsData.map(d => d.has_content ? `
         <a href="/content.html?type=direction&id=${d.id}" class="direction-content-link" data-dir="${d.id}" hidden>
-          Детальніше про напрямок →
+          ${t('Детальніше про напрямок →')}
         </a>` : '').join('');
       const showLink = (dirId) => {
         contentLinks.querySelectorAll('.direction-content-link').forEach(a => {
@@ -166,12 +212,17 @@ export async function initProgramsSection() {
       showLink(directionsData[0].id);
     }
 
+    document.getElementById('programs-search')?.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      if (activeDirectionId != null) renderPrograms(activeDirectionId);
+    });
+
     slider.querySelectorAll('.track-switch-btn').forEach(btn => {
       btn.addEventListener('click', () => selectDirection(parseInt(btn.dataset.id, 10)));
     });
 
     if (contactSelect) {
-      contactSelect.innerHTML = '<option value="" disabled selected>Оберіть напрямок</option>'
+      contactSelect.innerHTML = `<option value="" disabled selected>${t('Оберіть напрямок')}</option>`
         + directionsData.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
     }
 
@@ -186,6 +237,10 @@ export async function initProgramsSection() {
     });
   } catch {
     const grid = document.getElementById('programs-grid');
-    if (grid) grid.innerHTML = '<p class="empty-state">Не вдалося завантажити програми</p>';
+    if (grid) grid.innerHTML = `<p class="empty-state">${t('Не вдалося завантажити програми')}</p>`;
   }
+
+  window.addEventListener('localechange', () => {
+    if (activeDirectionId != null) renderPrograms(activeDirectionId);
+  });
 }

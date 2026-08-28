@@ -5,9 +5,14 @@ import {
 import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, dashTabAllowed, firstAllowedDashTab, setAllowedTabs } from '/tab-access.js';
+import { initI18n, t, getLocale } from '/i18n.js';
+
+function dateLocale() {
+  return { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' }[getLocale()] || 'uk-UA';
+}
 
 function timerHtml(left) {
-  const label = left <= 0 ? 'Час вийшов' : formatTimerRemaining(left);
+  const label = left <= 0 ? t('Час вийшов') : formatTimerRemaining(left);
   return `${icon('clock', 'ico ico--sm')} ${label}`;
 }
 
@@ -22,6 +27,7 @@ function statusMark(ok) {
 if (!(await requireAuthAsync())) throw new Error('auth');
 
 initTheme();
+initI18n();
 initSiteHeader({ showLogout: true, navMode: 'app' });
 initNavIcons();
 
@@ -52,10 +58,10 @@ function clearTaskTimers() {
 
 function formatDurationLabel(seconds) {
   if (seconds == null || seconds < 0) return '—';
-  if (seconds < 60) return `${seconds} с`;
+  if (seconds < 60) return t('{s} с', { s: seconds });
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return s ? `${m} хв ${s} с` : `${m} хв`;
+  return s ? t('{m} хв {s} с', { m, s }) : t('{m} хв', { m });
 }
 
 function formatTimerRemaining(ms) {
@@ -179,7 +185,7 @@ function renderDashboard(data) {
   document.getElementById('user-name').textContent = user.name;
   document.getElementById('user-handle').textContent = `@${user.handle}`;
   document.getElementById('user-tier').textContent = user.tier;
-  document.getElementById('stat-points').textContent = user.bounty_points.toLocaleString('uk-UA');
+  document.getElementById('stat-points').textContent = user.bounty_points.toLocaleString(dateLocale());
   document.getElementById('stat-rank').textContent = `#${rank}`;
   document.getElementById('stat-challenges').textContent = `${stats.challenges_completed}/${stats.challenges_total}`;
   document.getElementById('stat-programs').textContent = stats.programs_count;
@@ -187,12 +193,12 @@ function renderDashboard(data) {
   document.getElementById('tier-current').textContent = tier.name;
   if (nextTier) {
     const remaining = nextTier.min - user.bounty_points;
-    document.getElementById('tier-next-label').textContent = `до ${nextTier.name}: ${remaining} pts`;
+    document.getElementById('tier-next-label').textContent = t('до {tier}: {remaining} pts', { tier: nextTier.name, remaining });
     const range = nextTier.min - tier.min;
     const progress = ((user.bounty_points - tier.min) / range) * 100;
     document.getElementById('tier-progress').style.width = `${Math.min(100, progress)}%`;
   } else {
-    document.getElementById('tier-next-label').textContent = 'максимальний ранг';
+    document.getElementById('tier-next-label').textContent = t('максимальний ранг');
     document.getElementById('tier-progress').style.width = '100%';
   }
 
@@ -271,7 +277,7 @@ function renderArticles(articles) {
   if (!el) return;
 
   if (!articles.length) {
-    el.innerHTML = '<p class="empty-state">Поки немає статей. Напишіть першу!</p>';
+    el.innerHTML = `<p class="empty-state">${t('Поки немає статей. Напишіть першу!')}</p>`;
     return;
   }
 
@@ -280,16 +286,16 @@ function renderArticles(articles) {
       <div>
         <h4>${escapeHtml(a.title)}</h4>
         <div class="article-item-meta">
-          ${ARTICLE_STATUS_LABELS[a.status] || a.status}
+          ${t(ARTICLE_STATUS_LABELS[a.status] || a.status)}
           ${a.group_name ? ` · ${escapeHtml(a.group_name)}` : ''}
-          · ${new Date(a.updated_at + 'Z').toLocaleDateString('uk-UA')}
+          · ${new Date(a.updated_at + 'Z').toLocaleDateString(dateLocale())}
         </div>
       </div>
       <div class="article-item-actions">
-        <span class="article-status ${a.status}">${ARTICLE_STATUS_LABELS[a.status] || a.status}</span>
+        <span class="article-status ${a.status}">${t(ARTICLE_STATUS_LABELS[a.status] || a.status)}</span>
         ${a.status === 'draft' ? `
-          <button type="button" class="btn btn--ghost btn--sm article-edit-btn" data-id="${a.id}">Редагувати</button>
-          <button type="button" class="btn btn--outline btn--sm article-submit-btn" data-id="${a.id}">Надіслати</button>
+          <button type="button" class="btn btn--ghost btn--sm article-edit-btn" data-id="${a.id}">${t('Редагувати')}</button>
+          <button type="button" class="btn btn--outline btn--sm article-submit-btn" data-id="${a.id}">${t('Надіслати')}</button>
         ` : ''}
       </div>
     </article>
@@ -313,7 +319,7 @@ function renderArticles(articles) {
       try {
         await api(`/articles/${btn.dataset.id}/submit`, { method: 'POST' });
         await loadDashboard();
-        showToast('Статтю надіслано викладачу');
+        showToast(t('Статтю надіслано викладачу'));
       } catch (err) {
         showToast(err.message, 'error');
       }
@@ -334,7 +340,7 @@ function resetArticleForm() {
 function formatDue(dueAt) {
   if (!dueAt) return '';
   const d = new Date(dueAt.includes('T') ? dueAt : `${dueAt}T00:00:00`);
-  return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' });
 }
 
 function renderTasks(tasks, stats) {
@@ -347,7 +353,7 @@ function renderTasks(tasks, stats) {
       completed: stats.tasks_completed ?? 0,
     };
     statsEl.innerHTML = TASK_COLUMNS.map(col => `
-      <span class="task-stat-pill">${col.label}: ${counts[col.status]}</span>
+      <span class="task-stat-pill">${t(col.label)}: ${counts[col.status]}</span>
     `).join('');
   }
 
@@ -355,19 +361,19 @@ function renderTasks(tasks, stats) {
   if (!board) return;
 
   if (!tasks.length) {
-    board.innerHTML = '<p class="empty-state">Поки немає задач від викладача. Коли вас додадуть до групи — задачі з\'являться тут.</p>';
+    board.innerHTML = `<p class="empty-state">${t("Поки немає задач від викладача. Коли вас додадуть до групи — задачі з'являться тут.")}</p>`;
     return;
   }
 
   board.innerHTML = TASK_COLUMNS.map(col => {
-    const items = tasks.filter(t => t.status === col.status);
+    const items = tasks.filter(task => task.status === col.status);
     return `
       <div class="tasks-col tasks-col--${col.status}">
         <div class="tasks-col-head">
-          <span>${col.label}</span>
+          <span>${t(col.label)}</span>
           <span class="tasks-col-count">${items.length}</span>
         </div>
-        ${items.length ? items.map(t => renderTaskCard(t)).join('') : '<div class="tasks-col-empty">Порожньо</div>'}
+        ${items.length ? items.map(task => renderTaskCard(task)).join('') : `<div class="tasks-col-empty">${t('Порожньо')}</div>`}
       </div>`;
   }).join('');
 
@@ -379,7 +385,7 @@ function renderTasks(tasks, stats) {
       try {
         await api(`/tasks/${btn.dataset.id}/take`, { method: 'POST' });
         await loadDashboard();
-        showToast('Задачу взято в роботу');
+        showToast(t('Задачу взято в роботу'));
       } catch (err) {
         showToast(err.message, 'error');
         btn.disabled = false;
@@ -399,7 +405,7 @@ function renderTasks(tasks, stats) {
       const note = board.querySelector(`#task-note-${btn.dataset.id}`)?.value || '';
       const files = board.querySelector(`#task-files-${btn.dataset.id}`)?.files || [];
       if (!note.trim() && !files.length) {
-        showToast('Додайте коментар, файл або фото', 'error');
+        showToast(t('Додайте коментар, файл або фото'), 'error');
         return;
       }
       btn.disabled = true;
@@ -413,9 +419,9 @@ function renderTasks(tasks, stats) {
           body: fd,
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Помилка надсилання');
+        if (!res.ok) throw new Error(data.error || t('Помилка надсилання'));
         await loadDashboard();
-        showToast('Задачу надіслано на перевірку');
+        showToast(t('Задачу надіслано на перевірку'));
       } catch (err) {
         showToast(err.message, 'error');
         btn.disabled = false;
@@ -424,18 +430,18 @@ function renderTasks(tasks, stats) {
   });
 }
 
-function renderTaskCard(t) {
-  const due = t.due_at ? `<div class="task-card-meta">Дедлайн: ${formatDue(t.due_at)}</div>` : '';
-  const bounty = t.bounty_reward ? `<div class="task-card-meta">+${t.bounty_reward} bounty</div>` : '';
-  const group = t.group_name ? `<div class="task-card-meta">${t.group_name}</div>` : '';
-  const limit = t.time_limit_minutes
-    ? `<div class="task-card-meta">Ліміт: ${t.time_limit_minutes} хв</div>`
+function renderTaskCard(task) {
+  const due = task.due_at ? `<div class="task-card-meta">${t('Дедлайн: {date}', { date: formatDue(task.due_at) })}</div>` : '';
+  const bounty = task.bounty_reward ? `<div class="task-card-meta">+${task.bounty_reward} bounty</div>` : '';
+  const group = task.group_name ? `<div class="task-card-meta">${task.group_name}</div>` : '';
+  const limit = task.time_limit_minutes
+    ? `<div class="task-card-meta">${t('Ліміт: {min} хв', { min: task.time_limit_minutes })}</div>`
     : '';
-  const timer = (t.status === 'taken' && t.time_limit_minutes)
-    ? `<div class="task-timer ico-inline" id="task-timer-${t.id}">${icon('clock', 'ico ico--sm')} —</div>`
+  const timer = (task.status === 'taken' && task.time_limit_minutes)
+    ? `<div class="task-timer ico-inline" id="task-timer-${task.id}">${icon('clock', 'ico ico--sm')} —</div>`
     : '';
-  const duration = (t.status === 'completed' && t.duration_seconds != null)
-    ? `<div class="task-card-meta">Час виконання: ${formatDurationLabel(t.duration_seconds)}</div>`
+  const duration = (task.status === 'completed' && task.duration_seconds != null)
+    ? `<div class="task-card-meta">${t('Час виконання: {time}', { time: formatDurationLabel(task.duration_seconds) })}</div>`
     : '';
 
   const filesList = (files) => (files || []).length ? `
@@ -447,31 +453,31 @@ function renderTaskCard(t) {
     </div>` : '';
 
   let actions = '';
-  if (t.status === 'available') {
-    actions = `<button class="btn btn--primary btn--sm task-take-btn" data-id="${t.id}">Взяти задачу</button>`;
-  } else if (t.status === 'taken') {
+  if (task.status === 'available') {
+    actions = `<button class="btn btn--primary btn--sm task-take-btn" data-id="${task.id}">${t('Взяти задачу')}</button>`;
+  } else if (task.status === 'taken') {
     actions = `
-      <textarea class="task-note-input" id="task-note-${t.id}" placeholder="Коментар до здачі (необов'язково, якщо додаєте файл)"></textarea>
+      <textarea class="task-note-input" id="task-note-${task.id}" placeholder="${t("Коментар до здачі (необов'язково, якщо додаєте файл)")}"></textarea>
       <div class="task-file-row">
-        <label class="btn btn--ghost btn--sm" for="task-files-${t.id}">${icon('upload', 'ico ico--sm')}Файл / фото / архів</label>
-        <input type="file" id="task-files-${t.id}" data-id="${t.id}" class="task-files-input" multiple hidden
+        <label class="btn btn--ghost btn--sm" for="task-files-${task.id}">${icon('upload', 'ico ico--sm')}${t('Файл / фото / архів')}</label>
+        <input type="file" id="task-files-${task.id}" data-id="${task.id}" class="task-files-input" multiple hidden
           accept="image/*,.zip,.rar,.7z,.tar,.gz,.pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.ppt,.pptx">
-        <span class="task-file-names" id="task-file-names-${t.id}"></span>
+        <span class="task-file-names" id="task-file-names-${task.id}"></span>
       </div>
-      <button type="button" class="btn btn--outline btn--sm task-submit-btn" data-id="${t.id}">На перевірку</button>`;
-  } else if (t.status === 'review') {
-    const work = t.work_duration_seconds != null
-      ? ` · ${formatDurationLabel(t.work_duration_seconds)}`
+      <button type="button" class="btn btn--outline btn--sm task-submit-btn" data-id="${task.id}">${t('На перевірку')}</button>`;
+  } else if (task.status === 'review') {
+    const work = task.work_duration_seconds != null
+      ? ` · ${formatDurationLabel(task.work_duration_seconds)}`
       : '';
-    actions = `<span class="task-status-done">Очікує перевірки викладачем${work}</span>${filesList(t.submission_files)}`;
-  } else if (t.status === 'completed') {
-    actions = `<span class="task-status-done ico-inline">${icon('check', 'ico ico--sm')}Завершено${t.completed_at ? ` · ${formatDue(t.completed_at)}` : ''}</span>${filesList(t.submission_files)}`;
+    actions = `<span class="task-status-done">${t('Очікує перевірки викладачем')}${work}</span>${filesList(task.submission_files)}`;
+  } else if (task.status === 'completed') {
+    actions = `<span class="task-status-done ico-inline">${icon('check', 'ico ico--sm')}${t('Завершено')}${task.completed_at ? ` · ${formatDue(task.completed_at)}` : ''}</span>${filesList(task.submission_files)}`;
   }
 
   return `
-    <article class="task-card" style="--group-color:${t.group_color || 'var(--accent)'}">
-      <h4>${t.title}</h4>
-      ${t.description ? `<p>${t.description}</p>` : ''}
+    <article class="task-card" style="--group-color:${task.group_color || 'var(--accent)'}">
+      <h4>${task.title}</h4>
+      ${task.description ? `<p>${task.description}</p>` : ''}
       ${group}${bounty}${due}${limit}${timer}${duration}
       <div class="task-card-actions">${actions}</div>
     </article>`;
@@ -480,7 +486,7 @@ function renderTaskCard(t) {
 function renderEnrollments(enrollments) {
   const el = document.getElementById('enrollments-list');
   if (!enrollments.length) {
-    el.innerHTML = '<p class="empty-state">Ви ще не записані на програми. Натисніть «+ Записатися».</p>';
+    el.innerHTML = `<p class="empty-state">${t('Ви ще не записані на програми. Натисніть «+ Записатися».')}</p>`;
     return;
   }
 
@@ -488,7 +494,7 @@ function renderEnrollments(enrollments) {
     <article class="enrollment-card" data-id="${e.id}">
       <div class="enrollment-top">
         <span class="program-level">${e.level}</span>
-        <span class="enrollment-status ${e.status}">${e.status === 'completed' ? 'завершено' : 'активна'}</span>
+        <span class="enrollment-status ${e.status}">${e.status === 'completed' ? t('завершено') : t('активна')}</span>
       </div>
       <h3>${e.program_name}</h3>
       <div class="progress-wrap">
@@ -499,7 +505,7 @@ function renderEnrollments(enrollments) {
       </div>
       <div class="enrollment-actions">
         <button class="btn btn--ghost btn--sm progress-btn" data-id="${e.id}" data-progress="${Math.min(100, e.progress + 10)}">
-          +10% прогрес
+          ${t('+10% прогрес')}
         </button>
       </div>
     </article>
@@ -513,7 +519,7 @@ function renderEnrollments(enrollments) {
           body: JSON.stringify({ progress: btn.dataset.progress }),
         });
         await loadDashboard();
-        showToast('Прогрес оновлено');
+        showToast(t('Прогрес оновлено'));
       } catch (err) {
         showToast(err.message, 'error');
       }
@@ -543,16 +549,16 @@ function renderGroupContent(groups) {
 function renderChallenges(challenges) {
   const el = document.getElementById('challenges-list');
   el.innerHTML = challenges.map(c => {
-    const timed = c.time_limit_minutes ? `<span class="ico-inline">${icon('clock', 'ico ico--sm')}${c.time_limit_minutes} хв</span>` : '';
+    const timed = c.time_limit_minutes ? `<span class="ico-inline">${icon('clock', 'ico ico--sm')}${t('{min} хв', { min: c.time_limit_minutes })}</span>` : '';
     let action = '';
     if (c.completed) {
-      action = `<span class="challenge-done ico-inline">${icon('check', 'ico ico--sm')}виконано</span>`;
+      action = `<span class="challenge-done ico-inline">${icon('check', 'ico ico--sm')}${t('виконано')}</span>`;
     } else if (c.ctf_enabled) {
-      action = `<a href="/dashboard.html?tab=ctf" class="btn btn--outline btn--sm ico-inline">${icon('chevron-right', 'ico ico--sm')}Відкрити CTF</a>`;
+      action = `<a href="/dashboard.html?tab=ctf" class="btn btn--outline btn--sm ico-inline">${icon('chevron-right', 'ico ico--sm')}${t('Відкрити CTF')}</a>`;
     } else if (c.time_limit_minutes && !c.started_at) {
-      action = `<button class="btn btn--outline btn--sm challenge-start-btn" data-id="${c.id}">Почати</button>`;
+      action = `<button class="btn btn--outline btn--sm challenge-start-btn" data-id="${c.id}">${t('Почати')}</button>`;
     } else {
-      action = `<button class="btn btn--primary btn--sm complete-btn" data-id="${c.id}">Здати</button>`;
+      action = `<button class="btn btn--primary btn--sm complete-btn" data-id="${c.id}">${t('Здати')}</button>`;
     }
     return `
     <article class="challenge-card ${c.completed ? 'completed' : ''}" data-id="${c.id}">
@@ -574,7 +580,7 @@ function renderChallenges(challenges) {
       try {
         await api(`/challenges/${btn.dataset.id}/start`, { method: 'POST' });
         await loadDashboard();
-        showToast('Таймер запущено');
+        showToast(t('Таймер запущено'));
       } catch (err) {
         showToast(err.message, 'error');
         btn.disabled = false;
@@ -603,7 +609,7 @@ let activeQuizId = null;
 function renderQuizzes(quizzes) {
   const tag = document.getElementById('quiz-stats-tag');
   const passed = quizzes.filter(q => q.attempt?.passed).length;
-  if (tag) tag.textContent = `${passed}/${quizzes.length} пройдено`;
+  if (tag) tag.textContent = t('{passed}/{total} пройдено', { passed, total: quizzes.length });
 }
 
 async function loadQuizzesPanel() {
@@ -613,7 +619,7 @@ async function loadQuizzesPanel() {
     const { quizzes } = await api('/quizzes');
     renderQuizzes(quizzes || []);
     if (!quizzes?.length) {
-      el.innerHTML = '<p class="empty-state">Немає доступних тестів. Викладач додасть їх для вашої групи.</p>';
+      el.innerHTML = `<p class="empty-state">${t('Немає доступних тестів. Викладач додасть їх для вашої групи.')}</p>`;
       return;
     }
     el.innerHTML = quizzes.map(q => {
@@ -626,14 +632,14 @@ async function loadQuizzesPanel() {
             <p>${escapeHtml(q.description || '')}</p>
             <div class="quiz-card-meta">
               ${q.group_name ? `<span>${escapeHtml(q.group_name)}</span>` : ''}
-              <span>${q.question_count} пит.</span>
-              <span>прохід ${q.pass_percent}%</span>
+              <span>${t('{n} пит.', { n: q.question_count })}</span>
+              <span>${t('прохід {pct}%', { pct: q.pass_percent })}</span>
               <span>+${q.bounty_reward} pts</span>
-              ${q.time_limit_minutes ? `<span class="ico-inline">${icon('clock', 'ico ico--sm')}${q.time_limit_minutes} хв</span>` : ''}
+              ${q.time_limit_minutes ? `<span class="ico-inline">${icon('clock', 'ico ico--sm')}${t('{min} хв', { min: q.time_limit_minutes })}</span>` : ''}
             </div>
-            ${done ? `<div class="quiz-result ${passed ? 'quiz-result--ok' : ''}">Результат: ${q.attempt.score_percent}% <span class="ico-inline">${statusMark(passed)}</span>${q.attempt.duration_seconds != null ? ` · ${formatDurationLabel(q.attempt.duration_seconds)}` : ''}</div>` : ''}
+            ${done ? `<div class="quiz-result ${passed ? 'quiz-result--ok' : ''}">${t('Результат: {pct}%', { pct: q.attempt.score_percent })} <span class="ico-inline">${statusMark(passed)}</span>${q.attempt.duration_seconds != null ? ` · ${formatDurationLabel(q.attempt.duration_seconds)}` : ''}</div>` : ''}
           </div>
-          ${!done ? `<button type="button" class="btn btn--primary btn--sm quiz-start" data-id="${q.id}">Почати</button>` : '<span class="status-pill running">здано</span>'}
+          ${!done ? `<button type="button" class="btn btn--primary btn--sm quiz-start" data-id="${q.id}">${t('Почати')}</button>` : `<span class="status-pill running">${t('здано')}</span>`}
         </article>`;
     }).join('');
 
@@ -654,7 +660,7 @@ async function openQuizModal(quizId) {
     ]);
     document.getElementById('quiz-modal-title').textContent = quiz.title;
     document.getElementById('quiz-modal-meta').textContent =
-      `${quiz.group_name || ''} · ${quiz.questions.length} питань · прохідний бал ${quiz.pass_percent}%`;
+      `${quiz.group_name || ''} · ${t('{n} питань · прохідний бал {pct}%', { n: quiz.questions.length, pct: quiz.pass_percent })}`;
     const form = document.getElementById('quiz-form');
     form.innerHTML = quiz.questions.map((q, i) => `
       <fieldset class="quiz-q">
@@ -667,7 +673,7 @@ async function openQuizModal(quizId) {
       </fieldset>`).join('');
     document.getElementById('quiz-modal').hidden = false;
     startQuizTimer(startRes.started_at, quiz.time_limit_minutes, () => {
-      showToast('Час тесту вийшов — відповіді надіслано', 'error');
+      showToast(t('Час тесту вийшов — відповіді надіслано'), 'error');
       document.getElementById('quiz-form')?.requestSubmit();
     });
   } catch (err) { showToast(err.message, 'error'); }
@@ -711,7 +717,7 @@ document.getElementById('quiz-modal')?.addEventListener('click', (e) => {
 function renderBountyLog(log) {
   const el = document.getElementById('bounty-log');
   if (!log.length) {
-    el.innerHTML = '<p class="empty-state">Поки немає нарахувань</p>';
+    el.innerHTML = `<p class="empty-state">${t('Поки немає нарахувань')}</p>`;
     return;
   }
 
@@ -719,7 +725,7 @@ function renderBountyLog(log) {
     <div class="bounty-entry">
       <div class="bounty-entry-info">
         <span class="bounty-reason">${entry.reason}</span>
-        <span class="bounty-date">${new Date(entry.created_at + 'Z').toLocaleString('uk-UA')}</span>
+        <span class="bounty-date">${new Date(entry.created_at + 'Z').toLocaleString(dateLocale())}</span>
       </div>
       <span class="bounty-amount ${entry.amount >= 0 ? 'positive' : 'negative'}">
         ${entry.amount >= 0 ? '+' : ''}${entry.amount}
@@ -733,7 +739,7 @@ async function loadPrograms() {
   const select = document.getElementById('program-select');
   const enrolled = new Set((dashboardData?.enrollments || []).map(e => e.program_id));
 
-  select.innerHTML = '<option value="">Оберіть програму</option>' +
+  select.innerHTML = `<option value="">${t('Оберіть програму')}</option>` +
     programs
       .filter(p => !enrolled.has(p.id))
       .map(p => `<option value="${p.id}">${p.name} (${p.level})</option>`)
@@ -761,7 +767,7 @@ document.getElementById('enroll-toggle').addEventListener('click', () => {
 
 document.getElementById('enroll-btn').addEventListener('click', async () => {
   const programId = document.getElementById('program-select').value;
-  if (!programId) return showToast('Оберіть програму', 'error');
+  if (!programId) return showToast(t('Оберіть програму'), 'error');
 
   try {
     const res = await api('/enroll', {
@@ -789,7 +795,7 @@ document.getElementById('profile-form').addEventListener('submit', async (e) => 
     });
     setSession(localStorage.getItem('lab_token'), res.user);
     renderDashboard({ ...dashboardData, user: res.user });
-    showToast('Профіль оновлено');
+    showToast(t('Профіль оновлено'));
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -805,7 +811,7 @@ document.getElementById('article-form')?.addEventListener('submit', async (e) =>
   try {
     if (id) {
       await api(`/articles/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
-      showToast('Чернетку оновлено');
+      showToast(t('Чернетку оновлено'));
     } else {
       const res = await api('/articles', { method: 'POST', body: JSON.stringify(payload) });
       document.getElementById('article-id').value = res.article.id;
@@ -830,21 +836,21 @@ async function loadUpcoming() {
     const { conferences } = await api('/conferences/upcoming');
     const el = document.getElementById('upcoming-conferences');
     if (!conferences.length) {
-      el.innerHTML = '<p class="empty-state">Немає запланованих конференцій</p>';
+      el.innerHTML = `<p class="empty-state">${t('Немає запланованих конференцій')}</p>`;
       return;
     }
-    const MONTHS = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
     el.innerHTML = conferences.map(c => {
       const d = new Date(c.scheduled_at);
-      const time = `${String(d.getDate()).padStart(2,'0')} ${MONTHS[d.getMonth()]} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      const month = new Intl.DateTimeFormat(dateLocale(), { month: 'short' }).format(d);
+      const time = `${String(d.getDate()).padStart(2, '0')} ${month} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
       const isLive = c.status === 'live';
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px">
           <div>
             <div style="font-weight:500;margin-bottom:4px">${c.title}</div>
-            <div style="font-size:0.8rem;color:var(--text-muted)" class="meta-icon">${icon('clock', 'ico ico--sm')}${time} · ${c.duration_minutes} хв · ${icon('user', 'ico ico--sm')}@${c.host_handle}</div>
+            <div style="font-size:0.8rem;color:var(--text-muted)" class="meta-icon">${icon('clock', 'ico ico--sm')}${time} · ${t('{min} хв', { min: c.duration_minutes })} · ${icon('user', 'ico ico--sm')}@${c.host_handle}</div>
           </div>
-          <a href="/room.html?id=${c.id}" class="btn ${isLive ? 'btn--primary' : 'btn--outline'} btn--sm">${isLive ? `<span class="live-dot">${icon('live', 'ico ico--sm')} LIVE</span>` : 'Увійти'}</a>
+          <a href="/room.html?id=${c.id}" class="btn ${isLive ? 'btn--primary' : 'btn--outline'} btn--sm">${isLive ? `<span class="live-dot">${icon('live', 'ico ico--sm')} LIVE</span>` : t('Увійти')}</a>
         </div>`;
     }).join('');
   } catch { /* ignore */ }
@@ -855,7 +861,7 @@ let absenceLessonId = null;
 
 function fmtScheduleDate(iso) {
   const d = new Date(iso.includes('Z') ? iso : `${iso}Z`);
-  return d.toLocaleString('uk-UA', {
+  return d.toLocaleString(dateLocale(), {
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   });
 }
@@ -863,7 +869,7 @@ function fmtScheduleDate(iso) {
 async function loadSchedule() {
   const el = document.getElementById('schedule-list');
   if (!el) return;
-  el.innerHTML = '<p class="empty-state">Завантаження...</p>';
+  el.innerHTML = `<p class="empty-state">${t('Завантаження...')}</p>`;
   try {
     const { lessons } = await api('/schedule');
     const upcoming = (lessons || []).filter(l => {
@@ -873,7 +879,7 @@ async function loadSchedule() {
     });
 
     if (!upcoming.length) {
-      el.innerHTML = '<p class="empty-state">Немає запланованих занять у ваших групах</p>';
+      el.innerHTML = `<p class="empty-state">${t('Немає запланованих занять у ваших групах')}</p>`;
       return;
     }
 
@@ -883,11 +889,11 @@ async function loadSchedule() {
         <article class="sched-dash-item" style="--group-color:${l.group_color || 'var(--accent)'}">
           <div>
             <strong>${escapeHtml(l.title)}</strong>
-            <div class="sched-dash-meta">${fmtScheduleDate(l.lesson_at)} · ${escapeHtml(l.group_name)} · ${l.duration_minutes} хв</div>
+            <div class="sched-dash-meta">${fmtScheduleDate(l.lesson_at)} · ${escapeHtml(l.group_name)} · ${t('{min} хв', { min: l.duration_minutes })}</div>
             ${l.topic ? `<div class="sched-dash-topic">${escapeHtml(l.topic)}</div>` : ''}
-            ${reported ? `<div class="sched-dash-reported">Ви повідомили про відсутність: «${escapeHtml(l.my_absence.reason)}»</div>` : ''}
+            ${reported ? `<div class="sched-dash-reported">${t('Ви повідомили про відсутність: «{reason}»', { reason: escapeHtml(l.my_absence.reason) })}</div>` : ''}
           </div>
-          ${!reported ? `<button type="button" class="btn btn--outline btn--sm sched-absence-btn" data-id="${l.id}" data-title="${escapeHtml(l.title)}">Не зможу бути</button>` : '<span class="status-pill stopped">відсутність</span>'}
+          ${!reported ? `<button type="button" class="btn btn--outline btn--sm sched-absence-btn" data-id="${l.id}" data-title="${escapeHtml(l.title)}">${t('Не зможу бути')}</button>` : `<span class="status-pill stopped">${t('відсутність')}</span>`}
         </article>`;
     }).join('');
 
@@ -920,7 +926,7 @@ document.getElementById('absence-submit')?.addEventListener('click', async () =>
       body: JSON.stringify({ reason }),
     });
     document.getElementById('absence-modal').hidden = true;
-    showToast(res.message || 'Відсутність зафіксовано');
+    showToast(res.message || t('Відсутність зафіксовано'));
     loadSchedule();
   } catch (err) { showToast(err.message, 'error'); }
 });
@@ -940,7 +946,7 @@ async function loadCtfActivity() {
   try {
     const { activity } = await api('/lab/ctf/activity?limit=12');
     if (!activity?.length) { el.innerHTML = ''; return; }
-    el.innerHTML = `<div class="ctf-activity-title ico-inline">${icon('zap', 'ico ico--sm')}Останні події</div>` +
+    el.innerHTML = `<div class="ctf-activity-title ico-inline">${icon('zap', 'ico ico--sm')}${t('Останні події')}</div>` +
       activity.map(a => `<div class="ctf-activity-item ctf-activity-item--${a.type}">${escapeHtml(a.message)}</div>`).join('');
   } catch { /* тиха відмова — стрічка не критична */ }
 }
@@ -961,7 +967,7 @@ function renderCtfStageChain(c) {
         <span class="ctf-stage-num">${icon('lock', 'ico ico--sm')}</span>
         <div class="ctf-stage-body">
           <strong>${escapeHtml(s.title)}</strong>
-          <span class="ctf-stage-locked-note">Розблокується після попередньої стадії</span>
+          <span class="ctf-stage-locked-note">${t('Розблокується після попередньої стадії')}</span>
         </div>
       </div>`;
     }
@@ -969,13 +975,13 @@ function renderCtfStageChain(c) {
       <span class="ctf-stage-num">${i + 1}</span>
       <div class="ctf-stage-body">
         <strong>${escapeHtml(s.title)}</strong>
-        <span class="ctf-stage-pts">${s.points} pts${s.hint_available ? ` · підказка -${s.hint_cost}` : ''}</span>
+        <span class="ctf-stage-pts">${s.points} pts${s.hint_available ? ` · ${t('підказка -{cost}', { cost: s.hint_cost })}` : ''}</span>
         ${s.description ? `<p class="ctf-stage-desc">${escapeHtml(s.description)}</p>` : ''}
         ${s.hint_unlocked && s.hint_text ? `<p class="ctf-stage-hint-text ico-inline">${icon('lightbulb', 'ico ico--sm')}${escapeHtml(s.hint_text)}</p>` : ''}
         <div class="ctf-stage-actions">
           <input type="text" class="ctf-flag-input ctf-stage-flag-input" placeholder="lab{...}">
-          <button type="button" class="btn btn--primary btn--sm ctf-stage-submit-btn">Здати flag</button>
-          ${s.hint_available && !s.hint_unlocked ? `<button type="button" class="btn btn--ghost btn--sm ctf-stage-hint-btn">${icon('lightbulb', 'ico ico--sm')}Підказка (-${s.hint_cost})</button>` : ''}
+          <button type="button" class="btn btn--primary btn--sm ctf-stage-submit-btn">${t('Здати flag')}</button>
+          ${s.hint_available && !s.hint_unlocked ? `<button type="button" class="btn btn--ghost btn--sm ctf-stage-hint-btn">${icon('lightbulb', 'ico ico--sm')}${t('Підказка (-{cost})', { cost: s.hint_cost })}</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -983,10 +989,12 @@ function renderCtfStageChain(c) {
 }
 
 function applyCtfFilters() {
+  const query = document.getElementById('ctf-filter-search')?.value.trim().toLowerCase() || '';
   const cat = document.getElementById('ctf-filter-category')?.value || '';
   const diff = document.getElementById('ctf-filter-difficulty')?.value || '';
   const status = document.getElementById('ctf-filter-status')?.value || '';
   return ctfAllChallenges.filter(c => {
+    if (query && !`${c.title} ${c.description || ''}`.toLowerCase().includes(query)) return false;
     if (cat && (c.category || 'misc') !== cat) return false;
     if (diff && c.difficulty !== diff) return false;
     if (status === 'open' && c.completed) return false;
@@ -998,6 +1006,7 @@ function applyCtfFilters() {
 function bindCtfFiltersOnce() {
   if (ctfFiltersBound) return;
   ctfFiltersBound = true;
+  document.getElementById('ctf-filter-search')?.addEventListener('input', renderCtfList);
   ['ctf-filter-category', 'ctf-filter-difficulty', 'ctf-filter-status'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderCtfList);
   });
@@ -1009,11 +1018,11 @@ function renderCtfList() {
   const filtered = applyCtfFilters();
 
   if (!ctfAllChallenges.length) {
-    el.innerHTML = '<p class="empty-state">CTF завдань поки немає</p>';
+    el.innerHTML = `<p class="empty-state">${t('CTF завдань поки немає')}</p>`;
     return;
   }
   if (!filtered.length) {
-    el.innerHTML = '<p class="empty-state">Нічого не знайдено за цими фільтрами</p>';
+    el.innerHTML = `<p class="empty-state">${t('Нічого не знайдено за цими фільтрами')}</p>`;
     return;
   }
 
@@ -1031,21 +1040,21 @@ function renderCtfList() {
         </div>
         <h3>${escapeHtml(c.title)}</h3>
         <p>${escapeHtml(c.description || '')}</p>
-        ${c.time_limit_minutes ? `<div class="task-card-meta">Ліміт: ${c.time_limit_minutes} хв</div>` : ''}
+        ${c.time_limit_minutes ? `<div class="task-card-meta">${t('Ліміт: {min} хв', { min: c.time_limit_minutes })}</div>` : ''}
         ${c.time_limit_minutes && c.started_at && !c.completed ? `<div class="task-timer ctf-timer ico-inline" id="ctf-timer-${c.id}">${icon('clock', 'ico ico--sm')} —</div>` : ''}
         ${c.docker_image ? (
           c.deployment?.status === 'running' && ctfInfra.mockMode
             ? `<div class="ctf-demo-banner">
-                <strong>Demo стенд</strong>
-                <p>Інтерактивна симуляція завдання — відкрийте стенд, знайдіть flag і здайте його нижче.</p>
-                <a href="${escapeHtml(c.deployment.target_url)}" target="_blank" rel="noopener" class="btn btn--primary btn--sm ico-inline">${icon('play', 'ico ico--sm')}Відкрити demo-стенд</a>
+                <strong>${t('Demo стенд')}</strong>
+                <p>${t('Інтерактивна симуляція завдання — відкрийте стенд, знайдіть flag і здайте його нижче.')}</p>
+                <a href="${escapeHtml(c.deployment.target_url)}" target="_blank" rel="noopener" class="btn btn--primary btn--sm ico-inline">${icon('play', 'ico ico--sm')}${t('Відкрити demo-стенд')}</a>
               </div>`
             : (c.deployment?.target_url
-              ? `<div class="ctf-target"><a href="${escapeHtml(c.deployment.target_url)}" target="_blank" rel="noopener">${escapeHtml(c.deployment.target_url)}</a>${c.deployment.access_mode === 'secure_tunnel' ? `<span class="ctf-target-host ico-inline">${icon('lock', 'ico ico--sm')}HTTPS тунель</span>` : (c.deployment.public_host ? `<span class="ctf-target-host">${escapeHtml(c.deployment.public_host)}</span>` : '')}</div>
-                 ${(c.deployment.network_targets || []).map(t => `
+              ? `<div class="ctf-target"><a href="${escapeHtml(c.deployment.target_url)}" target="_blank" rel="noopener">${escapeHtml(c.deployment.target_url)}</a>${c.deployment.access_mode === 'secure_tunnel' ? `<span class="ctf-target-host ico-inline">${icon('lock', 'ico ico--sm')}${t('HTTPS тунель')}</span>` : (c.deployment.public_host ? `<span class="ctf-target-host">${escapeHtml(c.deployment.public_host)}</span>` : '')}</div>
+                 ${(c.deployment.network_targets || []).map(target => `
                    <div class="lab-access-box">
-                     <span class="lab-vm-label">${escapeHtml(t.label)}</span>
-                     <code class="lab-ssh-cmd">${escapeHtml(t.hint)}</code>
+                     <span class="lab-vm-label">${escapeHtml(target.label)}</span>
+                     <code class="lab-ssh-cmd">${escapeHtml(target.hint)}</code>
                    </div>`).join('')}
                  ${c.deployment.ssh_command ? `
                    <div class="lab-access-box">
@@ -1054,20 +1063,20 @@ function renderCtfList() {
                    </div>` : ''}
                  ${c.deployment.ssh_password ? `
                    <div class="lab-access-box">
-                     <span class="lab-vm-label">Пароль</span>
+                     <span class="lab-vm-label">${t('Пароль')}</span>
                      <code class="lab-ssh-cmd">${escapeHtml(c.deployment.ssh_password)}</code>
                    </div>` : ''}`
               : `<div class="ctf-actions">
                   ${!c.deployment || c.deployment.status !== 'running'
-                    ? `<button type="button" class="btn btn--outline btn--sm ctf-start-btn" data-id="${c.id}">Запустити стенд</button>`
-                    : `<button type="button" class="btn btn--ghost btn--sm ctf-stop-btn" data-id="${c.id}">Зупинити</button>`}
+                    ? `<button type="button" class="btn btn--outline btn--sm ctf-start-btn" data-id="${c.id}">${t('Запустити стенд')}</button>`
+                    : `<button type="button" class="btn btn--ghost btn--sm ctf-stop-btn" data-id="${c.id}">${t('Зупинити')}</button>`}
                 </div>`)
         ) : ''}
         <div class="ctf-progress-bar"><div class="ctf-progress-fill" style="width:${progressPct}%"></div></div>
-        <div class="ctf-progress-label">${solvedCount}/${c.stages.length} стадій · ${earnedPts}/${c.bounty_reward} pts</div>
+        <div class="ctf-progress-label">${t('{solved}/{total} стадій', { solved: solvedCount, total: c.stages.length })} · ${earnedPts}/${c.bounty_reward} pts</div>
         <div class="ctf-stage-chain">
           ${c.completed
-            ? `<div class="ctf-stage-item ctf-stage-item--done"><span class="ctf-stage-num">${icon('check', 'ico ico--sm')}</span><div class="ctf-stage-body"><strong>Усі стадії пройдено 🎉</strong></div></div>`
+            ? `<div class="ctf-stage-item ctf-stage-item--done"><span class="ctf-stage-num">${icon('check', 'ico ico--sm')}</span><div class="ctf-stage-body"><strong>${t('Усі стадії пройдено 🎉')}</strong></div></div>`
             : renderCtfStageChain(c)}
         </div>
       </article>`;
@@ -1080,7 +1089,7 @@ function renderCtfList() {
       btn.disabled = true;
       try {
         await api(`/lab/ctf/${btn.dataset.id}/start`, { method: 'POST' });
-        showToast('CTF стенд запущено');
+        showToast(t('CTF стенд запущено'));
         loadCtfPanel();
       } catch (err) { showToast(err.message, 'error'); btn.disabled = false; }
     });
@@ -1089,7 +1098,7 @@ function renderCtfList() {
     btn.addEventListener('click', async () => {
       try {
         await api(`/lab/ctf/${btn.dataset.id}/stop`, { method: 'POST' });
-        showToast('CTF зупинено');
+        showToast(t('CTF зупинено'));
         loadCtfPanel();
       } catch (err) { showToast(err.message, 'error'); }
     });
@@ -1111,10 +1120,10 @@ function renderCtfList() {
       } catch (err) { showToast(err.message, 'error'); }
     });
     item.querySelector('.ctf-stage-hint-btn')?.addEventListener('click', async () => {
-      if (!confirm('Підказка спише частину балів за цю стадію. Відкрити?')) return;
+      if (!confirm(t('Підказка спише частину балів за цю стадію. Відкрити?'))) return;
       try {
         await api(`/lab/ctf/${challengeId}/hint/${stageId}`, { method: 'POST' });
-        showToast('Підказку відкрито');
+        showToast(t('Підказку відкрито'));
         loadCtfPanel();
       } catch (err) { showToast(err.message, 'error'); }
     });
@@ -1154,7 +1163,7 @@ function vmStatusLabel(s) {
     stopped: 'зупинено',
     error: 'помилка',
   };
-  return map[s] || s;
+  return t(map[s] || s);
 }
 
 let labPollTimer = null;
@@ -1172,28 +1181,28 @@ async function loadLabPanel() {
 
     content.innerHTML = `
       <div class="lab-vm-grid">
-        <div class="lab-vm-stat"><span class="lab-vm-label">Статус</span><span class="lab-vm-val">${vmStatusLabel(vm.status)}</span></div>
+        <div class="lab-vm-stat"><span class="lab-vm-label">${t('Статус')}</span><span class="lab-vm-val">${vmStatusLabel(vm.status)}</span></div>
         <div class="lab-vm-stat"><span class="lab-vm-label">Hostname</span><span class="lab-vm-val">${escapeHtml(vm.hostname || '—')}</span></div>
-        <div class="lab-vm-stat"><span class="lab-vm-label">Доступ</span><span class="lab-vm-val">${vm.http_url ? `<a href="${escapeHtml(vm.http_url)}" target="_blank" rel="noopener">${escapeHtml(vm.secure_url ? 'Відкрити (HTTPS тунель)' : vm.public_host || vm.http_url)}</a>` : '—'}</span></div>
-        ${vm.public_host && vm.secure_url ? `<div class="lab-vm-stat"><span class="lab-vm-label">sslip шлюз</span><span class="lab-vm-val">${escapeHtml(vm.public_host)}</span></div>` : ''}
+        <div class="lab-vm-stat"><span class="lab-vm-label">${t('Доступ')}</span><span class="lab-vm-val">${vm.http_url ? `<a href="${escapeHtml(vm.http_url)}" target="_blank" rel="noopener">${escapeHtml(vm.secure_url ? t('Відкрити (HTTPS тунель)') : vm.public_host || vm.http_url)}</a>` : '—'}</span></div>
+        ${vm.public_host && vm.secure_url ? `<div class="lab-vm-stat"><span class="lab-vm-label">sslip ${t('шлюз')}</span><span class="lab-vm-val">${escapeHtml(vm.public_host)}</span></div>` : ''}
         <div class="lab-vm-stat"><span class="lab-vm-label">IP</span><span class="lab-vm-val">${escapeHtml(vm.ip || '—')}</span></div>
         <div class="lab-vm-stat"><span class="lab-vm-label">VMID</span><span class="lab-vm-val">${vm.proxmox_vmid || '—'}</span></div>
       </div>
       ${vm.ssh_command && vm.public_host ? `<div class="lab-access-box"><span class="lab-vm-label">SSH</span><code class="lab-ssh-cmd">${escapeHtml(vm.ssh_command)}</code></div>` : ''}
-      ${infra.publicAccess?.useSecureTunnel ? `<p class="lab-hint lab-hint--secure ico-inline">${icon('lock', 'ico ico--sm ico--ok')}<span>Доступ через захищений HTTPS-тунель sslip.io — токен у URL, порти Docker/VM не відкриті в інтернет</span></p>` : (infra.publicAccess?.useSslip ? `<p class="lab-hint ico-inline">${icon('globe', 'ico ico--sm')}<span>Доступ через sslip.io</span></p>` : '')}
+      ${infra.publicAccess?.useSecureTunnel ? `<p class="lab-hint lab-hint--secure ico-inline">${icon('lock', 'ico ico--sm ico--ok')}<span>${t('Доступ через захищений HTTPS-тунель sslip.io — токен у URL, порти Docker/VM не відкриті в інтернет')}</span></p>` : (infra.publicAccess?.useSslip ? `<p class="lab-hint ico-inline">${icon('globe', 'ico ico--sm')}<span>${t('Доступ через sslip.io')}</span></p>` : '')}
       ${vm.error_message ? `<p class="form-error ico-inline" style="display:flex;align-items:flex-start;gap:8px">${icon('warning', 'ico ico--sm ico--err')}<span>${escapeHtml(vm.error_message)}</span></p>` : ''}
-      ${vm.status === 'pending' ? `<p class="lab-status-note ico-inline">${icon('server', 'ico ico--sm')}<span>Машина буде створена автоматично після налаштування Proxmox адміністратором</span></p>` : ''}
-      ${vm.status === 'provisioning' ? `<p class="lab-status-note ico-inline">${icon('loader', 'ico ico--sm ico--spin')}<span>Створюємо вашу машину, зачекайте...</span></p>` : ''}
+      ${vm.status === 'pending' ? `<p class="lab-status-note ico-inline">${icon('server', 'ico ico--sm')}<span>${t('Машина буде створена автоматично після налаштування Proxmox адміністратором')}</span></p>` : ''}
+      ${vm.status === 'provisioning' ? `<p class="lab-status-note ico-inline">${icon('loader', 'ico ico--sm ico--spin')}<span>${t('Створюємо вашу машину, зачекайте...')}</span></p>` : ''}
       <div class="lab-vm-actions">
-        ${showStart ? '<button type="button" class="btn btn--outline btn--sm" id="lab-start">Запустити</button>' : ''}
-        ${showStop ? '<button type="button" class="btn btn--outline btn--sm" id="lab-stop">Зупинити</button>' : ''}
-        ${showReset ? '<button type="button" class="btn btn--ghost btn--sm" id="lab-reset">Пересоздати</button>' : ''}
+        ${showStart ? `<button type="button" class="btn btn--outline btn--sm" id="lab-start">${t('Запустити')}</button>` : ''}
+        ${showStop ? `<button type="button" class="btn btn--outline btn--sm" id="lab-stop">${t('Зупинити')}</button>` : ''}
+        ${showReset ? `<button type="button" class="btn btn--ghost btn--sm" id="lab-reset">${t('Пересоздати')}</button>` : ''}
       </div>`;
 
     document.getElementById('lab-start')?.addEventListener('click', () => labAction('start'));
     document.getElementById('lab-stop')?.addEventListener('click', () => labAction('stop'));
     document.getElementById('lab-reset')?.addEventListener('click', () => {
-      if (confirm('Пересоздати машину? Усі дані на VM будуть втрачені.')) labAction('reset');
+      if (confirm(t('Пересоздати машину? Усі дані на VM будуть втрачені.'))) labAction('reset');
     });
 
     if (vm.status === 'provisioning') {
@@ -1222,7 +1231,7 @@ function renderDockerList(deployments) {
   const el = document.getElementById('docker-list');
   if (!el) return;
   if (!deployments.length) {
-    el.innerHTML = '<p class="empty-state">Ще немає Docker-деплоїв</p>';
+    el.innerHTML = `<p class="empty-state">${t('Ще немає Docker-деплоїв')}</p>`;
     return;
   }
   el.innerHTML = deployments.map(d => `
@@ -1232,14 +1241,14 @@ function renderDockerList(deployments) {
         <div class="docker-item-meta">${escapeHtml(d.image)} · ${d.status}</div>
         ${d.target_url ? `<a href="${escapeHtml(d.target_url)}" target="_blank" rel="noopener">${escapeHtml(d.target_url)}</a>` : ''}
       </div>
-      ${d.status === 'running' ? `<button type="button" class="btn btn--ghost btn--sm docker-stop" data-id="${d.id}">Зупинити</button>` : ''}
+      ${d.status === 'running' ? `<button type="button" class="btn btn--ghost btn--sm docker-stop" data-id="${d.id}">${t('Зупинити')}</button>` : ''}
     </div>`).join('');
 
   el.querySelectorAll('.docker-stop').forEach(btn => {
     btn.addEventListener('click', async () => {
       try {
         await api(`/lab/docker/${btn.dataset.id}/stop`, { method: 'POST' });
-        showToast('Контейнер зупинено');
+        showToast(t('Контейнер зупинено'));
         loadLabPanel();
       } catch (err) { showToast(err.message, 'error'); }
     });
@@ -1263,7 +1272,7 @@ document.getElementById('docker-deploy-form')?.addEventListener('submit', async 
   const name = document.getElementById('docker-name').value;
   try {
     await api('/lab/docker/deploy', { method: 'POST', body: JSON.stringify({ image, name }) });
-    showToast('Docker контейнер розгорнуто');
+    showToast(t('Docker контейнер розгорнуто'));
     document.getElementById('docker-image').value = '';
     document.getElementById('docker-name').value = '';
     activeDashTab = 'lab';
@@ -1274,3 +1283,5 @@ document.getElementById('docker-deploy-form')?.addEventListener('submit', async 
     document.getElementById('lab-panel-docker').hidden = false;
   } catch (err) { showToast(err.message, 'error'); }
 });
+
+window.addEventListener('localechange', () => loadDashboard());

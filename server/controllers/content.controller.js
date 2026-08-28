@@ -4,7 +4,7 @@ import { ValidationError } from '../utils/errors.js';
 function parseTarget(req) {
   const targetType = req.params.type;
   const targetId = parseInt(req.params.id, 10);
-  if (!['direction', 'group'].includes(targetType) || !targetId) {
+  if (!['direction', 'group', 'program'].includes(targetType) || !targetId) {
     throw new ValidationError('Невірний тип або id');
   }
   return { targetType, targetId };
