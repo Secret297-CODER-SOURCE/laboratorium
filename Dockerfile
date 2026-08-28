@@ -15,7 +15,7 @@ WORKDIR /app
 
 ARG STATIC_VERSION=
 
-RUN apk add --no-cache libstdc++ \
+RUN apk add --no-cache libstdc++ docker-cli su-exec \
   && addgroup -g 1001 -S lab \
   && adduser -S lab -u 1001 -G lab
 
@@ -23,11 +23,12 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY server ./server
 COPY public ./public
+COPY challenges ./challenges
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 RUN mkdir -p /app/data/uploads/recordings /app/data/uploads/chat \
-  && chown -R lab:lab /app
-
-USER lab
+  && chown -R lab:lab /app \
+  && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV NODE_ENV=production \
     PORT=3000 \
@@ -46,4 +47,8 @@ VOLUME ["/app/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+# Starts as root only long enough to grant `lab` access to a mounted
+# /var/run/docker.sock (needed for LAB_USE_LOCAL_DOCKER=true), then drops to
+# `lab` via su-exec before running the app. No-op if the socket isn't mounted.
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "server/index.js"]

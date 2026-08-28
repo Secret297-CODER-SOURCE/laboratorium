@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 import config from './config/index.js';
 import createApp from './app.js';
 import { initSocket } from './socket/index.js';
+import { ensureCtfImageBuilt, isAgentEnabled } from './services/lab-agent.service.js';
 
 const app = createApp();
 const server = createServer(app);
@@ -25,6 +26,13 @@ server.listen(config.port, config.host, () => {
   console.log('  │  WebRTC + конференції + записи         │');
   console.log('  └─────────────────────────────────────────┘');
   console.log('');
+
+  if (config.labAgent.useLocalDocker) {
+    console.log(`[lab-agent] Local Docker CTF enabled (host: ${config.labAgent.hostIp || '(unset)'}, ports: ${config.labAgent.portRangeStart}-${config.labAgent.portRangeEnd})`);
+    ensureCtfImageBuilt().catch((err) => console.error('[lab-agent] ensureCtfImageBuilt crashed:', err));
+  } else if (!isAgentEnabled()) {
+    console.log('[lab-agent] No Docker/agent configured — CTF challenges run in demo/mock mode.');
+  }
 });
 
 function shutdown(signal) {
