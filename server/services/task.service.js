@@ -1,13 +1,27 @@
+import { unlinkSync } from 'fs';
+import { join } from 'path';
 import db from '../db/index.js';
+import config from '../config/index.js';
 import * as groupService from './group.service.js';
 import { ForbiddenError, NotFoundError, ValidationError, ConflictError } from '../utils/errors.js';
 
 const TASK_STATUSES = ['available', 'taken', 'review', 'completed'];
 
+function getSubmissionFiles(assignmentId) {
+  return db.prepare(`
+    SELECT id, filename, original_name, mime_type, size_bytes, created_at
+    FROM task_submission_files WHERE assignment_id = ? ORDER BY id ASC
+  `).all(assignmentId).map(f => ({
+    ...f,
+    url: `/uploads/task-submissions/${f.filename}`,
+  }));
+}
+
 function mapAssignment(row) {
   if (!row) return null;
+  const id = row.assignment_id ?? row.id;
   return {
-    id: row.assignment_id ?? row.id,
+    id,
     task_id: row.task_id,
     user_id: row.user_id,
     status: row.status,
@@ -17,6 +31,7 @@ function mapAssignment(row) {
     work_duration_seconds: row.work_duration_seconds,
     duration_seconds: row.duration_seconds,
     submission_note: row.submission_note,
+    submission_files: getSubmissionFiles(id),
     title: row.title,
     description: row.description,
     bounty_reward: row.bounty_reward,
@@ -192,23 +207,51 @@ export function takeTask(userId, assignmentId) {
     WHERE id = ?
   `).run(assignmentId);
 
-  return getAssignment(assignmentId);
+  return mapAssignment(getAssignment(assignmentId));
 }
 
-export function submitTask(userId, assignmentId, note = '') {
+export function submitTask(userId, assignmentId, note = '', files = []) {
   const assignment = assertStudentAssignment(assignmentId, userId);
   if (assignment.status !== 'taken') {
     throw new ConflictError('Задачу можна надіслати лише після того, як ви її взяли');
   }
 
-  db.prepare(`
-    UPDATE task_assignments
-    SET status = 'review', submitted_at = datetime('now'), submission_note = ?,
-      work_duration_seconds = CAST((strftime('%s', datetime('now')) - strftime('%s', taken_at)) AS INTEGER)
-    WHERE id = ?
-  `).run(note?.trim() || null, assignmentId);
+  const trimmedNote = note?.trim() || null;
+  if (!trimmedNote && !files.length) {
+    throw new ValidationError('Додайте коментар, файл або фото до здачі');
+  }
 
-  return getAssignment(assignmentId);
+  const insertFile = db.prepare(`
+    INSERT INTO task_submission_files (assignment_id, filename, original_name, mime_type, size_bytes)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE task_assignments
+      SET status = 'review', submitted_at = datetime('now'), submission_note = ?,
+        work_duration_seconds = CAST((strftime('%s', datetime('now')) - strftime('%s', taken_at)) AS INTEGER)
+      WHERE id = ?
+    `).run(trimmedNote, assignmentId);
+
+    for (const file of files) {
+      insertFile.run(assignmentId, file.filename, file.originalname, file.mimetype || null, file.size || 0);
+    }
+  });
+  tx();
+
+  return mapAssignment(getAssignment(assignmentId));
+}
+
+function deleteSubmissionFiles(assignmentId) {
+  const files = getSubmissionFiles(assignmentId);
+  if (!files.length) return;
+  db.prepare('DELETE FROM task_submission_files WHERE assignment_id = ?').run(assignmentId);
+  for (const file of files) {
+    try {
+      unlinkSync(join(config.uploads.tasksDir, file.filename));
+    } catch { /* файл вже відсутній на диску — не критично */ }
+  }
 }
 
 export function approveTask(actorId, actorRole, assignmentId) {
@@ -238,13 +281,14 @@ export function rejectTask(actorId, actorRole, assignmentId) {
     throw new ConflictError('Задача не на перевірці');
   }
 
+  deleteSubmissionFiles(assignmentId);
   db.prepare(`
     UPDATE task_assignments
     SET status = 'taken', submitted_at = NULL, submission_note = NULL
     WHERE id = ?
   `).run(assignmentId);
 
-  return getAssignment(assignmentId);
+  return mapAssignment(getAssignment(assignmentId));
 }
 
 export function deleteTask(taskId, actorId, actorRole) {

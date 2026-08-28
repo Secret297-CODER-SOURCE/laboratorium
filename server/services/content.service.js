@@ -2,6 +2,7 @@ import db from '../db/index.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import * as directionService from './direction.service.js';
 import * as groupService from './group.service.js';
+import * as programService from './program.service.js';
 
 const BLOCK_TYPES = new Set([
   'heading', 'text', 'list', 'image', 'video', 'link', 'divider',
@@ -76,6 +77,11 @@ function getTargetMeta(targetType, targetId) {
     if (!g) throw new NotFoundError('Групу не знайдено');
     return { type: 'group', id: targetId, name: g.name, label: 'Група' };
   }
+  if (targetType === 'program') {
+    const p = programService.getById(targetId);
+    if (!p) throw new NotFoundError('Програму не знайдено');
+    return { type: 'program', id: targetId, name: p.name, label: 'Програма' };
+  }
   throw new ValidationError('Невірний тип контенту');
 }
 
@@ -90,12 +96,16 @@ function assertCanEdit(targetType, targetId, actorId, actorRole) {
     if (group.teacher_id !== actorId) throw new ForbiddenError('Немає доступу до цієї групи');
     return;
   }
+  if (targetType === 'program') {
+    throw new ForbiddenError('Редагувати програми може лише адміністратор');
+  }
   throw new ForbiddenError();
 }
 
 function assertCanRead(targetType, targetId, userId, userRole) {
   if (userRole === 'owner' || userRole === 'developer') return;
   if (targetType === 'direction') return;
+  if (targetType === 'program') return;
   if (targetType === 'group') {
     const member = db.prepare(`
       SELECT 1 FROM study_group_members WHERE group_id = ? AND user_id = ?

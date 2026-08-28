@@ -99,3 +99,34 @@ export const uploadCtfAttachment = multer({
     cb(null, true);
   },
 }).single('file');
+
+const taskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    try {
+      cb(null, ensureDir(config.uploads.tasksDir));
+    } catch (err) {
+      cb(err);
+    }
+  },
+  filename: (_req, file, cb) => {
+    const ext = extname(file.originalname || '') || '.bin';
+    cb(null, `${Date.now()}-${randomBytes(6).toString('hex')}${ext}`);
+  },
+});
+
+const TASK_BLOCKED_EXTENSIONS = [
+  '.html', '.htm', '.svg', '.js', '.mjs', '.xml', '.xhtml',
+  '.php', '.exe', '.bat', '.cmd', '.msi', '.dll',
+];
+
+export const uploadTaskSubmission = multer({
+  storage: taskStorage,
+  limits: { fileSize: config.uploads.maxTaskFileSize, files: config.uploads.maxTaskFiles },
+  fileFilter: (_req, file, cb) => {
+    const ext = extname(file.originalname || '').toLowerCase();
+    if (TASK_BLOCKED_EXTENSIONS.includes(ext)) {
+      return cb(new Error(`Формат ${ext} не дозволено. Запакуйте код в архів (.zip)`));
+    }
+    cb(null, true);
+  },
+}).array('files', config.uploads.maxTaskFiles);

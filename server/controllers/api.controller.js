@@ -224,7 +224,7 @@ export async function takeTask(req, res) {
 
 export async function submitTask(req, res) {
   const assignmentId = parseInt(req.params.id, 10);
-  const assignment = taskService.submitTask(req.user.id, assignmentId, req.body.note);
+  const assignment = taskService.submitTask(req.user.id, assignmentId, req.body.note, req.files || []);
   res.json({ ok: true, assignment, message: 'Задачу надіслано на перевірку' });
 }
 

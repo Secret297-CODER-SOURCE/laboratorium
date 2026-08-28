@@ -63,6 +63,7 @@ function renderProgramCard(p, dir) {
     <h3>${p.name}</h3>
     <p>${p.description || ''}</p>
     <ul class="program-tags">${tags}</ul>
+    ${p.has_content ? `<a href="/content.html?type=program&id=${p.id}" class="program-details-link">Детальніше про курс →</a>` : ''}
     <div class="program-footer">
       <div class="program-meta">
         <span class="program-duration">${icon('calendar', 'ico ico--sm')}${p.duration}</span>

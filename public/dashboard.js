@@ -1,5 +1,5 @@
 import {
-  api, getUser, setSession, clearSession, requireAuthAsync, handleSessionError,
+  api, getToken, getUser, setSession, clearSession, requireAuthAsync, handleSessionError,
   initTheme,
 } from '/auth.js';
 import { icon, initNavIcons } from '/icons.js';
@@ -387,15 +387,33 @@ function renderTasks(tasks, stats) {
     });
   });
 
+  board.querySelectorAll('.task-files-input').forEach(input => {
+    input.addEventListener('change', () => {
+      const namesEl = document.getElementById(`task-file-names-${input.dataset.id}`);
+      if (namesEl) namesEl.textContent = input.files.length ? [...input.files].map(f => f.name).join(', ') : '';
+    });
+  });
+
   board.querySelectorAll('.task-submit-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const note = board.querySelector(`#task-note-${btn.dataset.id}`)?.value || '';
+      const files = board.querySelector(`#task-files-${btn.dataset.id}`)?.files || [];
+      if (!note.trim() && !files.length) {
+        showToast('Додайте коментар, файл або фото', 'error');
+        return;
+      }
       btn.disabled = true;
       try {
-        await api(`/tasks/${btn.dataset.id}/submit`, {
+        const fd = new FormData();
+        fd.append('note', note);
+        for (const file of files) fd.append('files', file);
+        const res = await fetch(`/api/tasks/${btn.dataset.id}/submit`, {
           method: 'POST',
-          body: JSON.stringify({ note }),
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: fd,
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Помилка надсилання');
         await loadDashboard();
         showToast('Задачу надіслано на перевірку');
       } catch (err) {
@@ -420,20 +438,34 @@ function renderTaskCard(t) {
     ? `<div class="task-card-meta">Час виконання: ${formatDurationLabel(t.duration_seconds)}</div>`
     : '';
 
+  const filesList = (files) => (files || []).length ? `
+    <div class="task-submission-files">
+      ${files.map(f => `
+        <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener" class="task-submission-file" title="${escapeHtml(f.original_name)}">
+          ${icon(f.mime_type?.startsWith('image/') ? 'image' : 'notes', 'ico ico--xs')}${escapeHtml(f.original_name)}
+        </a>`).join('')}
+    </div>` : '';
+
   let actions = '';
   if (t.status === 'available') {
     actions = `<button class="btn btn--primary btn--sm task-take-btn" data-id="${t.id}">Взяти задачу</button>`;
   } else if (t.status === 'taken') {
     actions = `
-      <textarea class="task-note-input" id="task-note-${t.id}" placeholder="Коментар до здачі (необов'язково)"></textarea>
+      <textarea class="task-note-input" id="task-note-${t.id}" placeholder="Коментар до здачі (необов'язково, якщо додаєте файл)"></textarea>
+      <div class="task-file-row">
+        <label class="btn btn--ghost btn--sm" for="task-files-${t.id}">${icon('upload', 'ico ico--sm')}Файл / фото / архів</label>
+        <input type="file" id="task-files-${t.id}" data-id="${t.id}" class="task-files-input" multiple hidden
+          accept="image/*,.zip,.rar,.7z,.tar,.gz,.pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.ppt,.pptx">
+        <span class="task-file-names" id="task-file-names-${t.id}"></span>
+      </div>
       <button type="button" class="btn btn--outline btn--sm task-submit-btn" data-id="${t.id}">На перевірку</button>`;
   } else if (t.status === 'review') {
     const work = t.work_duration_seconds != null
       ? ` · ${formatDurationLabel(t.work_duration_seconds)}`
       : '';
-    actions = `<span class="task-status-done">Очікує перевірки викладачем${work}</span>`;
+    actions = `<span class="task-status-done">Очікує перевірки викладачем${work}</span>${filesList(t.submission_files)}`;
   } else if (t.status === 'completed') {
-    actions = `<span class="task-status-done ico-inline">${icon('check', 'ico ico--sm')}Завершено${t.completed_at ? ` · ${formatDue(t.completed_at)}` : ''}</span>`;
+    actions = `<span class="task-status-done ico-inline">${icon('check', 'ico ico--sm')}Завершено${t.completed_at ? ` · ${formatDue(t.completed_at)}` : ''}</span>${filesList(t.submission_files)}`;
   }
 
   return `

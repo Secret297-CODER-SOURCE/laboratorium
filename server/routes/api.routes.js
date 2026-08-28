@@ -3,6 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { authRequired } from '../middleware/auth.js';
 import { requirePlatformAccess } from '../middleware/platform-access.js';
 import { requireTab } from '../middleware/tab-access.js';
+import { uploadTaskSubmission } from '../middleware/upload.js';
 import * as apiCtrl from '../controllers/api.controller.js';
 
 const router = Router();
@@ -25,7 +26,12 @@ router.patch('/enrollments/:id/progress', asyncHandler(apiCtrl.updateEnrollmentP
 
 router.get('/tasks', asyncHandler(apiCtrl.listTasks));
 router.post('/tasks/:id/take', asyncHandler(apiCtrl.takeTask));
-router.post('/tasks/:id/submit', asyncHandler(apiCtrl.submitTask));
+router.post('/tasks/:id/submit', (req, res, next) => {
+  uploadTaskSubmission(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, asyncHandler(apiCtrl.submitTask));
 
 router.get('/articles', requireTab('dash.article'), asyncHandler(apiCtrl.listArticles));
 router.post('/articles', requireTab('dash.article'), asyncHandler(apiCtrl.createArticle));

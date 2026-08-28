@@ -12,7 +12,7 @@ const targetType = params.get('type');
 const targetId = parseInt(params.get('id'), 10);
 const draft = params.get('draft') === '1';
 
-if (!['direction', 'group'].includes(targetType) || !targetId) {
+if (!['direction', 'group', 'program'].includes(targetType) || !targetId) {
   location.href = '/dashboard.html';
 }
 

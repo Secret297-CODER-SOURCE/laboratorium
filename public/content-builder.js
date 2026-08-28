@@ -12,7 +12,7 @@ const params = new URLSearchParams(location.search);
 const targetType = params.get('type');
 const targetId = parseInt(params.get('id'), 10);
 
-if (!['direction', 'group'].includes(targetType) || !targetId) {
+if (!['direction', 'group', 'program'].includes(targetType) || !targetId) {
   location.href = '/admin.html';
 }
 

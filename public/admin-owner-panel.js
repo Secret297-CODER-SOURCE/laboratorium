@@ -63,6 +63,7 @@ export function renderProgramsPanel(programs, directions) {
           <td><input class="admin-inp admin-inp--xs" type="number" data-field="bounty_reward" value="${p.bounty_reward}"></td>
           <td><input type="checkbox" data-field="is_featured" ${p.is_featured ? 'checked' : ''}></td>
           <td>
+            <a href="/content-builder.html?type=program&id=${p.id}" class="btn btn--outline btn--sm" title="Налаштування курсу">${icon('edit', 'ico ico--sm')}</a>
             <button class="btn btn--ghost btn--sm prog-save" data-id="${p.id}">${icon('check', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm prog-del" data-id="${p.id}">${icon('trash', 'ico ico--sm')}</button>
           </td>

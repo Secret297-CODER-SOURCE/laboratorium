@@ -107,9 +107,12 @@ export const config = {
     recordingsDir: env('RECORDINGS_DIR', join(root, 'data', 'uploads', 'recordings')),
     chatDir: env('CHAT_UPLOADS_DIR', join(root, 'data', 'uploads', 'chat')),
     ctfDir: env('CTF_ATTACHMENTS_DIR', join(root, 'data', 'uploads', 'ctf-attachments')),
+    tasksDir: env('TASK_SUBMISSIONS_DIR', join(root, 'data', 'uploads', 'task-submissions')),
     maxFileSize: envInt('MAX_RECORDING_SIZE_MB', 500) * 1024 * 1024,
     maxChatFileSize: envInt('MAX_CHAT_FILE_SIZE_MB', 50) * 1024 * 1024,
     maxCtfAttachmentSize: envInt('MAX_CTF_ATTACHMENT_SIZE_MB', 25) * 1024 * 1024,
+    maxTaskFileSize: envInt('MAX_TASK_FILE_SIZE_MB', 30) * 1024 * 1024,
+    maxTaskFiles: envInt('MAX_TASK_FILES', 6),
   },
 
   proxmox: {

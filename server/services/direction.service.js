@@ -38,9 +38,17 @@ export function getPublicWithPrograms() {
   `).all();
   const contentMap = Object.fromEntries(contentFlags.map(r => [r.target_id, !!r.is_published]));
 
+  const programContentFlags = db.prepare(`
+    SELECT target_id, is_published FROM content_pages WHERE target_type = 'program'
+  `).all();
+  const programContentMap = Object.fromEntries(programContentFlags.map(r => [r.target_id, !!r.is_published]));
+
   return directions.map(d => ({
     ...d,
-    programs: programs.filter(p => p.direction_id === d.id),
+    programs: programs.filter(p => p.direction_id === d.id).map(p => ({
+      ...p,
+      has_content: !!programContentMap[p.id],
+    })),
     has_content: !!contentMap[d.id],
   }));
 }

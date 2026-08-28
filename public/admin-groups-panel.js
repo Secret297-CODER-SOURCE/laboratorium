@@ -245,6 +245,14 @@ export function renderTasksPanel(groups, tasksData = {}) {
                   ${a.work_duration_seconds != null ? ` · ${Math.ceil(a.work_duration_seconds / 60)} хв` : ''}
                   ${a.submission_note ? ` · «${esc(a.submission_note)}»` : ''}
                 </div>
+                ${(a.submission_files || []).length ? `
+                  <div class="task-submission-files">
+                    ${a.submission_files.map(f => `
+                      <a href="${esc(f.url)}" target="_blank" rel="noopener" class="task-submission-file" title="${esc(f.original_name)}">
+                        ${icon(f.mime_type?.startsWith('image/') ? 'image' : 'notes', 'ico ico--xs')}
+                        ${esc(f.original_name)}
+                      </a>`).join('')}
+                  </div>` : ''}
               </div>
               <div style="display:flex;gap:6px">
                 <button type="button" class="btn btn--primary btn--sm task-approve" data-id="${a.id}">${icon('check', 'ico ico--sm')}Завершено</button>

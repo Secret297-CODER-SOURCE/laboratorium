@@ -111,6 +111,19 @@ export function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_tasks_group ON tasks(group_id);
     CREATE INDEX IF NOT EXISTS idx_task_assignments_user ON task_assignments(user_id, status);
     CREATE INDEX IF NOT EXISTS idx_task_assignments_task ON task_assignments(task_id);
+
+    CREATE TABLE IF NOT EXISTS task_submission_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      assignment_id INTEGER NOT NULL,
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT,
+      size_bytes INTEGER DEFAULT 0 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (assignment_id) REFERENCES task_assignments(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_task_submission_files_assignment ON task_submission_files(assignment_id);
   `);
 
   const memberCols = db.prepare('PRAGMA table_info(study_group_members)').all().map(c => c.name);
@@ -272,7 +285,7 @@ export function runMigrations(db) {
 
     CREATE TABLE IF NOT EXISTS content_pages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      target_type TEXT NOT NULL CHECK(target_type IN ('direction','group')),
+      target_type TEXT NOT NULL CHECK(target_type IN ('direction','group','program')),
       target_id INTEGER NOT NULL,
       title TEXT,
       subtitle TEXT,
@@ -578,6 +591,32 @@ export function runMigrations(db) {
 
     CREATE INDEX IF NOT EXISTS idx_stage_attachments_stage ON challenge_stage_attachments(stage_id);
   `);
+
+  const contentPagesSql = db.prepare(`
+    SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'content_pages'
+  `).get()?.sql || '';
+  if (contentPagesSql && !contentPagesSql.includes(`'program'`)) {
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE content_pages_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        target_type TEXT NOT NULL CHECK(target_type IN ('direction','group','program')),
+        target_id INTEGER NOT NULL,
+        title TEXT,
+        subtitle TEXT,
+        cover_gradient TEXT DEFAULT 'accent',
+        is_published INTEGER DEFAULT 0 NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+        updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+        UNIQUE(target_type, target_id)
+      );
+      INSERT INTO content_pages_new SELECT * FROM content_pages;
+      DROP TABLE content_pages;
+      ALTER TABLE content_pages_new RENAME TO content_pages;
+      CREATE INDEX IF NOT EXISTS idx_content_pages_target ON content_pages(target_type, target_id);
+    `);
+    db.pragma('foreign_keys = ON');
+  }
 }
 
 function bootstrapCurrentMonthPayments(db) {

@@ -1264,6 +1264,15 @@ input[type="number"]:focus {
   color: var(--text-muted);
 }
 
+.program-details-link {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: var(--accent);
+  margin: -12px 0 16px;
+  position: relative;
+  z-index: 1;
+}
+
 .program-footer {
   display: flex;
   justify-content: space-between;
