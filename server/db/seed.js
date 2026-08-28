@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import config from '../config/index.js';
 import { ROLES } from '../utils/roles.js';
 
@@ -106,22 +107,36 @@ function ensureExtraPrograms(db) {
 }
 
 function ensureOwner(db) {
-  const email = explicitEnv('OWNER_EMAIL').toLowerCase();
-  const password = explicitEnv('OWNER_PASSWORD');
-  if (!email || !password) return;
+  const byRole = db.prepare("SELECT id FROM users WHERE role = 'owner' LIMIT 1").get();
+  if (byRole) return;
+
+  const explicitEmail = explicitEnv('OWNER_EMAIL').toLowerCase();
+  const explicitPassword = explicitEnv('OWNER_PASSWORD');
+  const generated = !explicitEmail || !explicitPassword;
+  const email = explicitEmail || 'owner@laboratorium.club';
+  const password = explicitPassword || crypto.randomBytes(9).toString('base64url');
 
   const handle = 'lab_owner';
   const byEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   const byHandle = db.prepare('SELECT id FROM users WHERE handle = ?').get(handle);
-  const byRole = db.prepare("SELECT id FROM users WHERE role = 'owner' LIMIT 1").get();
-  if (byEmail || byHandle || byRole) return;
+  if (byEmail || byHandle) return;
 
   const hash = bcrypt.hashSync(password, config.bcryptRounds);
   db.prepare(`
     INSERT INTO users (email, password_hash, name, handle, role, bounty_points)
     VALUES (?, ?, 'Адміністратор', ?, 'owner', 0)
   `).run(email, hash, handle);
-  console.log(`[db] Owner account created: ${email}`);
+
+  if (generated) {
+    console.log('[db] ==========================================================');
+    console.log('[db] Owner account auto-generated (set OWNER_EMAIL/OWNER_PASSWORD to pick your own):');
+    console.log(`[db]   email:    ${email}`);
+    console.log(`[db]   password: ${password}`);
+    console.log('[db] This password is only ever printed here - copy it now.');
+    console.log('[db] ==========================================================');
+  } else {
+    console.log(`[db] Owner account created: ${email}`);
+  }
 }
 
 function ensureTestStudent(db) {
