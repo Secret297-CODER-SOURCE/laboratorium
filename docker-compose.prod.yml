@@ -83,7 +83,7 @@ services:
     volumes:
       - lab-data:/app/data
       # CTF labs on the same host (LAB_USE_LOCAL_DOCKER=true):
-      # - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - lab
     restart: always

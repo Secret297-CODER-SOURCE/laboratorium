@@ -74,6 +74,8 @@ services:
       - "${PORT:-3000}:3000"
     volumes:
       - lab-data:/app/data
+      # CTF labs on the same host (LAB_USE_LOCAL_DOCKER=true):
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
