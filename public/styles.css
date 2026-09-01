@@ -29,6 +29,17 @@
 /* ===== Reset ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/*
+ * A component that sets its own `display` (flex/block/grid) on the same
+ * class/id used for the `hidden` attribute can outrank the UA stylesheet's
+ * `[hidden]{display:none}` — same specificity, but the component's own CSS
+ * loads later, so it wins the cascade and the "hidden" element still renders
+ * (e.g. .preview-modal{display:flex} kept a full-screen overlay visible and
+ * click-blocking even with `hidden` set). This one rule makes `hidden`
+ * always win, everywhere, without hunting down every `.foo[hidden]` pair.
+ */
+[hidden] { display: none !important; }
+
 html {
   scroll-behavior: smooth;
   font-size: 16px;

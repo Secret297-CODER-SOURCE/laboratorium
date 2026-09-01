@@ -238,9 +238,15 @@ export function renderProxmoxPanel(settings, labPublic = {}, labs = []) {
       <label>URL Proxmox
         <input class="admin-inp" id="px-host" placeholder="https://pve.example.com:8006" value="${esc(s.host || '')}">
       </label>
-      <label>Token ID
-        <input class="admin-inp" id="px-token-id" placeholder="root@pam!laboratorium" value="${esc(s.tokenId || '')}">
+      <label>Proxmox User
+        <input class="admin-inp" id="px-token-user" placeholder="root@pam" value="${esc((s.tokenId || '').split('!')[0] || '')}">
       </label>
+      <label>Token Name
+        <input class="admin-inp" id="px-token-name" placeholder="laboratorium" value="${esc((s.tokenId || '').split('!')[1] || '')}">
+      </label>
+      <p class="empty-state" style="padding:0;text-align:left;grid-column:1/-1;font-size:0.75rem">
+        Це два окремі поля з Proxmox: Datacenter → Permissions → API Tokens → User name і Token Name.
+      </p>
       <label>API Secret
         <input class="admin-inp" id="px-token-secret" type="password" placeholder="${s.hasTokenSecret ? '•••••••• (залиште порожнім, щоб не змінювати)' : 'секрет токена'}">
       </label>
@@ -487,12 +493,14 @@ export function bindOwnerPanelEvents(showToast, reload) {
   document.getElementById('proxmox-settings-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
+      const tokenUser = document.getElementById('px-token-user').value.trim();
+      const tokenName = document.getElementById('px-token-name').value.trim();
       const res = await api('/admin/settings/proxmox', {
         method: 'PATCH',
         body: JSON.stringify({
           enabled: document.getElementById('px-enabled').checked,
           host: document.getElementById('px-host').value,
-          tokenId: document.getElementById('px-token-id').value,
+          tokenId: tokenUser && tokenName ? `${tokenUser}!${tokenName}` : (tokenUser || ''),
           tokenSecret: document.getElementById('px-token-secret').value,
           node: document.getElementById('px-node').value,
           templateVmid: document.getElementById('px-template').value,

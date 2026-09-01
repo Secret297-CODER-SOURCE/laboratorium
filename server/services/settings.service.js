@@ -87,6 +87,16 @@ export function saveProxmoxSettings(data) {
   if (enabled && !tokenId) {
     throw new ValidationError('Вкажіть Token ID');
   }
+  // Proxmox's own UI lists "User name" (root@pam) and "Token Name" (e.g.
+  // laboratorium) as two separate columns — pasting just the user name here
+  // is the single most common misconfiguration and produces an opaque
+  // Proxmox-side error ("not able to split into user and token parts") only
+  // once a real API call is attempted. Catch it here instead, immediately.
+  if (enabled && tokenId && !tokenId.includes('!')) {
+    throw new ValidationError(
+      `Token ID має включати назву токена через "!": user@realm!назва_токена (наприклад root@pam!laboratorium), а не просто "${tokenId}"`,
+    );
+  }
 
   const tokenSecret = data.tokenSecret?.trim()
     ? data.tokenSecret.trim()
