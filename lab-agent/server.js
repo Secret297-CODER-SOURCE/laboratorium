@@ -128,6 +128,40 @@ app.post('/deploy', auth, (req, res) => {
   }
 });
 
+app.post('/backup', auth, (req, res) => {
+  const { containerId, tag } = req.body;
+  const safeId = String(containerId || '').replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 48);
+  let safeTag;
+  try {
+    safeTag = assertSafeDockerImage(tag);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  if (!safeId) return res.status(400).json({ error: 'containerId required' });
+  try {
+    execFileSync('docker', ['commit', safeId, safeTag], { stdio: 'pipe' });
+    res.json({ ok: true, tag: safeTag });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Backup failed' });
+  }
+});
+
+app.post('/backup/delete', auth, (req, res) => {
+  const { tag } = req.body;
+  let safeTag;
+  try {
+    safeTag = assertSafeDockerImage(tag);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  try {
+    execFileSync('docker', ['rmi', '-f', safeTag], { stdio: 'pipe' });
+  } catch {
+    /* already gone */
+  }
+  res.json({ ok: true });
+});
+
 app.post('/stop', auth, (req, res) => {
   const { containerId } = req.body;
   const safeId = String(containerId || '').replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 48);

@@ -16,6 +16,9 @@ function envDefaults() {
     bridge: config.proxmox.bridge || 'vmbr0',
     vmMemoryMb: config.proxmox.vmMemoryMb || 4096,
     vmCores: config.proxmox.vmCores || 2,
+    backupAutoEnabled: false,
+    backupIntervalHours: 24,
+    backupRetention: 3,
   };
 }
 
@@ -43,6 +46,9 @@ export function getProxmoxConfig() {
     bridge: stored.bridge || defaults.bridge,
     vmMemoryMb: parseInt(stored.vmMemoryMb ?? defaults.vmMemoryMb, 10),
     vmCores: parseInt(stored.vmCores ?? defaults.vmCores, 10),
+    backupAutoEnabled: stored.backupAutoEnabled ?? defaults.backupAutoEnabled,
+    backupIntervalHours: parseInt(stored.backupIntervalHours ?? defaults.backupIntervalHours, 10) || 24,
+    backupRetention: parseInt(stored.backupRetention ?? defaults.backupRetention, 10) || 3,
   };
 }
 
@@ -59,39 +65,55 @@ export function getProxmoxSettingsPublic() {
     bridge: cfg.bridge,
     vmMemoryMb: cfg.vmMemoryMb,
     vmCores: cfg.vmCores,
+    backupAutoEnabled: cfg.backupAutoEnabled,
+    backupIntervalHours: cfg.backupIntervalHours,
+    backupRetention: cfg.backupRetention,
     configured: !!(cfg.enabled && cfg.host && cfg.tokenId && cfg.tokenSecret),
   };
 }
 
 export function saveProxmoxSettings(data) {
-  const current = loadRaw();
-  const host = data.host?.trim();
-  if (data.enabled && !host) {
+  // Merge over the currently stored config, not just hardcoded defaults, so a
+  // partial update (e.g. the backup-schedule form, which only sends
+  // backup* fields) can't blank out host/token/node/etc — every field here
+  // falls back to what's already saved when the caller didn't send it.
+  const merged = getProxmoxConfig();
+  const host = data.host !== undefined ? data.host?.trim() : merged.host;
+  const enabled = data.enabled !== undefined ? !!data.enabled : merged.enabled;
+  if (enabled && !host) {
     throw new ValidationError('Вкажіть URL Proxmox');
   }
-  if (data.enabled && !data.tokenId?.trim()) {
+  const tokenId = data.tokenId !== undefined ? data.tokenId?.trim() : merged.tokenId;
+  if (enabled && !tokenId) {
     throw new ValidationError('Вкажіть Token ID');
   }
 
   const tokenSecret = data.tokenSecret?.trim()
     ? data.tokenSecret.trim()
-    : (current.tokenSecret || '');
+    : merged.tokenSecret;
 
-  if (data.enabled && !tokenSecret) {
+  if (enabled && !tokenSecret) {
     throw new ValidationError('Вкажіть API Secret');
   }
 
   const payload = {
-    enabled: !!data.enabled,
+    enabled,
     host: host || '',
-    tokenId: data.tokenId?.trim() || '',
-    tokenSecret,
-    node: data.node?.trim() || 'pve',
-    templateVmid: parseInt(data.templateVmid, 10) || 9000,
-    storage: data.storage?.trim() || 'local-lvm',
-    bridge: data.bridge?.trim() || 'vmbr0',
-    vmMemoryMb: parseInt(data.vmMemoryMb, 10) || 4096,
-    vmCores: parseInt(data.vmCores, 10) || 2,
+    tokenId: tokenId || '',
+    tokenSecret: tokenSecret || '',
+    node: data.node !== undefined ? (data.node?.trim() || 'pve') : merged.node,
+    templateVmid: data.templateVmid !== undefined ? (parseInt(data.templateVmid, 10) || 9000) : merged.templateVmid,
+    storage: data.storage !== undefined ? (data.storage?.trim() || 'local-lvm') : merged.storage,
+    bridge: data.bridge !== undefined ? (data.bridge?.trim() || 'vmbr0') : merged.bridge,
+    vmMemoryMb: data.vmMemoryMb !== undefined ? (parseInt(data.vmMemoryMb, 10) || 4096) : merged.vmMemoryMb,
+    vmCores: data.vmCores !== undefined ? (parseInt(data.vmCores, 10) || 2) : merged.vmCores,
+    backupAutoEnabled: data.backupAutoEnabled !== undefined ? !!data.backupAutoEnabled : merged.backupAutoEnabled,
+    backupIntervalHours: data.backupIntervalHours !== undefined
+      ? Math.max(1, parseInt(data.backupIntervalHours, 10) || 24)
+      : merged.backupIntervalHours,
+    backupRetention: data.backupRetention !== undefined
+      ? Math.max(1, parseInt(data.backupRetention, 10) || 3)
+      : merged.backupRetention,
     updatedBy: 'owner',
   };
 

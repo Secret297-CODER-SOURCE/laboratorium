@@ -98,6 +98,20 @@ router.get('/settings/proxmox', requireRole('owner', 'developer'), asyncHandler(
 router.patch('/settings/proxmox', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateProxmoxSettings));
 router.post('/settings/proxmox/provision-missing', requireRole('owner', 'developer'), asyncHandler(adminCtrl.provisionMissingLabs));
 
+router.get('/labs', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listLabs));
+router.post('/labs/:userId/start', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminStartVm));
+router.post('/labs/:userId/stop', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminStopVm));
+router.post('/labs/:userId/reset', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminResetVm));
+router.get('/labs/:userId/backups', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listVmBackups));
+router.post('/labs/:userId/backups', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createVmBackup));
+router.post('/labs/:userId/backups/:backupId/restore', requireRole('owner', 'developer'), asyncHandler(adminCtrl.restoreVmBackup));
+router.delete('/labs/:userId/backups/:backupId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteVmBackup));
+
+router.get('/labs/:userId/docker/:deployId/backups', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listDockerBackups));
+router.post('/labs/:userId/docker/:deployId/backups', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createDockerBackup));
+router.post('/labs/:userId/docker/backups/:backupId/restore', requireRole('owner', 'developer'), asyncHandler(adminCtrl.restoreDockerBackup));
+router.delete('/labs/:userId/docker/backups/:backupId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteDockerBackup));
+
 router.get('/settings/tab-access', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getTabAccessSettings));
 router.patch('/settings/tab-access', requireRole('owner', 'developer'), asyncHandler(adminCtrl.saveTabAccessSettings));
 

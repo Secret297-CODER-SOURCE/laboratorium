@@ -61,30 +61,38 @@ export async function provisionVm(userId, handle) {
 
   const c = settings.getProxmoxConfig();
   const hostname = `lab-${handle}`.slice(0, 32).replace(/[^a-zA-Z0-9-]/g, '');
-  const vmid = await proxmox.getNextVmid();
 
+  // Mark 'provisioning' before any Proxmox call so a failure below (including
+  // getNextVmid, which used to run unguarded and could reject before any row
+  // existed) always lands as a visible 'error' row instead of vanishing —
+  // otherwise provisionMissingStudents silently retries forever with 0 visible result.
   if (existing) {
     db.prepare(`
-      UPDATE user_labs SET proxmox_vmid = ?, node = ?, hostname = ?, ip = NULL,
+      UPDATE user_labs SET node = ?, hostname = ?, ip = NULL,
         status = 'provisioning', error_message = NULL, updated_at = datetime('now')
       WHERE user_id = ?
-    `).run(vmid, c.node, hostname, userId);
+    `).run(c.node, hostname, userId);
   } else {
     db.prepare(`
-      INSERT INTO user_labs (user_id, proxmox_vmid, node, hostname, status)
-      VALUES (?, ?, ?, ?, 'provisioning')
-    `).run(userId, vmid, c.node, hostname);
+      INSERT INTO user_labs (user_id, node, hostname, status)
+      VALUES (?, ?, ?, 'provisioning')
+    `).run(userId, c.node, hostname);
   }
 
   try {
+    const vmid = await proxmox.getNextVmid();
+    db.prepare(`
+      UPDATE user_labs SET proxmox_vmid = ? WHERE user_id = ?
+    `).run(vmid, userId);
+
     const cloned = await proxmox.cloneVm({ vmid, name: hostname, userId });
     await proxmox.startVm(vmid, cloned.node);
     const ip = cloned.ip || `10.10.10.${(userId % 200) + 10}`;
 
     db.prepare(`
-      UPDATE user_labs SET status = 'running', ip = ?, updated_at = datetime('now')
+      UPDATE user_labs SET status = 'running', node = ?, ip = ?, updated_at = datetime('now')
       WHERE user_id = ?
-    `).run(ip, userId);
+    `).run(cloned.node || c.node, ip, userId);
 
     return getUserLab(userId);
   } catch (err) {
@@ -147,6 +155,87 @@ export async function resetVm(userId, handle) {
   return provisionVm(userId, handle);
 }
 
+export async function createVmBackup(userId, label, source = 'manual') {
+  const lab = db.prepare('SELECT * FROM user_labs WHERE user_id = ?').get(userId);
+  if (!lab?.proxmox_vmid) throw new NotFoundError('Машина ще не створена');
+
+  const snapname = `backup_${Date.now()}`;
+  const { lastInsertRowid: id } = db.prepare(`
+    INSERT INTO vm_backups (user_id, resource_type, resource_id, label, ref, source, status)
+    VALUES (?, 'vm', NULL, ?, ?, ?, 'creating')
+  `).run(userId, label || null, snapname, source);
+
+  try {
+    await proxmox.createSnapshot(lab.proxmox_vmid, lab.node, snapname, label || undefined);
+    db.prepare(`UPDATE vm_backups SET status = 'ready' WHERE id = ?`).run(id);
+  } catch (err) {
+    db.prepare(`UPDATE vm_backups SET status = 'error', error_message = ? WHERE id = ?`).run(err.message, id);
+    throw err;
+  }
+  return db.prepare('SELECT * FROM vm_backups WHERE id = ?').get(id);
+}
+
+export function listVmBackups(userId) {
+  return db.prepare(`
+    SELECT * FROM vm_backups WHERE user_id = ? AND resource_type = 'vm' ORDER BY created_at DESC
+  `).all(userId);
+}
+
+export async function restoreVmBackup(userId, backupId) {
+  const backup = db.prepare(`
+    SELECT * FROM vm_backups WHERE id = ? AND user_id = ? AND resource_type = 'vm'
+  `).get(backupId, userId);
+  if (!backup) throw new NotFoundError('Бекап не знайдено');
+  const lab = db.prepare('SELECT * FROM user_labs WHERE user_id = ?').get(userId);
+  if (!lab?.proxmox_vmid) throw new NotFoundError('Машина не знайдена');
+
+  await proxmox.rollbackSnapshot(lab.proxmox_vmid, lab.node, backup.ref);
+  db.prepare(`
+    UPDATE user_labs SET status = 'running', error_message = NULL, updated_at = datetime('now') WHERE user_id = ?
+  `).run(userId);
+  return getUserLab(userId);
+}
+
+export async function deleteVmBackup(userId, backupId) {
+  const backup = db.prepare(`
+    SELECT * FROM vm_backups WHERE id = ? AND user_id = ? AND resource_type = 'vm'
+  `).get(backupId, userId);
+  if (!backup) throw new NotFoundError('Бекап не знайдено');
+  const lab = db.prepare('SELECT * FROM user_labs WHERE user_id = ?').get(userId);
+  if (lab?.proxmox_vmid) {
+    await proxmox.deleteSnapshot(lab.proxmox_vmid, lab.node, backup.ref).catch(() => {});
+  }
+  db.prepare('DELETE FROM vm_backups WHERE id = ?').run(backupId);
+  return { ok: true };
+}
+
+/** Прибирає найстаріші авто/ручні бекапи понад ліміт retention. */
+export async function pruneVmBackups(userId, retention) {
+  const keep = Math.max(1, parseInt(retention, 10) || 3);
+  const rows = db.prepare(`
+    SELECT * FROM vm_backups WHERE user_id = ? AND resource_type = 'vm' AND status = 'ready'
+    ORDER BY created_at DESC
+  `).all(userId);
+  for (const b of rows.slice(keep)) {
+    await deleteVmBackup(userId, b.id).catch(() => {});
+  }
+}
+
+/** Список усіх учнів з їхніми лабораторними машинами та Docker-деплоями (для адмін-панелі). */
+export function adminListLabs() {
+  const students = db.prepare(`
+    SELECT id, handle, name, email FROM users WHERE role = 'student' ORDER BY name COLLATE NOCASE
+  `).all();
+  return students.map((s) => ({
+    userId: s.id,
+    handle: s.handle,
+    name: s.name,
+    email: s.email,
+    vm: getUserLab(s.id),
+    dockerDeployments: listDockerDeployments(s.id),
+  }));
+}
+
 export async function deployDocker(userId, { image, name }) {
   const imageName = assertSafeDockerImage(image);
 
@@ -197,6 +286,78 @@ export async function stopDocker(userId, deployId) {
     getLabPublicConfig(),
     { userId, resourceType: 'docker', resourceId: deployId, mock: !labAgent.isAgentEnabled() },
   );
+}
+
+export async function createDockerBackup(userId, deployId, label, source = 'manual') {
+  const dep = db.prepare('SELECT * FROM docker_deployments WHERE id = ? AND user_id = ?').get(deployId, userId);
+  if (!dep?.container_id) throw new NotFoundError('Деплой не знайдено');
+
+  const tag = `lab-backup-${userId}-${deployId}-${Date.now()}`;
+  const { lastInsertRowid: id } = db.prepare(`
+    INSERT INTO vm_backups (user_id, resource_type, resource_id, label, ref, source, status)
+    VALUES (?, 'docker', ?, ?, ?, ?, 'creating')
+  `).run(userId, deployId, label || null, tag, source);
+
+  try {
+    await labAgent.backupContainer(dep.container_id, tag);
+    db.prepare(`UPDATE vm_backups SET status = 'ready' WHERE id = ?`).run(id);
+  } catch (err) {
+    db.prepare(`UPDATE vm_backups SET status = 'error', error_message = ? WHERE id = ?`).run(err.message, id);
+    throw err;
+  }
+  return db.prepare('SELECT * FROM vm_backups WHERE id = ?').get(id);
+}
+
+export function listDockerBackups(userId, deployId) {
+  return db.prepare(`
+    SELECT * FROM vm_backups WHERE user_id = ? AND resource_type = 'docker' AND resource_id = ?
+    ORDER BY created_at DESC
+  `).all(userId, deployId);
+}
+
+export async function restoreDockerBackup(userId, backupId) {
+  const backup = db.prepare(`
+    SELECT * FROM vm_backups WHERE id = ? AND user_id = ? AND resource_type = 'docker'
+  `).get(backupId, userId);
+  if (!backup) throw new NotFoundError('Бекап не знайдено');
+  const dep = db.prepare('SELECT * FROM docker_deployments WHERE id = ? AND user_id = ?').get(backup.resource_id, userId);
+  if (!dep) throw new NotFoundError('Деплой не знайдено');
+
+  const deployed = await labAgent.deployContainer({ name: dep.name, image: backup.ref, port: dep.host_port });
+
+  db.prepare(`
+    UPDATE docker_deployments SET container_id = ?, target_url = ?, host_port = ?,
+      status = 'running', error_message = NULL, updated_at = datetime('now')
+    WHERE id = ?
+  `).run(deployed.containerId, deployed.targetUrl, deployed.hostPort, dep.id);
+
+  return enrichDeploymentUrl(
+    db.prepare('SELECT * FROM docker_deployments WHERE id = ?').get(dep.id),
+    getLabPublicConfig(),
+    { userId, resourceType: 'docker', resourceId: dep.id, mock: !labAgent.isAgentEnabled() },
+  );
+}
+
+export async function deleteDockerBackup(userId, backupId) {
+  const backup = db.prepare(`
+    SELECT * FROM vm_backups WHERE id = ? AND user_id = ? AND resource_type = 'docker'
+  `).get(backupId, userId);
+  if (!backup) throw new NotFoundError('Бекап не знайдено');
+  await labAgent.deleteBackupImage(backup.ref).catch(() => {});
+  db.prepare('DELETE FROM vm_backups WHERE id = ?').run(backupId);
+  return { ok: true };
+}
+
+/** Прибирає найстаріші бекапи контейнера понад ліміт retention. */
+export async function pruneDockerBackups(userId, deployId, retention) {
+  const keep = Math.max(1, parseInt(retention, 10) || 3);
+  const rows = db.prepare(`
+    SELECT * FROM vm_backups WHERE user_id = ? AND resource_type = 'docker' AND resource_id = ? AND status = 'ready'
+    ORDER BY created_at DESC
+  `).all(userId, deployId);
+  for (const b of rows.slice(keep)) {
+    await deleteDockerBackup(userId, b.id).catch(() => {});
+  }
 }
 
 export function getLabOverview(userId, handle) {

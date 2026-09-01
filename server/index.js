@@ -4,6 +4,7 @@ import config from './config/index.js';
 import createApp from './app.js';
 import { initSocket } from './socket/index.js';
 import { ensureCtfImageBuilt, isAgentEnabled } from './services/lab-agent.service.js';
+import { startBackupScheduler } from './services/backup-scheduler.service.js';
 
 const app = createApp();
 const server = createServer(app);
@@ -33,6 +34,8 @@ server.listen(config.port, config.host, () => {
   } else if (!isAgentEnabled()) {
     console.log('[lab-agent] No Docker/agent configured — CTF challenges run in demo/mock mode.');
   }
+
+  startBackupScheduler();
 });
 
 function shutdown(signal) {

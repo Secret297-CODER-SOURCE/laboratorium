@@ -269,6 +269,22 @@ export function runMigrations(db) {
 
     CREATE INDEX IF NOT EXISTS idx_ctf_deployments_user ON ctf_deployments(user_id);
     CREATE INDEX IF NOT EXISTS idx_docker_deployments_user ON docker_deployments(user_id);
+
+    CREATE TABLE IF NOT EXISTS vm_backups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      resource_type TEXT NOT NULL CHECK(resource_type IN ('vm','docker')),
+      resource_id INTEGER,
+      label TEXT,
+      ref TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','auto')),
+      status TEXT NOT NULL DEFAULT 'creating' CHECK(status IN ('creating','ready','error')),
+      error_message TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_vm_backups_user ON vm_backups(user_id, resource_type);
   `);
 
   const ctfDepCols = db.prepare('PRAGMA table_info(ctf_deployments)').all().map(c => c.name);

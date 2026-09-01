@@ -147,6 +147,27 @@
 .status-pill.rejected { color: #ff4466; background: rgba(255,68,102,0.1); }
 .status-pill.scheduled { color: var(--accent); background: var(--accent-subtle); }
 .status-pill.live { color: #ff4466; background: rgba(255,68,102,0.1); }
+.status-pill.running { color: #2ecc71; background: rgba(46,204,113,0.12); }
+.status-pill.provisioning,
+.status-pill.deploying { color: #ffaa00; background: rgba(255,170,0,0.1); }
+.status-pill.stopped { color: var(--text-muted); background: rgba(148,163,184,0.12); }
+.status-pill.error { color: #ff4466; background: rgba(255,68,102,0.1); }
+.status-pill.none { color: var(--text-muted); background: rgba(148,163,184,0.12); }
+.status-pill.creating { color: #ffaa00; background: rgba(255,170,0,0.1); }
+.status-pill.ready { color: #2ecc71; background: rgba(46,204,113,0.12); }
+
+.backup-history {
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  margin-top: 8px;
+}
+
+.admin-table--compact th,
+.admin-table--compact td {
+  padding: 6px 8px;
+  font-size: 0.78rem;
+}
 
 .admin-list { display: flex; flex-direction: column; gap: 8px; }
 
@@ -1163,4 +1184,28 @@
 
 .billing-exempt-check {
   font-size: 0.72rem;
+}
+
+.toast {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  z-index: 200;
+  padding: 14px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: toastSlideIn 0.3s ease;
+}
+
+.toast--error {
+  border-color: #ff3344;
+  color: #ff6b7a;
+}
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }

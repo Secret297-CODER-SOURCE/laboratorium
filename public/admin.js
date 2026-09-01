@@ -32,6 +32,9 @@ import {
 import {
   renderStoragePanel, bindStoragePanelEvents, loadStorageAdminData,
 } from '/admin-storage-panel.js';
+import {
+  renderLabsPanel, bindLabsPanelEvents,
+} from '/admin-labs-panel.js';
 import { initNumberInputs } from '/number-inputs.js';
 
 if (!(await requireAuthAsync())) throw new Error('auth');
@@ -75,6 +78,7 @@ let ctfAdminData = { challenges: [], programs: [] };
 let quizzesAdminData = { quizzes: [] };
 let statsAdminData = null;
 let storageAdminData = { servers: [], assets: [] };
+let labsAdminData = [];
 let adminLoadSeq = 0;
 
 function isScheduleTab(role) {
@@ -185,6 +189,12 @@ async function load() {
     try {
       storageAdminData = await loadStorageAdminData();
     } catch { storageAdminData = { servers: [], assets: [] }; }
+  }
+
+  if (role === 'owner' && ownerTab === 'labs') {
+    try {
+      ({ labs: labsAdminData } = await api('/admin/labs'));
+    } catch { labsAdminData = []; }
   }
 
   if (role === 'owner' && ownerTab === 'schedule') {
@@ -330,6 +340,8 @@ async function load() {
       }
     } else if (ownerTab === 'storage') {
       html += renderStoragePanel(storageAdminData);
+    } else if (ownerTab === 'labs') {
+      html += renderLabsPanel(labsAdminData);
     } else if (ownerTab === 'schedule') {
       const schedGroups = window.__scheduleGroups || groups || [];
       const gf = new URLSearchParams(location.search).get('groupId') || '';
@@ -475,6 +487,9 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
   }
   if (role === 'owner' && ownerTab === 'storage') {
     bindStoragePanelEvents(showToast, load);
+  }
+  if (role === 'owner' && ownerTab === 'labs') {
+    bindLabsPanelEvents(showToast, load);
   }
 
   document.querySelectorAll('.role-select').forEach(sel => {

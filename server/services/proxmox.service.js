@@ -98,6 +98,38 @@ export async function deleteVm(vmid, node) {
   return { ok: true };
 }
 
+export async function createSnapshot(vmid, node, snapname, description) {
+  const c = cfg();
+  const n = node || c.node;
+  if (!isEnabled()) return { ok: true, mock: true };
+  await request('POST', `/nodes/${n}/qemu/${vmid}/snapshot`, { snapname, description: description || undefined });
+  return { ok: true };
+}
+
+export async function listSnapshots(vmid, node) {
+  const c = cfg();
+  const n = node || c.node;
+  if (!isEnabled()) return [];
+  const data = await request('GET', `/nodes/${n}/qemu/${vmid}/snapshot`);
+  return (data || []).filter((s) => s.name !== 'current');
+}
+
+export async function rollbackSnapshot(vmid, node, snapname) {
+  const c = cfg();
+  const n = node || c.node;
+  if (!isEnabled()) return { ok: true, mock: true };
+  await request('POST', `/nodes/${n}/qemu/${vmid}/snapshot/${encodeURIComponent(snapname)}/rollback`);
+  return { ok: true };
+}
+
+export async function deleteSnapshot(vmid, node, snapname) {
+  const c = cfg();
+  const n = node || c.node;
+  if (!isEnabled()) return { ok: true, mock: true };
+  await request('DELETE', `/nodes/${n}/qemu/${vmid}/snapshot/${encodeURIComponent(snapname)}`);
+  return { ok: true };
+}
+
 export function getConsoleUrl(vmid, node) {
   const c = cfg();
   if (!isEnabled() || !vmid) return null;

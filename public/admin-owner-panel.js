@@ -12,6 +12,7 @@ export function renderOwnerTabs(active = 'overview') {
     { id: 'access', label: 'Доступ', icon: 'shield' },
     { id: 'applications', label: 'Заявки', icon: 'calendar' },
     { id: 'proxmox', label: 'Proxmox', icon: 'server' },
+    { id: 'labs', label: 'Машини', icon: 'database' },
     { id: 'storage', label: 'Сховище', icon: 'upload' },
     { id: 'schedule', label: 'Розклад', icon: 'calendar' },
   ];
@@ -161,6 +162,29 @@ export function renderProxmoxPanel(settings, labPublic = {}) {
       <div class="admin-form-actions">
         <button type="submit" class="btn btn--primary btn--sm">${icon('check', 'ico ico--sm')}Зберегти Proxmox</button>
         <button type="button" class="btn btn--outline btn--sm" id="px-provision-missing">Створити машини учням без VM</button>
+      </div>
+    </form>
+  </section>
+  <section class="admin-panel admin-panel--wide" style="margin-top:16px">
+    <div class="admin-panel-head">
+      <h2>${icon('database', 'ico ico--md')}Автоматичні бекапи</h2>
+    </div>
+    <p class="empty-state" style="padding:0 0 16px;text-align:left">
+      Регулярні бекапи всіх запущених машин і Docker-контейнерів учнів зі старими копіями, що видаляються автоматично.
+    </p>
+    <form id="backup-settings-form" class="admin-form-grid">
+      <label class="admin-check">
+        <input type="checkbox" id="bk-enabled" ${s.backupAutoEnabled ? 'checked' : ''}>
+        Увімкнути автоматичні бекапи
+      </label>
+      <label>Інтервал (год)
+        <input class="admin-inp" id="bk-interval" type="number" min="1" value="${s.backupIntervalHours || 24}">
+      </label>
+      <label>Зберігати останніх копій
+        <input class="admin-inp" id="bk-retention" type="number" min="1" value="${s.backupRetention || 3}">
+      </label>
+      <div class="admin-form-actions">
+        <button type="submit" class="btn btn--primary btn--sm">${icon('check', 'ico ico--sm')}Зберегти розклад бекапів</button>
       </div>
     </form>
   </section>
@@ -362,6 +386,22 @@ export function bindOwnerPanelEvents(showToast, reload) {
       });
       const extra = res.provisioned?.started ? ` · створення ${res.provisioned.started} VM` : '';
       showToast((res.message || 'Збережено') + extra);
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('backup-settings-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api('/admin/settings/proxmox', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          backupAutoEnabled: document.getElementById('bk-enabled').checked,
+          backupIntervalHours: document.getElementById('bk-interval').value,
+          backupRetention: document.getElementById('bk-retention').value,
+        }),
+      });
+      showToast(res.message || 'Збережено');
       reload();
     } catch (err) { showToast(err.message, 'error'); }
   });

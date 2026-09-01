@@ -142,6 +142,35 @@ export async function deployContainer({
   return mockDeploy({ name, image: safeImage, port, containerPort, demoMeta });
 }
 
+export async function backupContainer(containerId, tag) {
+  const safeTag = assertSafeDockerImage(tag);
+  const result = await agentRequest('/backup', { containerId, tag: safeTag });
+  if (result) return result;
+  if (config.labAgent.useLocalDocker) {
+    try {
+      execFileSync('docker', ['commit', assertSafeContainerName(containerId), safeTag], { stdio: 'pipe' });
+      return { ok: true, tag: safeTag };
+    } catch (err) {
+      throw new ValidationError(err.message || 'Backup failed');
+    }
+  }
+  return { ok: true, tag: safeTag, mock: true };
+}
+
+export async function deleteBackupImage(tag) {
+  const safeTag = assertSafeDockerImage(tag);
+  const result = await agentRequest('/backup/delete', { tag: safeTag });
+  if (result) return result;
+  if (config.labAgent.useLocalDocker) {
+    try {
+      execFileSync('docker', ['rmi', '-f', safeTag], { stdio: 'pipe' });
+    } catch {
+      /* already gone */
+    }
+  }
+  return { ok: true };
+}
+
 export async function stopContainer(containerId) {
   if (!containerId) return { ok: true };
   const result = await agentRequest('/stop', { containerId });

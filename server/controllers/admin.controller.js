@@ -11,7 +11,7 @@ import * as tabAccessService from '../services/tab-access.service.js';
 import * as paymentService from '../services/payment.service.js';
 import * as labService from '../services/lab.service.js';
 import { addBounty } from '../services/bounty.service.js';
-import { ForbiddenError } from '../utils/errors.js';
+import { ForbiddenError, NotFoundError } from '../utils/errors.js';
 import { isAdminRole } from '../utils/roles.js';
 
 export async function getOverview(req, res) {
@@ -235,16 +235,95 @@ export async function updateProxmoxSettings(req, res) {
   if (!wasEnabled && settings.configured) {
     provisioned = await labService.provisionMissingStudents();
   }
+  const isBackupOnly = req.body.host === undefined && req.body.enabled === undefined;
   res.json({
     settings,
     provisioned,
-    message: settings.configured ? 'Налаштування Proxmox збережено' : 'Proxmox вимкнено',
+    message: isBackupOnly
+      ? 'Розклад бекапів збережено'
+      : (settings.configured ? 'Налаштування Proxmox збережено' : 'Proxmox вимкнено'),
   });
 }
 
 export async function provisionMissingLabs(req, res) {
   const result = await labService.provisionMissingStudents();
   res.json({ ...result, message: `Запущено створення ${result.started} машин` });
+}
+
+export async function listLabs(req, res) {
+  res.json({ labs: labService.adminListLabs() });
+}
+
+export async function adminStartVm(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const vm = await labService.startVm(userId);
+  res.json({ vm, message: 'Машину запущено' });
+}
+
+export async function adminStopVm(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const vm = await labService.stopVm(userId);
+  res.json({ vm, message: 'Машину зупинено' });
+}
+
+export async function adminResetVm(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const user = userService.findById(userId);
+  if (!user) throw new NotFoundError('Учня не знайдено');
+  const vm = await labService.resetVm(userId, user.handle);
+  res.json({ vm, message: 'Машину пересоздано' });
+}
+
+export async function listVmBackups(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  res.json({ backups: labService.listVmBackups(userId) });
+}
+
+export async function createVmBackup(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const backup = await labService.createVmBackup(userId, req.body?.label);
+  res.status(201).json({ backup, message: 'Бекап машини створено' });
+}
+
+export async function restoreVmBackup(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const backupId = parseInt(req.params.backupId, 10);
+  const vm = await labService.restoreVmBackup(userId, backupId);
+  res.json({ vm, message: 'Машину відновлено з бекапу' });
+}
+
+export async function deleteVmBackup(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const backupId = parseInt(req.params.backupId, 10);
+  const result = await labService.deleteVmBackup(userId, backupId);
+  res.json({ ...result, message: 'Бекап видалено' });
+}
+
+export async function listDockerBackups(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const deployId = parseInt(req.params.deployId, 10);
+  res.json({ backups: labService.listDockerBackups(userId, deployId) });
+}
+
+export async function createDockerBackup(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const deployId = parseInt(req.params.deployId, 10);
+  const backup = await labService.createDockerBackup(userId, deployId, req.body?.label);
+  res.status(201).json({ backup, message: 'Бекап контейнера створено' });
+}
+
+export async function restoreDockerBackup(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const backupId = parseInt(req.params.backupId, 10);
+  const deployment = await labService.restoreDockerBackup(userId, backupId);
+  res.json({ deployment, message: 'Контейнер відновлено з бекапу' });
+}
+
+export async function deleteDockerBackup(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const backupId = parseInt(req.params.backupId, 10);
+  const result = await labService.deleteDockerBackup(userId, backupId);
+  res.json({ ...result, message: 'Бекап видалено' });
 }
 
 export async function getTabAccessSettings(_req, res) {
