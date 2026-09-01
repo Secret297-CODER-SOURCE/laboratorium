@@ -21,6 +21,21 @@ export function generatePassword(length = 12) {
   return pwd;
 }
 
+function createResetToken(user) {
+  const token = generateToken();
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + config.auth.resetTokenHours * 3600_000).toISOString();
+
+  db.prepare('UPDATE password_reset_tokens SET used_at = datetime(\'now\') WHERE user_id = ? AND used_at IS NULL')
+    .run(user.id);
+  db.prepare(`
+    INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+    VALUES (?, ?, ?)
+  `).run(user.id, tokenHash, expiresAt);
+
+  return `${config.appUrl}/reset-password.html?token=${token}`;
+}
+
 export async function requestPasswordReset(email) {
   if (!email?.trim()) throw new ValidationError('Введіть email');
 
@@ -29,19 +44,7 @@ export async function requestPasswordReset(email) {
     return { ok: true, message: 'Якщо email зареєстровано, лист надіслано' };
   }
 
-  const token = generateToken();
-  const tokenHash = hashToken(token);
-  const expiresAt = new Date(Date.now() + config.auth.resetTokenHours * 3600_000).toISOString();
-
-  db.prepare('UPDATE password_reset_tokens SET used_at = datetime(\'now\') WHERE user_id = ? AND used_at IS NULL')
-    .run(user.id);
-
-  db.prepare(`
-    INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
-    VALUES (?, ?, ?)
-  `).run(user.id, tokenHash, expiresAt);
-
-  const resetUrl = `${config.appUrl}/reset-password.html?token=${token}`;
+  const resetUrl = createResetToken(user);
   await mailService.sendPasswordResetEmail(user, resetUrl);
 
   return { ok: true, message: 'Якщо email зареєстровано, лист надіслано' };
@@ -69,10 +72,20 @@ export async function resetPassword(token, password) {
   return { ok: true };
 }
 
+/**
+ * Admin-triggered (not the public self-service flow), so — unlike
+ * requestPasswordReset — it's safe and useful to hand the resetUrl and
+ * delivery status back to the caller: if SMTP isn't configured or fails,
+ * the admin UI shows the link directly instead of it just vanishing.
+ */
 export async function adminSendPasswordReset(userId) {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   if (!user) throw new NotFoundError('Користувача не знайдено');
-  return requestPasswordReset(user.email);
+
+  const resetUrl = createResetToken(user);
+  const mailResult = await mailService.sendPasswordResetEmail(user, resetUrl);
+
+  return { ok: true, resetUrl, emailSent: mailResult.sent };
 }
 
 export async function adminSendNewPassword(userId) {
@@ -84,6 +97,6 @@ export async function adminSendNewPassword(userId) {
   db.prepare(`UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`)
     .run(password_hash, userId);
 
-  await mailService.sendWelcomeCredentialsEmail(user, password);
-  return { ok: true };
+  const mailResult = await mailService.sendWelcomeCredentialsEmail(user, password);
+  return { ok: true, password, emailSent: mailResult.sent };
 }

@@ -2,6 +2,7 @@ import { api, getToken, getUser, requireAuthAsync, initTheme } from '/auth.js';
 import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, pageAllowed } from '/tab-access.js';
+import { showPrompt, showAlert } from '/dialog.js';
 
 if (!(await requireAuthAsync())) throw new Error('auth');
 initTheme();
@@ -130,7 +131,7 @@ function bindCompose() {
   });
 
   document.getElementById('send-gif-btn')?.addEventListener('click', async () => {
-    const url = prompt('Вставте посилання на GIF (https://...)');
+    const url = await showPrompt('Вставте посилання на GIF (https://...)');
     if (!url?.trim()) return;
     await sendPayload({ msg_type: 'gif', attachment_url: url.trim() });
   });
@@ -150,7 +151,7 @@ function bindCompose() {
       if (!res.ok) throw new Error(data.error || 'Помилка завантаження');
       await sendPayload({ msg_type: data.msg_type, attachment_url: data.url });
     } catch (err) {
-      alert(err.message);
+      await showAlert(err.message);
     }
     e.target.value = '';
   });
@@ -430,7 +431,7 @@ async function startDm(userId) {
     const { dms } = await api(`/chat/groups/${activeGroupId}/dms`);
     groupDms = dms;
   } catch (err) {
-    alert(err.message);
+    await showAlert(err.message);
   }
 }
 

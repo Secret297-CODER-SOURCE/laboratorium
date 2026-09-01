@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
+import { showConfirm, showPrompt } from '/dialog.js';
 
 const MONTHS = [
   'Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
@@ -143,7 +144,7 @@ export function bindBillingPanelEvents(showToast, reload) {
       const userId = parseInt(btn.dataset.userId, 10);
       const year = parseInt(document.getElementById('billing-year')?.value, 10);
       const month = parseInt(document.getElementById('billing-month')?.value, 10);
-      const note = prompt('Примітка (необов\'язково):') ?? '';
+      const note = (await showPrompt('Примітка (необов\'язково):')) ?? '';
       try {
         await api(`/admin/billing/users/${userId}/payments`, {
           method: 'POST',
@@ -157,7 +158,7 @@ export function bindBillingPanelEvents(showToast, reload) {
 
   document.querySelectorAll('.billing-unpay').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Скасувати запис оплати за цей місяць?')) return;
+      if (!(await showConfirm('Скасувати запис оплати за цей місяць?', { danger: true }))) return;
       try {
         await api(`/admin/billing/payments/${btn.dataset.paymentId}`, { method: 'DELETE' });
         showToast('Запис оплати видалено');

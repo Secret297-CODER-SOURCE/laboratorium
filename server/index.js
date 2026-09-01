@@ -5,6 +5,8 @@ import createApp from './app.js';
 import { initSocket } from './socket/index.js';
 import { ensureCtfImageBuilt, isAgentEnabled } from './services/lab-agent.service.js';
 import { startBackupScheduler } from './services/backup-scheduler.service.js';
+import { setIo as setNotificationIo } from './services/notification.service.js';
+import { startBillingReminderScheduler } from './services/billing-reminder.service.js';
 
 const app = createApp();
 const server = createServer(app);
@@ -18,6 +20,7 @@ const io = new Server(server, {
 });
 
 initSocket(io);
+setNotificationIo(io);
 
 server.listen(config.port, config.host, () => {
   console.log('');
@@ -36,6 +39,7 @@ server.listen(config.port, config.host, () => {
   }
 
   startBackupScheduler();
+  startBillingReminderScheduler();
 });
 
 function shutdown(signal) {

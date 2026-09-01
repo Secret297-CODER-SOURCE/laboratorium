@@ -162,6 +162,10 @@ export function createTask(actorId, actorRole, data) {
   return getTaskById(taskId);
 }
 
+export function getTaskAssigneeIds(taskId) {
+  return db.prepare('SELECT user_id FROM task_assignments WHERE task_id = ?').all(taskId).map((r) => r.user_id);
+}
+
 function getTaskById(taskId) {
   return db.prepare(`
     SELECT t.*, g.name as group_name, g.color as group_color

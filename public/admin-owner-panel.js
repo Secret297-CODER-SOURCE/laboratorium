@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon, ROLE_LABELS } from '/icons.js';
+import { showConfirm, showPrompt, showCopyDialog } from '/dialog.js';
 
 export function renderOwnerTabs(active = 'overview') {
   const tabs = [
@@ -116,10 +117,112 @@ export function renderUsersPanelExtended(users, role) {
   </section>`;
 }
 
-export function renderProxmoxPanel(settings, labPublic = {}) {
+const VM_STATUS_LABELS = {
+  running: 'Працює',
+  provisioning: 'Створюється',
+  deploying: 'Створюється',
+  stopped: 'Зупинено',
+  error: 'Помилка',
+  none: 'Немає',
+  pending: 'Очікує',
+};
+
+function isLinkedVm(vm) {
+  if (!vm) return false;
+  return !!(vm.proxmox_vmid || vm.hostname);
+}
+
+function hostDisplay(host) {
+  if (!host) return '—';
+  try {
+    return new URL(host).host;
+  } catch {
+    return String(host).replace(/^https?:\/\//, '');
+  }
+}
+
+function renderLinkedServersSidebar(settings, labs = []) {
+  const s = settings || {};
+  const rows = labs || [];
+  const linked = rows.filter((r) => isLinkedVm(r.vm));
+  const unlinked = rows.length - linked.length;
+  const running = linked.filter((r) => r.vm?.status === 'running').length;
+
+  const hostCard = `
+    <article class="px-host-card${s.configured ? ' is-online' : ''}">
+      <div class="px-host-card-top">
+        <span class="px-host-dot" aria-hidden="true"></span>
+        <div>
+          <strong>${esc(s.node || 'pve')}</strong>
+          <code class="px-host-url">${esc(hostDisplay(s.host))}</code>
+        </div>
+        <span class="status-pill ${s.configured ? 'running' : 'stopped'}">${s.configured ? 'онлайн' : 'офлайн'}</span>
+      </div>
+      <div class="px-host-meta">
+        <span>tpl ${esc(s.templateVmid || 9000)}</span>
+        <span>${esc(s.storage || 'local-lvm')}</span>
+        <span>${esc(s.bridge || 'vmbr0')}</span>
+      </div>
+    </article>`;
+
+  const cards = linked.length
+    ? linked.map((row) => {
+      const vm = row.vm || {};
+      const status = vm.status || 'none';
+      const meta = [
+        vm.hostname,
+        vm.ip,
+        vm.proxmox_vmid ? `#${vm.proxmox_vmid}` : null,
+        vm.node && vm.node !== (s.node || 'pve') ? vm.node : null,
+      ].filter(Boolean);
+      const dockerN = (row.dockerDeployments || []).length;
+      const canControl = !!vm.proxmox_vmid;
+      return `
+        <article class="px-server-card${status === 'running' ? ' is-running' : ''}${status === 'error' ? ' is-error' : ''}">
+          <div class="px-server-card-top">
+            <div>
+              <strong>@${esc(row.handle)}</strong>
+              <div class="px-server-name">${esc(row.name || '')}</div>
+            </div>
+            <span class="status-pill ${esc(status)}">${esc(VM_STATUS_LABELS[status] || status)}</span>
+          </div>
+          ${meta.length ? `<div class="px-server-meta">${esc(meta.join(' · '))}</div>` : ''}
+          ${vm.error_message ? `<div class="px-server-err" title="${esc(vm.error_message)}">${esc(vm.error_message)}</div>` : ''}
+          <div class="px-server-foot">
+            ${dockerN ? `<span class="px-server-docker">${icon('database', 'ico ico--xs')}${dockerN} docker</span>` : '<span></span>'}
+            ${canControl ? `
+              <div class="px-server-actions">
+                <button type="button" class="btn btn--ghost btn--sm vm-start" data-user="${row.userId}" title="Запустити">${icon('play', 'ico ico--sm')}</button>
+                <button type="button" class="btn btn--ghost btn--sm vm-stop" data-user="${row.userId}" title="Зупинити">${icon('x', 'ico ico--sm')}</button>
+              </div>` : ''}
+          </div>
+        </article>`;
+    }).join('')
+    : `<p class="empty-state px-servers-empty">Ще немає прив'язаних машин. Після збереження API ключів VM створюються автоматично.</p>`;
+
+  return `
+    <aside class="px-servers">
+      <section class="admin-panel px-servers-panel">
+        <div class="admin-panel-head">
+          <h2>${icon('server', 'ico ico--md')}Прив'язані сервери</h2>
+          <span class="px-servers-count" title="${running} працює">${linked.length}</span>
+        </div>
+        ${hostCard}
+        <div class="px-servers-list">${cards}</div>
+        <div class="px-servers-footer">
+          ${unlinked ? `<span>${unlinked} учнів без VM</span>` : '<span></span>'}
+          <button type="button" class="btn btn--ghost btn--sm" id="px-goto-labs">Усі машини →</button>
+        </div>
+      </section>
+    </aside>`;
+}
+
+export function renderProxmoxPanel(settings, labPublic = {}, labs = []) {
   const s = settings || {};
   const lp = labPublic || {};
-  return `<section class="admin-panel admin-panel--wide">
+  return `<div class="px-layout">
+  <div class="px-layout-main">
+  <section class="admin-panel">
     <div class="admin-panel-head">
       <h2>${icon('server', 'ico ico--md')}Proxmox — лабораторні машини</h2>
       <span class="status-pill ${s.configured ? 'running' : 'stopped'}">${s.configured ? 'налаштовано' : 'не налаштовано'}</span>
@@ -235,7 +338,10 @@ export function renderProxmoxPanel(settings, labPublic = {}) {
       </div>
       ${lp.exampleTunnel ? `<p class="builder-hint" style="grid-column:1/-1">Тунель: <code>${esc(lp.exampleTunnel)}</code>${lp.exampleVm ? ` · SSH VM: <code>${esc(lp.exampleVm)}</code>` : ''}</p>` : ''}
     </form>
-  </section>`;
+  </section>
+  </div>
+  ${renderLinkedServersSidebar(s, labs)}
+  </div>`;
 }
 
 function esc(s) {
@@ -268,7 +374,7 @@ export function bindOwnerPanelEvents(showToast, reload) {
   });
 
   document.getElementById('add-direction-btn')?.addEventListener('click', async () => {
-    const name = prompt('Назва напрямку:');
+    const name = await showPrompt('Назва напрямку:');
     if (!name?.trim()) return;
     try {
       await api('/admin/directions', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
@@ -289,7 +395,7 @@ export function bindOwnerPanelEvents(showToast, reload) {
 
   document.querySelectorAll('.dir-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Видалити напрямок?')) return;
+      if (!(await showConfirm('Видалити напрямок?', { danger: true }))) return;
       try {
         await api(`/admin/directions/${btn.dataset.id}`, { method: 'DELETE' });
         showToast('Видалено');
@@ -299,7 +405,7 @@ export function bindOwnerPanelEvents(showToast, reload) {
   });
 
   document.getElementById('add-program-btn')?.addEventListener('click', async () => {
-    const name = prompt('Назва програми:');
+    const name = await showPrompt('Назва програми:');
     if (!name?.trim()) return;
     try {
       await api('/admin/programs', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
@@ -322,7 +428,7 @@ export function bindOwnerPanelEvents(showToast, reload) {
 
   document.querySelectorAll('.prog-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Деактивувати програму?')) return;
+      if (!(await showConfirm('Деактивувати програму?', { danger: true }))) return;
       try {
         await api(`/admin/programs/${btn.dataset.id}`, { method: 'DELETE' });
         showToast('Деактивовано');
@@ -341,8 +447,12 @@ export function bindOwnerPanelEvents(showToast, reload) {
     const email = document.getElementById('new-user-email').value;
     const role = document.getElementById('new-user-role').value;
     try {
-      await api('/admin/users', { method: 'POST', body: JSON.stringify({ name, email, role, sendEmail: true }) });
-      showToast('Акаунт створено, пароль надіслано на email');
+      const res = await api('/admin/users', { method: 'POST', body: JSON.stringify({ name, email, role, sendEmail: true }) });
+      if (res.emailSent) {
+        showToast('Акаунт створено, пароль надіслано на email');
+      } else {
+        await showCopyDialog(`Акаунт створено, але email НЕ надіслано (SMTP не налаштовано або збій). Скопіюйте пароль і передайте учню (${email}) вручну:`, res.password, { title: 'Пароль учня' });
+      }
       reload();
     } catch (err) { showToast(err.message, 'error'); }
   });
@@ -350,18 +460,26 @@ export function bindOwnerPanelEvents(showToast, reload) {
   document.querySelectorAll('.user-send-reset').forEach(btn => {
     btn.addEventListener('click', async () => {
       try {
-        await api(`/admin/users/${btn.dataset.id}/send-reset`, { method: 'POST' });
-        showToast('Посилання для скидання надіслано');
+        const res = await api(`/admin/users/${btn.dataset.id}/send-reset`, { method: 'POST' });
+        if (res.emailSent) {
+          showToast('Посилання для скидання надіслано');
+        } else {
+          await showCopyDialog('Email НЕ надіслано (SMTP не налаштовано або збій). Скопіюйте посилання і передайте учню вручну:', res.resetUrl, { title: 'Посилання для скидання' });
+        }
       } catch (err) { showToast(err.message, 'error'); }
     });
   });
 
   document.querySelectorAll('.user-send-pwd').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Надіслати новий пароль на email?')) return;
+      if (!(await showConfirm('Надіслати новий пароль на email?'))) return;
       try {
-        await api(`/admin/users/${btn.dataset.id}/send-password`, { method: 'POST' });
-        showToast('Новий пароль надіслано');
+        const res = await api(`/admin/users/${btn.dataset.id}/send-password`, { method: 'POST' });
+        if (res.emailSent) {
+          showToast('Новий пароль надіслано');
+        } else {
+          await showCopyDialog('Email НЕ надіслано (SMTP не налаштовано або збій). Скопіюйте новий пароль і передайте учню вручну:', res.password, { title: 'Новий пароль' });
+        }
       } catch (err) { showToast(err.message, 'error'); }
     });
   });
@@ -407,11 +525,15 @@ export function bindOwnerPanelEvents(showToast, reload) {
   });
 
   document.getElementById('px-provision-missing')?.addEventListener('click', async () => {
-    if (!confirm('Створити машини всім учням, у яких їх ще немає?')) return;
+    if (!(await showConfirm('Створити машини всім учням, у яких їх ще немає?'))) return;
     try {
       const res = await api('/admin/settings/proxmox/provision-missing', { method: 'POST' });
       showToast(res.message);
     } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('px-goto-labs')?.addEventListener('click', () => {
+    document.querySelector('.admin-tab[data-tab="labs"]')?.click();
   });
 
   document.getElementById('lab-public-form')?.addEventListener('submit', async (e) => {

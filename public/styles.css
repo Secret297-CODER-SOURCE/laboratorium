@@ -545,6 +545,269 @@ input[type="number"]:focus {
   flex-shrink: 0;
 }
 
+/* ===== Notification bell ===== */
+.notif-bell-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notif-bell-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.notif-bell-btn:hover {
+  color: var(--text);
+  border-color: var(--border-accent);
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #ff4466;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 999px;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  max-width: 90vw;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  z-index: 300;
+}
+
+.notif-dropdown-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.notif-dropdown-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.notif-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.notif-item:hover { background: var(--bg-card-hover); }
+
+.notif-item--unread {
+  background: var(--accent-subtle);
+  border-left: 2px solid var(--accent);
+}
+
+.notif-item-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.notif-item-body {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.notif-item-time {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.notif-load-more {
+  margin: 10px auto;
+  display: block;
+}
+
+.notif-push-toggle {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.notif-push-toggle:hover { color: var(--accent); }
+
+.notif-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notif-comp-inp {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.82rem;
+}
+
+.notif-comp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.notif-popup {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  max-width: 320px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  font-size: 0.82rem;
+  cursor: pointer;
+  z-index: 500;
+  animation: notifPopupIn 0.3s ease;
+}
+
+.notif-popup div { color: var(--text-muted); margin-top: 4px; }
+
+@keyframes notifPopupIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 640px) {
+  .notif-dropdown { position: fixed; top: 64px; right: 8px; left: 8px; width: auto; }
+}
+
+/* ===== App dialogs (replaces window.alert/confirm/prompt) ===== */
+.app-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.app-dialog-overlay.is-visible { opacity: 1; }
+
+.app-dialog {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  transform: translateY(8px) scale(0.98);
+  transition: transform 0.18s ease;
+}
+
+.app-dialog-overlay.is-visible .app-dialog { transform: translateY(0) scale(1); }
+
+.app-dialog-title {
+  font-size: 1.05rem;
+  margin-bottom: 10px;
+}
+
+.app-dialog-message {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.app-dialog-input {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.app-dialog-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.app-dialog-copy-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.app-dialog-copy-row .app-dialog-input { margin-top: 0; font-family: var(--mono); }
+
+.app-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+@media (max-width: 480px) {
+  .app-dialog { max-width: 100%; }
+  .app-dialog-copy-row { flex-direction: column; }
+}
+
 .lang-switch {
   flex-shrink: 0;
   padding: 6px 8px;
@@ -745,6 +1008,17 @@ input[type="number"]:focus {
 }
 
 .btn--ghost:hover { color: var(--accent); }
+
+.btn--danger {
+  background: rgba(255, 68, 102, 0.12);
+  border: 1px solid #ff4466;
+  color: #ff6b7a;
+}
+
+.btn--danger:hover {
+  background: #ff4466;
+  color: #fff;
+}
 
 .btn--sm { padding: 8px 20px; font-size: 0.8rem; }
 .btn--lg { padding: 16px 36px; font-size: 1rem; }

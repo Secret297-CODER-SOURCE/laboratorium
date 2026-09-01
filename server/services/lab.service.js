@@ -6,6 +6,7 @@ import { NotFoundError, ConflictError, ValidationError } from '../utils/errors.j
 import { assertSafeDockerImage } from '../utils/docker-ref.js';
 import { buildVmAccess, enrichDeploymentUrl } from '../utils/publicUrl.js';
 import { getLabPublicConfig } from './settings.service.js';
+import { notifyUser } from './notification.service.js';
 
 function mapUserLab(row) {
   if (!row) return null;
@@ -104,13 +105,24 @@ export async function provisionVm(userId, handle) {
   }
 }
 
-/** Автоматичне створення VM для нового учня (фоново) */
+/** Автоматичне створення VM для нового учня (фоново) — жодного request/response
+ * тут немає, тому сповіщення про результат — єдиний спосіб для учня дізнатися,
+ * що сталося, і сповіщати треба саме тут, а не на виклику controller. */
 export function scheduleProvisionForStudent(userId, handle) {
   if (!proxmox.isEnabled()) return;
   setImmediate(() => {
-    provisionVm(userId, handle).catch((err) => {
-      console.error(`[lab] auto-provision user ${userId}:`, err.message);
-    });
+    provisionVm(userId, handle)
+      .then((vm) => {
+        notifyUser(userId, {
+          type: 'lab_ready',
+          title: 'Ваша лабораторна машина готова',
+          body: vm?.ip ? `IP: ${vm.ip}` : null,
+          link: '/dashboard.html?tab=lab',
+        });
+      })
+      .catch((err) => {
+        console.error(`[lab] auto-provision user ${userId}:`, err.message);
+      });
   });
 }
 

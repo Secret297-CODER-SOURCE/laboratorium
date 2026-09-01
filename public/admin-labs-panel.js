@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
+import { showConfirm, showPrompt } from '/dialog.js';
 
 const STATUS_LABELS = {
   running: 'Працює',
@@ -125,7 +126,7 @@ export function bindLabsPanelEvents(showToast, reload) {
   }));
 
   document.querySelectorAll('.vm-reset').forEach((btn) => btn.addEventListener('click', async () => {
-    if (!confirm('Пересоздати машину учня? Поточну машину буде видалено і створено заново.')) return;
+    if (!(await showConfirm('Пересоздати машину учня? Поточну машину буде видалено і створено заново.', { danger: true }))) return;
     try {
       const res = await api(`/admin/labs/${btn.dataset.user}/reset`, { method: 'POST' });
       showToast(res.message);
@@ -134,7 +135,7 @@ export function bindLabsPanelEvents(showToast, reload) {
   }));
 
   document.querySelectorAll('.vm-backup-now').forEach((btn) => btn.addEventListener('click', async () => {
-    const label = prompt('Мітка бекапу (необов\'язково):') || undefined;
+    const label = (await showPrompt('Мітка бекапу (необов\'язково):')) || undefined;
     try {
       const res = await api(`/admin/labs/${btn.dataset.user}/backups`, { method: 'POST', body: JSON.stringify({ label }) });
       showToast(res.message);
@@ -152,7 +153,7 @@ export function bindLabsPanelEvents(showToast, reload) {
   }));
 
   document.querySelectorAll('.docker-backup-now').forEach((btn) => btn.addEventListener('click', async () => {
-    const label = prompt('Мітка бекапу (необов\'язково):') || undefined;
+    const label = (await showPrompt('Мітка бекапу (необов\'язково):')) || undefined;
     try {
       const res = await api(`/admin/labs/${btn.dataset.user}/docker/${btn.dataset.deploy}/backups`, { method: 'POST', body: JSON.stringify({ label }) });
       showToast(res.message);
@@ -177,7 +178,7 @@ async function loadVmHistory(userId, showToast, reload) {
     const { backups } = await api(`/admin/labs/${userId}/backups`);
     box.innerHTML = renderBackupList(backups, {});
     box.querySelectorAll('.backup-restore').forEach((b) => b.addEventListener('click', async () => {
-      if (!confirm('Відновити машину з цього бекапу? Поточний стан диска буде втрачено.')) return;
+      if (!(await showConfirm('Відновити машину з цього бекапу? Поточний стан диска буде втрачено.', { danger: true }))) return;
       try {
         const res = await api(`/admin/labs/${userId}/backups/${b.dataset.backup}/restore`, { method: 'POST' });
         showToast(res.message);
@@ -185,7 +186,7 @@ async function loadVmHistory(userId, showToast, reload) {
       } catch (err) { showToast(err.message, 'error'); }
     }));
     box.querySelectorAll('.backup-delete').forEach((b) => b.addEventListener('click', async () => {
-      if (!confirm('Видалити бекап?')) return;
+      if (!(await showConfirm('Видалити бекап?', { danger: true }))) return;
       try {
         const res = await api(`/admin/labs/${userId}/backups/${b.dataset.backup}`, { method: 'DELETE' });
         showToast(res.message);
@@ -205,7 +206,7 @@ async function loadDockerHistory(userId, deployId, showToast, reload) {
     const { backups } = await api(`/admin/labs/${userId}/docker/${deployId}/backups`);
     box.innerHTML = renderBackupList(backups, {});
     box.querySelectorAll('.backup-restore').forEach((b) => b.addEventListener('click', async () => {
-      if (!confirm('Відновити контейнер з цього бекапу?')) return;
+      if (!(await showConfirm('Відновити контейнер з цього бекапу?', { danger: true }))) return;
       try {
         const res = await api(`/admin/labs/${userId}/docker/backups/${b.dataset.backup}/restore`, { method: 'POST' });
         showToast(res.message);
@@ -213,7 +214,7 @@ async function loadDockerHistory(userId, deployId, showToast, reload) {
       } catch (err) { showToast(err.message, 'error'); }
     }));
     box.querySelectorAll('.backup-delete').forEach((b) => b.addEventListener('click', async () => {
-      if (!confirm('Видалити бекап?')) return;
+      if (!(await showConfirm('Видалити бекап?', { danger: true }))) return;
       try {
         const res = await api(`/admin/labs/${userId}/docker/backups/${b.dataset.backup}`, { method: 'DELETE' });
         showToast(res.message);

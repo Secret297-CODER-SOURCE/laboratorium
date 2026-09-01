@@ -2,6 +2,7 @@ import { api, initTheme, requireAuthAsync, getToken } from '/auth.js';
 import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, pageAllowed } from '/tab-access.js';
+import { showConfirm, showPrompt } from '/dialog.js';
 
 initTheme();
 initSiteHeader({ showLogout: true, navMode: 'app' });
@@ -173,7 +174,7 @@ function renderNotes(notes) {
 
 async function handleNoteAction(action, noteId, btn) {
   if (action === 'delete') {
-    if (!confirm('Видалити нотатку?')) return;
+    if (!(await showConfirm('Видалити нотатку?', { danger: true }))) return;
     await api(`/recordings/${currentRecordingId}/notes/${noteId}`, { method: 'DELETE' });
     await refreshNotes();
   } else if (action === 'pin') {
@@ -186,7 +187,7 @@ async function handleNoteAction(action, noteId, btn) {
   } else if (action === 'edit') {
     const contentEl = document.getElementById(`note-content-${noteId}`);
     const current = contentEl.textContent;
-    const newContent = prompt('Редагувати нотатку:', current);
+    const newContent = await showPrompt('Редагувати нотатку:', current, { multiline: true });
     if (newContent && newContent !== current) {
       await api(`/recordings/${currentRecordingId}/notes/${noteId}`, {
         method: 'PATCH',

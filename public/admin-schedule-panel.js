@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
+import { showConfirm } from '/dialog.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -189,7 +190,7 @@ export function bindSchedulePanelEvents(showToast, reload) {
 
     const delBtn = e.target.closest('.sched-del');
     if (delBtn) {
-      if (!confirm('Скасувати заняття?')) return;
+      if (!(await showConfirm('Скасувати заняття?', { danger: true }))) return;
       try {
         await api(`/admin/schedule/lessons/${delBtn.dataset.id}`, { method: 'DELETE' });
         showToast('Заняття скасовано');

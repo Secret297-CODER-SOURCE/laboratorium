@@ -20,22 +20,33 @@ export function isMailConfigured() {
   return !!config.smtp.host;
 }
 
+/**
+ * Never throws — a broken/unconfigured mail relay must not block the action
+ * that triggered it (account creation, password reset). Callers check
+ * `.sent` and fall back to showing the credential in the admin UI directly,
+ * so delivery never silently depends on SMTP actually working.
+ */
 export async function sendMail({ to, subject, html, text }) {
   const transport = getTransporter();
 
   if (!transport) {
-    console.log(`[mail] (dev, no SMTP) To: ${to}\nSubject: ${subject}\n${text || html}`);
-    return { dev: true, preview: text || html };
+    console.log(`[mail] (no SMTP configured) To: ${to}\nSubject: ${subject}\n${text || html}`);
+    return { sent: false, reason: 'no-smtp' };
   }
 
-  await transport.sendMail({
-    from: config.smtp.from,
-    to,
-    subject,
-    html,
-    text: text || html.replace(/<[^>]+>/g, ''),
-  });
-  return { sent: true };
+  try {
+    await transport.sendMail({
+      from: config.smtp.from,
+      to,
+      subject,
+      html,
+      text: text || html.replace(/<[^>]+>/g, ''),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error(`[mail] send failed to ${to}:`, err.message);
+    return { sent: false, reason: err.message };
+  }
 }
 
 export async function sendPasswordResetEmail(user, resetUrl) {

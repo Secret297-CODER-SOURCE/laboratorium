@@ -51,6 +51,8 @@ router.post('/tasks/assignments/:id/approve', asyncHandler(adminCtrl.approveTask
 router.post('/tasks/assignments/:id/reject', asyncHandler(adminCtrl.rejectTask));
 router.get('/articles', asyncHandler(adminCtrl.listArticles));
 
+router.post('/announcements', asyncHandler(adminCtrl.createAnnouncement));
+
 router.get('/schedule/lessons', asyncHandler(scheduleCtrl.listLessons));
 router.post('/schedule/lessons', asyncHandler(scheduleCtrl.createLesson));
 router.patch('/schedule/lessons/:id', asyncHandler(scheduleCtrl.updateLesson));

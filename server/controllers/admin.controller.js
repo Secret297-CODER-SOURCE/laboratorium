@@ -10,8 +10,9 @@ import * as settingsService from '../services/settings.service.js';
 import * as tabAccessService from '../services/tab-access.service.js';
 import * as paymentService from '../services/payment.service.js';
 import * as labService from '../services/lab.service.js';
+import * as notificationService from '../services/notification.service.js';
 import { addBounty } from '../services/bounty.service.js';
-import { ForbiddenError, NotFoundError } from '../utils/errors.js';
+import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { isAdminRole } from '../utils/roles.js';
 
 export async function getOverview(req, res) {
@@ -48,7 +49,11 @@ export async function listUsers(req, res) {
 
 export async function createUser(req, res) {
   const result = await userService.adminCreateUser(req.body);
-  res.status(201).json({ user: userService.toPublic(result.user), password: result.password });
+  res.status(201).json({
+    user: userService.toPublic(result.user),
+    password: result.password,
+    emailSent: result.emailSent,
+  });
 }
 
 export async function updateUserRole(req, res) {
@@ -150,9 +155,21 @@ export async function listGroupMembers(req, res) {
 export async function addGroupMembers(req, res) {
   const groupId = parseInt(req.params.id, 10);
   const userIds = req.body.userIds || req.body.userId;
-  res.json({
-    members: groupService.addGroupMembers(groupId, req.user.id, req.user.role, userIds),
+  const members = groupService.addGroupMembers(groupId, req.user.id, req.user.role, userIds);
+  const group = groupService.getGroupById(groupId);
+
+  // Only notify ids group.service actually confirmed as real students in this
+  // group (members) — notifying a raw, unvalidated id from the request could
+  // hit a non-existent user and violate the notifications FK constraint.
+  const requestedIds = new Set((Array.isArray(userIds) ? userIds : [userIds]).map((id) => parseInt(id, 10)));
+  const addedIds = members.filter((m) => requestedIds.has(m.id)).map((m) => m.id);
+  notificationService.notifyUsers(addedIds, {
+    type: 'group_added',
+    title: 'Вас додано до групи',
+    body: group?.name || null,
+    link: '/dashboard.html',
   });
+  res.json({ members });
 }
 
 export async function removeGroupMember(req, res) {
@@ -192,6 +209,13 @@ export async function listTasks(req, res) {
 
 export async function createTask(req, res) {
   const task = taskService.createTask(req.user.id, req.user.role, req.body);
+  const assigneeIds = taskService.getTaskAssigneeIds(task.id);
+  notificationService.notifyUsers(assigneeIds, {
+    type: 'task_assigned',
+    title: 'Нове завдання',
+    body: task.title,
+    link: '/dashboard.html',
+  });
   res.status(201).json({ task, message: 'Задачу створено для учнів групи' });
 }
 
@@ -206,12 +230,24 @@ export async function approveTask(req, res) {
   if (result.bounty_reward > 0) {
     addBounty(result.user_id, result.bounty_reward, `Задача: ${result.title}`);
   }
+  notificationService.notifyUser(result.user_id, {
+    type: 'task_approved',
+    title: 'Завдання зараховано',
+    body: result.bounty_reward > 0 ? `«${result.title}» — +${result.bounty_reward} bounty` : `«${result.title}»`,
+    link: '/dashboard.html',
+  });
   res.json({ ok: true, assignment: result.assignment, message: 'Задачу завершено' });
 }
 
 export async function rejectTask(req, res) {
   const assignmentId = parseInt(req.params.id, 10);
   const assignment = taskService.rejectTask(req.user.id, req.user.role, assignmentId);
+  notificationService.notifyUser(assignment.user_id, {
+    type: 'task_rejected',
+    title: 'Задачу повернуто на доопрацювання',
+    body: assignment.title,
+    link: '/dashboard.html',
+  });
   res.json({ ok: true, assignment, message: 'Повернуто на доопрацювання' });
 }
 
@@ -257,12 +293,24 @@ export async function listLabs(req, res) {
 export async function adminStartVm(req, res) {
   const userId = parseInt(req.params.userId, 10);
   const vm = await labService.startVm(userId);
+  notificationService.notifyUser(userId, {
+    type: 'lab_ready',
+    title: 'Вашу машину запущено',
+    body: 'Адміністратор запустив вашу лабораторну машину',
+    link: '/dashboard.html?tab=lab',
+  });
   res.json({ vm, message: 'Машину запущено' });
 }
 
 export async function adminStopVm(req, res) {
   const userId = parseInt(req.params.userId, 10);
   const vm = await labService.stopVm(userId);
+  notificationService.notifyUser(userId, {
+    type: 'lab_stopped',
+    title: 'Вашу машину зупинено',
+    body: 'Адміністратор зупинив вашу лабораторну машину',
+    link: '/dashboard.html?tab=lab',
+  });
   res.json({ vm, message: 'Машину зупинено' });
 }
 
@@ -271,6 +319,12 @@ export async function adminResetVm(req, res) {
   const user = userService.findById(userId);
   if (!user) throw new NotFoundError('Учня не знайдено');
   const vm = await labService.resetVm(userId, user.handle);
+  notificationService.notifyUser(userId, {
+    type: 'lab_reset',
+    title: 'Вашу машину пересоздано',
+    body: vm?.ip ? `Нова IP-адреса: ${vm.ip}` : null,
+    link: '/dashboard.html?tab=lab',
+  });
   res.json({ vm, message: 'Машину пересоздано' });
 }
 
@@ -353,6 +407,12 @@ export async function recordBillingPayment(req, res) {
     amount,
     recordedBy: req.user.id,
   });
+  notificationService.notifyUser(userId, {
+    type: 'billing_recorded',
+    title: 'Оплату отримано',
+    body: `Дякуємо! Оплату за ${payment.period_month}/${payment.period_year} зафіксовано.`,
+    link: '/portal.html',
+  });
   res.status(201).json({ payment, message: 'Оплату зафіксовано' });
 }
 
@@ -366,4 +426,32 @@ export async function updateBillingUser(req, res) {
   const userId = parseInt(req.params.userId, 10);
   const user = paymentService.updateBillingSettings(userId, req.body);
   res.json({ user, message: 'Налаштування оплати оновлено' });
+}
+
+/** Ручна розсилка оголошення учням: вчитель — лише своїй групі, owner/developer — будь-якій аудиторії. */
+export async function createAnnouncement(req, res) {
+  const title = req.body.title?.trim();
+  if (!title) throw new ValidationError('Вкажіть заголовок оголошення');
+
+  let audienceType = req.body.audienceType || 'all';
+  let groupId = req.body.groupId ? parseInt(req.body.groupId, 10) : null;
+  let programId = req.body.programId ? parseInt(req.body.programId, 10) : null;
+
+  if (req.user.role === 'teacher') {
+    if (!groupId) throw new ValidationError('Оберіть групу');
+    const group = groupService.getGroupById(groupId);
+    if (!group || group.teacher_id !== req.user.id) throw new ForbiddenError('Немає доступу до цієї групи');
+    audienceType = 'group';
+    programId = null;
+  }
+
+  const userIds = notificationService.resolveStudentAudience({ audienceType, groupId, programId });
+  notificationService.notifyUsers(userIds, {
+    type: 'announcement',
+    title,
+    body: req.body.body?.trim() || null,
+    link: req.body.link?.trim() || '/dashboard.html',
+  });
+
+  res.status(201).json({ ok: true, sent: userIds.length, message: `Оголошення надіслано ${userIds.length} учням` });
 }

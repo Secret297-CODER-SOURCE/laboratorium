@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
+import { showConfirm } from '/dialog.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -102,7 +103,7 @@ export function bindQuizzesPanelEvents(showToast, reload) {
 
   document.querySelectorAll('.quiz-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Видалити тест?')) return;
+      if (!(await showConfirm('Видалити тест?', { danger: true }))) return;
       try {
         await api(`/admin/quizzes/${btn.dataset.id}`, { method: 'DELETE' });
         showToast('Тест видалено');

@@ -156,6 +156,14 @@ export const config = {
     defaultBillingDay: envInt('BILLING_DEFAULT_DAY', 1),
   },
 
+  vapid: {
+    // Optional — if unset, webpush.service.js auto-generates a keypair on
+    // first boot and persists it in platform_settings so it survives restarts.
+    publicKey: env('VAPID_PUBLIC_KEY', ''),
+    privateKey: env('VAPID_PRIVATE_KEY', ''),
+    subject: env('VAPID_SUBJECT', `mailto:${env('CONTACT_EMAIL', 'hello@laboratorium.club')}`),
+  },
+
   staticVersion: env('STATIC_VERSION', readPackageVersion()),
 };
 

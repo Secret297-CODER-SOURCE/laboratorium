@@ -6,6 +6,7 @@ import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, dashTabAllowed, firstAllowedDashTab, setAllowedTabs } from '/tab-access.js';
 import { initI18n, t, getLocale } from '/i18n.js';
+import { showConfirm } from '/dialog.js';
 
 function dateLocale() {
   return { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' }[getLocale()] || 'uk-UA';
@@ -1120,7 +1121,7 @@ function renderCtfList() {
       } catch (err) { showToast(err.message, 'error'); }
     });
     item.querySelector('.ctf-stage-hint-btn')?.addEventListener('click', async () => {
-      if (!confirm(t('Підказка спише частину балів за цю стадію. Відкрити?'))) return;
+      if (!(await showConfirm(t('Підказка спише частину балів за цю стадію. Відкрити?')))) return;
       try {
         await api(`/lab/ctf/${challengeId}/hint/${stageId}`, { method: 'POST' });
         showToast(t('Підказку відкрито'));
@@ -1201,8 +1202,8 @@ async function loadLabPanel() {
 
     document.getElementById('lab-start')?.addEventListener('click', () => labAction('start'));
     document.getElementById('lab-stop')?.addEventListener('click', () => labAction('stop'));
-    document.getElementById('lab-reset')?.addEventListener('click', () => {
-      if (confirm(t('Пересоздати машину? Усі дані на VM будуть втрачені.'))) labAction('reset');
+    document.getElementById('lab-reset')?.addEventListener('click', async () => {
+      if (await showConfirm(t('Пересоздати машину? Усі дані на VM будуть втрачені.'), { danger: true })) labAction('reset');
     });
 
     if (vm.status === 'provisioning') {

@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
+import { showConfirm } from '/dialog.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -119,7 +120,7 @@ export function bindStoragePanelEvents(showToast, reload) {
 
   document.querySelectorAll('.storage-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Видалити сервер? (лише якщо порожній)')) return;
+      if (!(await showConfirm('Видалити сервер? (лише якщо порожній)', { danger: true }))) return;
       try {
         await api(`/admin/storage/servers/${btn.dataset.id}`, { method: 'DELETE' });
         showToast('Видалено');

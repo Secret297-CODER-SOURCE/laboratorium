@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon, STUDENT_MEMBER_ROLE_LABELS } from '/icons.js';
+import { showConfirm, showPrompt } from '/dialog.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -180,7 +181,7 @@ export function bindGroupsPanelEvents(showToast, reload, programs = []) {
 
   document.querySelectorAll('.group-edit').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const name = prompt('Нова назва групи:');
+      const name = await showPrompt('Нова назва групи:');
       if (!name?.trim()) return;
       try {
         await api(`/admin/groups/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
@@ -192,7 +193,7 @@ export function bindGroupsPanelEvents(showToast, reload, programs = []) {
 
   document.querySelectorAll('.group-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Видалити групу?')) return;
+      if (!(await showConfirm('Видалити групу?', { danger: true }))) return;
       try {
         await api(`/admin/groups/${btn.dataset.id}`, { method: 'DELETE' });
         showToast('Групу видалено');
@@ -321,7 +322,7 @@ export function bindTasksPanelEvents(showToast, reload) {
 
   document.querySelectorAll('.task-reject').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Повернути задачу учню на доопрацювання?')) return;
+      if (!(await showConfirm('Повернути задачу учню на доопрацювання?'))) return;
       try {
         await api(`/admin/tasks/assignments/${btn.dataset.id}/reject`, { method: 'POST' });
         showToast('Повернуто на доопрацювання');
@@ -332,7 +333,7 @@ export function bindTasksPanelEvents(showToast, reload) {
 
   document.querySelectorAll('.task-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Видалити задачу для всіх учнів?')) return;
+      if (!(await showConfirm('Видалити задачу для всіх учнів?', { danger: true }))) return;
       try {
         await api(`/admin/tasks/${btn.dataset.id}`, { method: 'DELETE' });
         showToast('Задачу видалено');

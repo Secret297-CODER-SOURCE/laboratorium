@@ -13,6 +13,7 @@ import * as applicationService from '../services/application.service.js';
 import * as tabAccessService from '../services/tab-access.service.js';
 import * as paymentService from '../services/payment.service.js';
 import { addBounty, getBountyLog, getUserRank } from '../services/bounty.service.js';
+import * as notificationService from '../services/notification.service.js';
 import { getTier, getNextTier } from '../utils/tier.js';
 import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../utils/errors.js';
 import QRCode from 'qrcode';
@@ -314,6 +315,14 @@ export async function reportAbsence(req, res) {
     parseInt(req.params.lessonId, 10),
     req.body.reason,
   );
+  if (absence.teacher_id) {
+    notificationService.notifyUser(absence.teacher_id, {
+      type: 'absence_reported',
+      title: `${absence.name} не буде на занятті`,
+      body: `${absence.lesson_title} · ${absence.reason}`,
+      link: '/admin.html?tab=schedule',
+    });
+  }
   res.status(201).json({ absence, message: 'Відсутність зафіксовано. Викладач отримає повідомлення.' });
 }
 

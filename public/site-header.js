@@ -2,6 +2,7 @@ import { updateNavAuth, initBurger, clearSession } from '/auth.js';
 import { LOGO_SVG, renderLogo } from '/logo.js';
 import { renderAppNavLinks, setAppNavActive, refreshAppNav } from '/app-nav.js';
 import { t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
+import { initNotificationBell } from '/notifications.js';
 
 export { LOGO_SVG, renderLogo, setAppNavActive, refreshAppNav };
 
@@ -47,6 +48,7 @@ export function renderSiteHeader({
     ${navBlock}
     <div class="nav-actions">
       <span class="nav-extra-slot">${extraActions}</span>
+      ${navMode === 'app' ? '<span id="notif-bell-mount"></span>' : ''}
       ${renderLangSwitch()}
       <div id="auth-nav" class="auth-nav"></div>
       ${showEnroll ? `<a href="${hashAnchors ? '#contact' : '/#contact'}" class="btn btn--outline btn--sm hide-mobile nav-enroll-btn">${t('Записатися')}</a>` : '<span class="nav-enroll-slot hide-mobile" aria-hidden="true"></span>'}
@@ -68,6 +70,9 @@ export function initSiteHeader(options = {}) {
   initBurger();
   bindLangSwitch(document);
   el.classList.add('is-ready');
+
+  const notifMount = document.getElementById('notif-bell-mount');
+  if (notifMount) initNotificationBell(notifMount);
 
   const logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn && !logoutBtn.dataset.bound) {

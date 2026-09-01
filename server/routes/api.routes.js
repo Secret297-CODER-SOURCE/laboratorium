@@ -5,12 +5,25 @@ import { requirePlatformAccess } from '../middleware/platform-access.js';
 import { requireTab } from '../middleware/tab-access.js';
 import { uploadTaskSubmission } from '../middleware/upload.js';
 import * as apiCtrl from '../controllers/api.controller.js';
+import * as notificationCtrl from '../controllers/notification.controller.js';
 
 const router = Router();
 
 router.use(authRequired);
 
 router.get('/billing/status', asyncHandler(apiCtrl.getBillingStatus));
+
+// Notifications stay reachable even with suspended billing access — a student
+// whose access is blocked still needs to see *why* (e.g. a billing_due
+// notification), so this must not sit behind requirePlatformAccess below.
+router.get('/notifications', asyncHandler(notificationCtrl.listNotifications));
+router.get('/notifications/unread-count', asyncHandler(notificationCtrl.getUnreadCount));
+router.post('/notifications/read-all', asyncHandler(notificationCtrl.markAllRead));
+router.post('/notifications/:id/read', asyncHandler(notificationCtrl.markRead));
+router.delete('/notifications/:id', asyncHandler(notificationCtrl.deleteNotification));
+router.get('/notifications/push/public-key', asyncHandler(notificationCtrl.getPushPublicKey));
+router.post('/notifications/push/subscribe', asyncHandler(notificationCtrl.subscribePush));
+router.post('/notifications/push/unsubscribe', asyncHandler(notificationCtrl.unsubscribePush));
 
 router.use(requirePlatformAccess);
 

@@ -56,6 +56,10 @@ export function initSocket(io) {
     let currentRoom = null;
     let currentChatChannel = null;
 
+    // Personal room for push-style delivery (notification bell) — every
+    // connection joins it regardless of what else it's doing (conference/chat).
+    socket.join(`user:${socket.user.id}`);
+
     socket.on('room:join', async ({ conferenceId }) => {
       try {
         const conf = conferenceService.getById(conferenceId);

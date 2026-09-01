@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
+import { showConfirm } from '/dialog.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -244,7 +245,7 @@ export function bindCtfPanelEvents(challenges = [], showToast, reload) {
 
   document.querySelectorAll('.ctf-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Видалити CTF?')) return;
+      if (!(await showConfirm('Видалити CTF?', { danger: true }))) return;
       try {
         await api(`/admin/challenges/${btn.dataset.id}`, { method: 'DELETE' });
         showToast('Видалено');

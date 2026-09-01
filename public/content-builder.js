@@ -3,6 +3,7 @@ import {
   BLOCK_PALETTE, renderBlock, renderPage, esc,
 } from '/content-render.js';
 import { icon } from '/icons.js';
+import { showConfirm } from '/dialog.js';
 
 initTheme();
 
@@ -340,7 +341,7 @@ function bindCanvasDelegation() {
   canvasBound = true;
 
   const canvas = document.getElementById('builder-canvas');
-  canvas.addEventListener('click', (e) => {
+  canvas.addEventListener('click', async (e) => {
     const section = e.target.closest('.builder-section');
     if (!section) return;
 
@@ -366,7 +367,7 @@ function bindCanvasDelegation() {
       e.stopPropagation();
       const i = parseInt(e.target.closest('.section-del').dataset.sidx, 10);
       if (state.page.sections.length <= 1) return showToast('Має залишитись хоча б один розділ', 'error');
-      if (!confirm('Видалити розділ?')) return;
+      if (!(await showConfirm('Видалити розділ?', { danger: true }))) return;
       state.page.sections.splice(i, 1);
       selected = { sectionIdx: null, blockIdx: null };
       activeSectionIdx = 0;

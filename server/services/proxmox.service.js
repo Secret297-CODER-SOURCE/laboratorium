@@ -1,8 +1,23 @@
+import { Agent } from 'undici';
 import * as settings from './settings.service.js';
+import config from '../config/index.js';
 import { ValidationError } from '../utils/errors.js';
 
 function cfg() {
   return settings.getProxmoxConfig();
+}
+
+// Proxmox almost always runs behind its own self-signed certificate (the
+// default install has no real TLS cert), so Node's global fetch — which
+// rejects unverified certs by default — fails every request with the opaque
+// "fetch failed" error before ever reaching Proxmox's API. PROXMOX_REJECT_UNAUTHORIZED
+// defaults to false precisely for this reason; this dispatcher is what actually
+// applies that setting (it used to exist in config but was never wired in).
+let insecureDispatcher = null;
+function insecureDispatcherIfNeeded() {
+  if (config.proxmox.rejectUnauthorized) return undefined;
+  if (!insecureDispatcher) insecureDispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+  return insecureDispatcher;
 }
 
 async function request(method, path, body = null) {
@@ -15,11 +30,17 @@ async function request(method, path, body = null) {
   };
   if (body) headers['Content-Type'] = 'application/json';
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      dispatcher: insecureDispatcherIfNeeded(),
+    });
+  } catch (err) {
+    throw new ValidationError(`Proxmox: не вдалося з'єднатися з ${c.host} (${err.cause?.message || err.message})`);
+  }
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {

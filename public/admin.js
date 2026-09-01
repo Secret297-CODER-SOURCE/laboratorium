@@ -3,6 +3,7 @@ import {
 } from '/auth.js';
 import { icon } from '/icons.js';
 import { initSiteHeader, setAppNavActive } from '/site-header.js';
+import { showConfirm, showCopyDialog } from '/dialog.js';
 import {
   renderOwnerTabs, renderDirectionsPanel, renderProgramsPanel,
   renderUsersPanelExtended, renderProxmoxPanel, bindOwnerPanelEvents,
@@ -330,11 +331,12 @@ async function load() {
       html += renderApplicationsPanel(applications);
     } else if (ownerTab === 'proxmox') {
       try {
-        const [{ settings }, { settings: labPublic }] = await Promise.all([
+        const [{ settings }, { settings: labPublic }, labsRes] = await Promise.all([
           api('/admin/settings/proxmox'),
           api('/admin/settings/lab-public'),
+          api('/admin/labs').catch(() => ({ labs: [] })),
         ]);
-        html += renderProxmoxPanel(settings, labPublic);
+        html += renderProxmoxPanel(settings, labPublic, labsRes.labs || []);
       } catch (err) {
         html += `<p class="empty-state">${err.message}</p>`;
       }
@@ -488,7 +490,7 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
   if (role === 'owner' && ownerTab === 'storage') {
     bindStoragePanelEvents(showToast, load);
   }
-  if (role === 'owner' && ownerTab === 'labs') {
+  if (role === 'owner' && (ownerTab === 'labs' || ownerTab === 'proxmox')) {
     bindLabsPanelEvents(showToast, load);
   }
 
@@ -518,14 +520,22 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
 async function updateApp(id, status) {
   let createAccount = false;
   if (status === 'approved') {
-    if (!confirm('Схвалити заявку і створити акаунт з паролем на email?')) return;
+    if (!(await showConfirm('Схвалити заявку і створити акаунт з паролем на email?'))) return;
     createAccount = true;
-  } else if (status === 'rejected' && !confirm('Відхилити заявку?')) {
+  } else if (status === 'rejected' && !(await showConfirm('Відхилити заявку?', { danger: true }))) {
     return;
   }
   try {
-    await api(`/admin/applications/${id}`, { method: 'PATCH', body: JSON.stringify({ status, createAccount }) });
-    showToast('Заявку оновлено');
+    const res = await api(`/admin/applications/${id}`, { method: 'PATCH', body: JSON.stringify({ status, createAccount }) });
+    if (res.account) {
+      if (res.account.emailSent) {
+        showToast('Заявку схвалено, акаунт створено, пароль надіслано на email');
+      } else {
+        await showCopyDialog(`Email НЕ надіслано (SMTP не налаштовано або збій). Скопіюйте пароль і передайте учню (${res.account.user.email}) вручну:`, res.account.password, { title: 'Пароль учня' });
+      }
+    } else {
+      showToast('Заявку оновлено');
+    }
     load();
   } catch (err) {
     showToast(err.message, 'error');

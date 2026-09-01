@@ -81,15 +81,21 @@ export async function adminCreateUser({ name, email, role = 'student', handle, p
   `).run(email.toLowerCase(), password_hash, name.trim(), userHandle, validRole);
 
   const user = findById(result.lastInsertRowid);
+  let emailSent = false;
   if (sendEmail) {
-    await mailService.sendWelcomeCredentialsEmail(user, plainPassword);
+    const mailResult = await mailService.sendWelcomeCredentialsEmail(user, plainPassword);
+    emailSent = mailResult.sent;
   }
 
   if (validRole === 'student') {
     scheduleProvisionForStudent(user.id, userHandle);
   }
 
-  return { user, password: sendEmail ? undefined : plainPassword };
+  // Always hand the plaintext password back — if the email didn't actually
+  // go out (no SMTP configured, or delivery failed), this is the only place
+  // it exists; the admin UI falls back to showing it directly so the
+  // account is never created with a password nobody knows.
+  return { user, password: plainPassword, emailSent };
 }
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('laboratorium-timing-dummy', config.bcryptRounds);

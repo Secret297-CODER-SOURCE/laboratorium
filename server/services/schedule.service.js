@@ -180,7 +180,7 @@ export function reportAbsence(userId, lessonId, reason) {
   `).run(lessonId, userId, text);
 
   return db.prepare(`
-    SELECT la.*, u.name, u.handle, l.title as lesson_title, l.lesson_at, g.name as group_name
+    SELECT la.*, u.name, u.handle, l.title as lesson_title, l.lesson_at, l.teacher_id, g.name as group_name
     FROM lesson_absences la
     JOIN users u ON u.id = la.user_id
     JOIN lessons l ON l.id = la.lesson_id

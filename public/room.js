@@ -1,5 +1,6 @@
 import { getToken, getUser, initTheme, requireAuthAsync } from '/auth.js';
 import { icon, setIcon, initNavIcons } from '/icons.js';
+import { showAlert } from '/dialog.js';
 
 initTheme();
 initNavIcons();
@@ -287,9 +288,9 @@ socket.on('recording:status', ({ isRecording: rec, userName }) => {
   addSystemMessage(rec ? `${userName} почав запис` : `${userName} зупинив запис`);
 });
 
-socket.on('error', ({ message }) => {
+socket.on('error', async ({ message }) => {
   if (!startTime) {
-    alert(message);
+    await showAlert(message);
     location.href = '/conferences.html';
     return;
   }
