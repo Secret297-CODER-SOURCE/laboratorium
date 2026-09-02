@@ -328,6 +328,43 @@ export async function adminResetVm(req, res) {
   res.json({ vm, message: 'Машину пересоздано' });
 }
 
+export async function adminTransferVm(req, res) {
+  const fromUserId = parseInt(req.params.userId, 10);
+  const toUserId = parseInt(req.body.toUserId, 10);
+  const vm = labService.transferLab(fromUserId, toUserId);
+  notificationService.notifyUser(toUserId, {
+    type: 'lab_ready',
+    title: 'Вам передано лабораторну машину',
+    body: vm?.ip ? `IP: ${vm.ip}` : null,
+    link: '/dashboard.html?tab=lab',
+  });
+  res.json({ vm, message: 'Машину передано іншому учню' });
+}
+
+export async function adminLinkVm(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  const vm = await labService.linkExistingVm(userId, req.body.vmid, req.body.ip);
+  notificationService.notifyUser(userId, {
+    type: 'lab_ready',
+    title: 'Вам прив\'язано лабораторну машину',
+    body: vm?.ip ? `IP: ${vm.ip}` : null,
+    link: '/dashboard.html?tab=lab',
+  });
+  res.json({ vm, message: 'Машину прив\'язано до учня' });
+}
+
+export async function adminDeleteVm(req, res) {
+  const userId = parseInt(req.params.userId, 10);
+  await labService.deleteLab(userId);
+  notificationService.notifyUser(userId, {
+    type: 'lab_deleted',
+    title: 'Вашу машину видалено',
+    body: 'Адміністратор видалив вашу лабораторну машину',
+    link: '/dashboard.html?tab=lab',
+  });
+  res.json({ ok: true, message: 'Машину видалено' });
+}
+
 export async function listVmBackups(req, res) {
   const userId = parseInt(req.params.userId, 10);
   res.json({ backups: labService.listVmBackups(userId) });

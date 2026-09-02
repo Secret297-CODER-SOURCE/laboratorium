@@ -336,7 +336,8 @@ async function load() {
           api('/admin/settings/lab-public'),
           api('/admin/labs').catch(() => ({ labs: [] })),
         ]);
-        html += renderProxmoxPanel(settings, labPublic, labsRes.labs || []);
+        labsAdminData = labsRes.labs || [];
+        html += renderProxmoxPanel(settings, labPublic, labsAdminData);
       } catch (err) {
         html += `<p class="empty-state">${err.message}</p>`;
       }
@@ -491,7 +492,7 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
     bindStoragePanelEvents(showToast, load);
   }
   if (role === 'owner' && (ownerTab === 'labs' || ownerTab === 'proxmox')) {
-    bindLabsPanelEvents(showToast, load);
+    bindLabsPanelEvents(labsAdminData, showToast, load);
   }
 
   document.querySelectorAll('.role-select').forEach(sel => {

@@ -104,6 +104,9 @@ router.get('/labs', requireRole('owner', 'developer'), asyncHandler(adminCtrl.li
 router.post('/labs/:userId/start', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminStartVm));
 router.post('/labs/:userId/stop', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminStopVm));
 router.post('/labs/:userId/reset', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminResetVm));
+router.delete('/labs/:userId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminDeleteVm));
+router.post('/labs/:userId/transfer', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminTransferVm));
+router.post('/labs/:userId/link', requireRole('owner', 'developer'), asyncHandler(adminCtrl.adminLinkVm));
 router.get('/labs/:userId/backups', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listVmBackups));
 router.post('/labs/:userId/backups', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createVmBackup));
 router.post('/labs/:userId/backups/:backupId/restore', requireRole('owner', 'developer'), asyncHandler(adminCtrl.restoreVmBackup));

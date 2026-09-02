@@ -1,6 +1,12 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
-import { showConfirm, showPrompt } from '/dialog.js';
+import { showConfirm, showPrompt, showForm } from '/dialog.js';
+
+function isLinkedVm(vm) {
+  if (!vm) return false;
+  if (vm.proxmox_vmid) return true;
+  return ['running', 'stopped', 'provisioning', 'error'].includes(vm.status);
+}
 
 const STATUS_LABELS = {
   running: 'Працює',
@@ -78,6 +84,10 @@ export function renderLabsPanel(labs) {
               <button type="button" class="btn btn--outline btn--sm vm-reset" data-user="${row.userId}" title="Пересоздати машину">${icon('zap', 'ico ico--sm')}</button>
               <button type="button" class="btn btn--outline btn--sm vm-backup-now" data-user="${row.userId}" title="Створити бекап зараз">${icon('database', 'ico ico--sm')}</button>
               <button type="button" class="btn btn--outline btn--sm vm-backup-toggle" data-user="${row.userId}" title="Історія бекапів">${icon('clock', 'ico ico--sm')}</button>
+              ${isLinkedVm(row.vm)
+                ? `<button type="button" class="btn btn--outline btn--sm vm-transfer" data-user="${row.userId}" title="Передати іншому учню">${icon('users', 'ico ico--sm')}</button>`
+                : `<button type="button" class="btn btn--outline btn--sm vm-link" data-user="${row.userId}" title="Прив'язати існуючу VM">${icon('link', 'ico ico--sm')}</button>`}
+              <button type="button" class="btn btn--danger btn--sm vm-delete" data-user="${row.userId}" title="Видалити машину">${icon('trash', 'ico ico--sm')}</button>
             </div>
           </td>
         </tr>
@@ -108,7 +118,7 @@ function renderBackupList(backups, { onRestore, onDelete }) {
   </table>`;
 }
 
-export function bindLabsPanelEvents(showToast, reload) {
+export function bindLabsPanelEvents(labs, showToast, reload) {
   document.querySelectorAll('.vm-start').forEach((btn) => btn.addEventListener('click', async () => {
     try {
       const res = await api(`/admin/labs/${btn.dataset.user}/start`, { method: 'POST' });
@@ -129,6 +139,49 @@ export function bindLabsPanelEvents(showToast, reload) {
     if (!(await showConfirm('Пересоздати машину учня? Поточну машину буде видалено і створено заново.', { danger: true }))) return;
     try {
       const res = await api(`/admin/labs/${btn.dataset.user}/reset`, { method: 'POST' });
+      showToast(res.message);
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  }));
+
+  document.querySelectorAll('.vm-delete').forEach((btn) => btn.addEventListener('click', async () => {
+    if (!(await showConfirm('Видалити машину учня остаточно? Це не можна скасувати.', { danger: true, confirmText: 'Видалити' }))) return;
+    try {
+      const res = await api(`/admin/labs/${btn.dataset.user}`, { method: 'DELETE' });
+      showToast(res.message);
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  }));
+
+  document.querySelectorAll('.vm-transfer').forEach((btn) => btn.addEventListener('click', async () => {
+    const fromUserId = btn.dataset.user;
+    const candidates = (labs || []).filter((l) => String(l.userId) !== fromUserId && !isLinkedVm(l.vm));
+    if (!candidates.length) {
+      showToast('Немає учнів без машини, яким можна передати', 'error');
+      return;
+    }
+    const result = await showForm('Передати машину іншому учню', [{
+      id: 'toUserId',
+      label: 'Учень-отримувач',
+      type: 'select',
+      options: candidates.map((c) => ({ value: c.userId, label: `${c.name || c.handle} (@${c.handle})` })),
+    }]);
+    if (!result) return;
+    try {
+      const res = await api(`/admin/labs/${fromUserId}/transfer`, { method: 'POST', body: JSON.stringify({ toUserId: result.toUserId }) });
+      showToast(res.message);
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  }));
+
+  document.querySelectorAll('.vm-link').forEach((btn) => btn.addEventListener('click', async () => {
+    const result = await showForm('Прив\'язати існуючу VM', [
+      { id: 'vmid', label: 'VMID на Proxmox', type: 'text', placeholder: 'наприклад 121' },
+      { id: 'ip', label: 'IP-адреса (необов\'язково)', type: 'text', placeholder: '10.10.10.5' },
+    ]);
+    if (!result?.vmid) return;
+    try {
+      const res = await api(`/admin/labs/${btn.dataset.user}/link`, { method: 'POST', body: JSON.stringify(result) });
       showToast(res.message);
       reload();
     } catch (err) { showToast(err.message, 'error'); }

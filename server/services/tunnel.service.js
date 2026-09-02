@@ -4,7 +4,6 @@ import https from 'https';
 import { URL } from 'url';
 import db from '../db/index.js';
 import config from '../config/index.js';
-import * as labAgent from './lab-agent.service.js';
 import { getLabPublicConfig } from './settings.service.js';
 
 const PRIVATE_IP_RE = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.)/;
@@ -26,7 +25,13 @@ export function resolveTunnelTarget(host, port, cfg) {
   const cleanPort = parseInt(port, 10);
   if (!cleanHost || !Number.isFinite(cleanPort)) return null;
 
-  if (labAgent.isAgentEnabled()) {
+  // Relaying through the agent only makes sense when there's an actual
+  // *remote* lab-agent HTTP endpoint to relay through (LAB_AGENT_URL).
+  // labAgent.isAgentEnabled() is also true for local-Docker mode, where
+  // containers run on this same host and are reachable directly — routing
+  // those through agentRelayRequest() crashed on `new URL('')` since there's
+  // no agent URL to build a request against (ERR_INVALID_URL on every tunnel).
+  if (config.labAgent.url) {
     const agentReachable = isPrivateHost(cleanHost) || cleanHost === cfg.dockerHostIp;
     if (agentReachable) {
       return {
@@ -173,7 +178,11 @@ export function handleTunnelProxy(req, res, tokenValue, forwardPath) {
     viaAgent: !!row.via_agent,
   };
 
-  if (target.viaAgent && labAgent.isAgentEnabled()) {
+  // Re-check config.labAgent.url directly (not just the stored via_agent flag)
+  // so tokens issued before the resolveTunnelTarget fix — which could carry
+  // via_agent=1 with no agent URL configured — self-heal immediately instead
+  // of crashing until they expire.
+  if (target.viaAgent && config.labAgent.url) {
     return agentRelayRequest(req, res, target, forwardPath);
   }
   return directProxyRequest(req, res, target, forwardPath);

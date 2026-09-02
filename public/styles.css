@@ -807,6 +807,23 @@ input[type="number"]:focus {
 
 .app-dialog-copy-row .app-dialog-input { margin-top: 0; font-family: var(--mono); }
 
+.app-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.app-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.app-dialog-field .app-dialog-input { margin-top: 0; }
+
 .app-dialog-actions {
   display: flex;
   justify-content: flex-end;

@@ -167,6 +167,58 @@ export async function resetVm(userId, handle) {
   return provisionVm(userId, handle);
 }
 
+/** На відміну від resetVm — видаляє машину без повторного створення. */
+export async function deleteLab(userId) {
+  const lab = db.prepare('SELECT * FROM user_labs WHERE user_id = ?').get(userId);
+  if (lab?.proxmox_vmid) {
+    await proxmox.deleteVm(lab.proxmox_vmid, lab.node).catch(() => {});
+  }
+  db.prepare('DELETE FROM user_labs WHERE user_id = ?').run(userId);
+  db.prepare(`DELETE FROM vm_backups WHERE user_id = ? AND resource_type = 'vm'`).run(userId);
+  return { ok: true };
+}
+
+/** Передає вже існуючу машину (і її бекапи) іншому учню без звернень до Proxmox. */
+export function transferLab(fromUserId, toUserId) {
+  if (fromUserId === toUserId) throw new ValidationError('Оберіть іншого учня');
+
+  const lab = db.prepare('SELECT * FROM user_labs WHERE user_id = ?').get(fromUserId);
+  if (!lab) throw new NotFoundError('У цього учня немає машини');
+
+  const target = db.prepare("SELECT id FROM users WHERE id = ? AND role = 'student'").get(toUserId);
+  if (!target) throw new NotFoundError('Учня-отримувача не знайдено');
+
+  const existing = db.prepare('SELECT id FROM user_labs WHERE user_id = ?').get(toUserId);
+  if (existing) throw new ConflictError('У обраного учня вже є своя машина — спочатку видаліть або передайте її');
+
+  db.prepare(`UPDATE user_labs SET user_id = ?, updated_at = datetime('now') WHERE user_id = ?`).run(toUserId, fromUserId);
+  db.prepare(`UPDATE vm_backups SET user_id = ? WHERE user_id = ? AND resource_type = 'vm'`).run(toUserId, fromUserId);
+
+  return getUserLab(toUserId);
+}
+
+/** Прив'язує вже існуючу на Proxmox VM (створену вручну) до учня замість автоклонування. */
+export async function linkExistingVm(userId, vmid, ip) {
+  if (!proxmox.isEnabled()) throw new ValidationError('Proxmox не налаштовано');
+
+  const existing = db.prepare('SELECT id FROM user_labs WHERE user_id = ?').get(userId);
+  if (existing) throw new ConflictError('У цього учня вже є машина — спочатку видаліть її');
+
+  const parsedVmid = parseInt(vmid, 10);
+  if (!Number.isInteger(parsedVmid) || parsedVmid <= 0) throw new ValidationError('Вкажіть коректний VMID');
+
+  const c = settings.getProxmoxConfig();
+  const info = await proxmox.getVmStatus(parsedVmid, c.node);
+  const status = info?.status === 'running' ? 'running' : 'stopped';
+
+  db.prepare(`
+    INSERT INTO user_labs (user_id, proxmox_vmid, node, hostname, ip, status)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(userId, parsedVmid, c.node, info?.name || null, ip?.trim() || null, status);
+
+  return getUserLab(userId);
+}
+
 export async function createVmBackup(userId, label, source = 'manual') {
   const lab = db.prepare('SELECT * FROM user_labs WHERE user_id = ?').get(userId);
   if (!lab?.proxmox_vmid) throw new NotFoundError('Машина ще не створена');

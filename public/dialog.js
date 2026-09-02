@@ -159,3 +159,44 @@ export function showCopyDialog(message, value, { title = null, okText = 'Зак�
     });
   });
 }
+
+/**
+ * A small multi-field form dialog — text inputs and/or <select> dropdowns.
+ * Resolves with { fieldId: value, ... } on submit, or null on cancel.
+ * fields: [{ id, label, type: 'text'|'select', value, placeholder, options: [{value,label}] }]
+ */
+export function showForm(title, fields, { message = null, okText = 'Гаразд', cancelText = 'Скасувати' } = {}) {
+  const uid = Math.random().toString(36).slice(2);
+  const fieldId = (f) => `app-dialog-form-${uid}-${f.id}`;
+
+  const bodyHtml = `<div class="app-dialog-form">${fields.map((f) => {
+    const fid = fieldId(f);
+    if (f.type === 'select') {
+      return `<label class="app-dialog-field">${esc(f.label)}
+        <select id="${fid}" class="app-dialog-input">
+          ${(f.options || []).map((o) => `<option value="${esc(o.value)}" ${String(o.value) === String(f.value) ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}
+        </select>
+      </label>`;
+    }
+    return `<label class="app-dialog-field">${esc(f.label)}
+      <input id="${fid}" class="app-dialog-input" type="text" value="${esc(f.value || '')}" placeholder="${esc(f.placeholder || '')}">
+    </label>`;
+  }).join('')}</div>`;
+
+  return renderDialog({
+    title,
+    message,
+    bodyHtml,
+    buttons: [
+      { label: cancelText, variant: 'ghost', value: null },
+      {
+        label: okText,
+        variant: 'primary',
+        primary: true,
+        value: () => Object.fromEntries(fields.map((f) => [f.id, document.getElementById(fieldId(f))?.value ?? null])),
+      },
+    ],
+    cancelValue: null,
+    focusId: fieldId(fields[0]),
+  });
+}
