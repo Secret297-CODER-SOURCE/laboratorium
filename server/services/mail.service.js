@@ -1,23 +1,41 @@
 import nodemailer from 'nodemailer';
 import config from '../config/index.js';
+import * as settings from './settings.service.js';
 
 let transporter = null;
+let transporterKey = '';
+
+function transportFingerprint(c) {
+  return `${c.host}|${c.port}|${c.secure}|${c.user}|${c.pass}|${c.from}`;
+}
 
 function getTransporter() {
-  if (transporter) return transporter;
-  if (!config.smtp.host) return null;
+  const c = settings.getSmtpConfig();
+  if (!c.host) {
+    transporter = null;
+    transporterKey = '';
+    return null;
+  }
+  const key = transportFingerprint(c);
+  if (transporter && transporterKey === key) return transporter;
 
   transporter = nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: config.smtp.secure,
-    auth: config.smtp.user ? { user: config.smtp.user, pass: config.smtp.pass } : undefined,
+    host: c.host,
+    port: c.port,
+    secure: c.secure || c.port === 465,
+    auth: c.user ? { user: c.user, pass: c.pass } : undefined,
   });
+  transporterKey = key;
   return transporter;
 }
 
+export function resetTransporter() {
+  transporter = null;
+  transporterKey = '';
+}
+
 export function isMailConfigured() {
-  return !!config.smtp.host;
+  return !!settings.getSmtpConfig().host;
 }
 
 /**
@@ -28,6 +46,7 @@ export function isMailConfigured() {
  */
 export async function sendMail({ to, subject, html, text }) {
   const transport = getTransporter();
+  const from = settings.getSmtpConfig().from || config.smtp.from;
 
   if (!transport) {
     console.log(`[mail] (no SMTP configured) To: ${to}\nSubject: ${subject}\n${text || html}`);
@@ -36,7 +55,7 @@ export async function sendMail({ to, subject, html, text }) {
 
   try {
     await transport.sendMail({
-      from: config.smtp.from,
+      from,
       to,
       subject,
       html,
@@ -46,6 +65,26 @@ export async function sendMail({ to, subject, html, text }) {
   } catch (err) {
     console.error(`[mail] send failed to ${to}:`, err.message);
     return { sent: false, reason: err.message };
+  }
+}
+
+export async function testSmtp(to) {
+  const transport = getTransporter();
+  if (!transport) return { ok: false, reason: 'no-smtp' };
+  try {
+    await transport.verify();
+    if (to) {
+      const result = await sendMail({
+        to,
+        subject: 'Тест SMTP — laboratorium.',
+        text: 'Якщо ви бачите цей лист, SMTP налаштовано правильно.',
+        html: '<p>Якщо ви бачите цей лист, SMTP налаштовано правильно.</p>',
+      });
+      if (!result.sent) return { ok: false, reason: result.reason };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.message };
   }
 }
 

@@ -120,6 +120,11 @@ export async function cloneVm({ vmid, name, userId }) {
     cores: c.vmCores,
     memory: c.vmMemoryMb,
     net0: `virtio,bridge=${c.bridge}`,
+    // Enables the QEMU Guest Agent *channel* on the hypervisor side — file
+    // browsing / system info in the student dashboard need this, but it's a
+    // no-op until qemu-guest-agent is also installed and running inside the
+    // guest OS itself (must be baked into the template before cloning).
+    agent: '1',
   });
   await waitForTask(c.node, configUpid);
 
@@ -151,6 +156,138 @@ export async function deleteVm(vmid, node) {
   await stopVm(vmid, n).catch(() => {});
   const upid = await request('DELETE', `/nodes/${n}/qemu/${vmid}`);
   await waitForTask(n, upid, { timeoutMs: 120_000 });
+  return { ok: true };
+}
+
+export async function getVmStatusCurrent(vmid, node) {
+  const n = node || cfg().node;
+  if (!isEnabled()) return null;
+  return request('GET', `/nodes/${n}/qemu/${vmid}/status/current`);
+}
+
+function isAgentUnavailableError(err) {
+  return /guest agent/i.test(err?.message || '');
+}
+
+/**
+ * CPU/RAM/uptime come straight from the hypervisor — no guest agent needed.
+ * OS name and real per-filesystem disk usage need qemu-guest-agent actually
+ * running inside the guest, which isn't guaranteed (must be installed in the
+ * template OS beforehand); this degrades gracefully to `agentAvailable: false`
+ * instead of failing the whole panel when it isn't.
+ */
+export async function getSystemInfo(vmid, node) {
+  const n = node || cfg().node;
+  if (!isEnabled()) {
+    return {
+      cpu: 0.12, mem: 512 * 1024 * 1024, maxmem: 1024 * 1024 * 1024, uptime: 3600,
+      agentAvailable: false, os: null, filesystems: [], mock: true,
+    };
+  }
+
+  const status = await getVmStatusCurrent(vmid, n);
+  const base = {
+    cpu: status?.cpu ?? null,
+    mem: status?.mem ?? null,
+    maxmem: status?.maxmem ?? null,
+    disk: status?.disk ?? null,
+    maxdisk: status?.maxdisk ?? null,
+    uptime: status?.uptime ?? null,
+    netin: status?.netin ?? null,
+    netout: status?.netout ?? null,
+  };
+
+  try {
+    const [osinfo, fsinfo] = await Promise.all([
+      request('GET', `/nodes/${n}/qemu/${vmid}/agent/get-osinfo`),
+      request('GET', `/nodes/${n}/qemu/${vmid}/agent/get-fsinfo`),
+    ]);
+    return {
+      ...base,
+      agentAvailable: true,
+      os: osinfo?.result || null,
+      filesystems: fsinfo?.result || [],
+    };
+  } catch (err) {
+    if (isAgentUnavailableError(err)) {
+      return { ...base, agentAvailable: false, os: null, filesystems: [] };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Runs a binary via the guest agent's exec (argv array, no shell involved —
+ * arguments are passed to execve() directly, so paths with spaces/quotes are
+ * inherently safe and there's no injection surface).
+ */
+export async function agentExec(vmid, node, argv, { timeoutMs = 15_000 } = {}) {
+  const n = node || cfg().node;
+  if (!isEnabled()) return { exited: true, exitcode: 0, out: '', err: '', mock: true };
+
+  const [command, ...args] = argv;
+  const started = await request('POST', `/nodes/${n}/qemu/${vmid}/agent/exec`, {
+    command: [command, ...args],
+  });
+  const pid = started?.pid;
+  if (!pid) throw new ValidationError("Proxmox: не вдалося запустити команду в гостьовій ОС");
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const status = await request('GET', `/nodes/${n}/qemu/${vmid}/agent/exec-status?pid=${pid}`);
+    if (status?.exited) {
+      return {
+        exited: true,
+        exitcode: status.exitcode ?? 0,
+        out: status['out-data'] || '',
+        err: status['err-data'] || '',
+      };
+    }
+    await sleep(300);
+  }
+  throw new ValidationError('Proxmox: команда в гостьовій ОС виконується задовго');
+}
+
+/** Список файлів у директорії гостьової ОС через `find` (без shell — безпечно до шляхів). */
+export async function agentListDir(vmid, node, path) {
+  const result = await agentExec(vmid, node, [
+    'find', path, '-mindepth', '1', '-maxdepth', '1', '-printf', '%y\t%s\t%T@\t%f\n',
+  ]);
+  if (result.mock) {
+    return [
+      { type: 'd', size: 0, mtime: Date.now() / 1000, name: 'приклад-папки' },
+      { type: 'f', size: 1234, mtime: Date.now() / 1000, name: 'приклад-файлу.txt' },
+    ];
+  }
+  if (result.exitcode !== 0) {
+    throw new ValidationError(result.err?.trim() || 'Не вдалося прочитати директорію');
+  }
+  return result.out.split('\n').filter(Boolean).map((line) => {
+    const [type, size, mtime, ...nameParts] = line.split('\t');
+    return { type, size: parseInt(size, 10) || 0, mtime: parseFloat(mtime) || 0, name: nameParts.join('\t') };
+  }).sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : (a.type === 'd' ? -1 : 1)));
+}
+
+const MAX_VIEWABLE_FILE_BYTES = 512 * 1024;
+
+export async function agentReadFile(vmid, node, path) {
+  const n = node || cfg().node;
+  if (!isEnabled()) return { content: '// mock-режим — реального файлу немає', truncated: false };
+
+  const sizeCheck = await agentExec(vmid, node, ['stat', '-c', '%s', path]);
+  const size = parseInt(sizeCheck.out?.trim(), 10);
+  if (Number.isFinite(size) && size > MAX_VIEWABLE_FILE_BYTES) {
+    throw new ValidationError(`Файл завеликий для перегляду (${(size / 1024).toFixed(0)} KB, максимум ${MAX_VIEWABLE_FILE_BYTES / 1024} KB)`);
+  }
+
+  const data = await request('GET', `/nodes/${n}/qemu/${vmid}/agent/file-read?file=${encodeURIComponent(path)}`);
+  return { content: data?.content ?? '', truncated: !!data?.truncated };
+}
+
+export async function agentWriteFile(vmid, node, path, content) {
+  const n = node || cfg().node;
+  if (!isEnabled()) return { ok: true, mock: true };
+  await request('POST', `/nodes/${n}/qemu/${vmid}/agent/file-write`, { file: path, content });
   return { ok: true };
 }
 

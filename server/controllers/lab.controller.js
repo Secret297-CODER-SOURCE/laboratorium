@@ -26,6 +26,40 @@ export async function resetVm(req, res) {
   res.json({ vm, message: 'Машину пересоздано' });
 }
 
+export async function getVmSystem(req, res) {
+  const info = await labService.getVmSystemInfo(req.user.id);
+  res.json({ info });
+}
+
+export async function listVmFiles(req, res) {
+  const data = await labService.listVmFiles(req.user.id, req.query.path);
+  res.json(data);
+}
+
+export async function readVmFile(req, res) {
+  const data = await labService.readVmFile(req.user.id, req.query.path);
+  res.json(data);
+}
+
+export async function writeVmFile(req, res) {
+  const data = await labService.writeVmFile(req.user.id, req.body.path, req.body.content);
+  res.json({ ...data, message: 'Файл збережено' });
+}
+
+export async function listVmPorts(req, res) {
+  res.json({ ports: labService.listExposedPorts(req.user.id) });
+}
+
+export async function addVmPort(req, res) {
+  const ports = labService.addExposedPort(req.user.id, req.body.port, req.body.label);
+  res.status(201).json({ ports, message: 'Порт додано' });
+}
+
+export async function removeVmPort(req, res) {
+  const ports = labService.removeExposedPort(req.user.id, parseInt(req.params.id, 10));
+  res.json({ ports, message: 'Порт видалено' });
+}
+
 export async function deployDocker(req, res) {
   const deployment = await labService.deployDocker(req.user.id, req.body);
   res.status(201).json({ deployment, message: 'Контейнер розгорнуто' });

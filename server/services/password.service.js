@@ -85,7 +85,7 @@ export async function adminSendPasswordReset(userId) {
   const resetUrl = createResetToken(user);
   const mailResult = await mailService.sendPasswordResetEmail(user, resetUrl);
 
-  return { ok: true, resetUrl, emailSent: mailResult.sent };
+  return { ok: true, resetUrl, emailSent: mailResult.sent, mailReason: mailResult.sent ? null : (mailResult.reason || 'no-smtp') };
 }
 
 export async function adminSendNewPassword(userId) {
@@ -98,5 +98,5 @@ export async function adminSendNewPassword(userId) {
     .run(password_hash, userId);
 
   const mailResult = await mailService.sendWelcomeCredentialsEmail(user, password);
-  return { ok: true, password, emailSent: mailResult.sent };
+  return { ok: true, password, emailSent: mailResult.sent, mailReason: mailResult.sent ? null : (mailResult.reason || 'no-smtp') };
 }

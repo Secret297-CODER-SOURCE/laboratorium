@@ -4,7 +4,7 @@ import * as settings from './settings.service.js';
 import * as labAgent from './lab-agent.service.js';
 import { NotFoundError, ConflictError, ValidationError } from '../utils/errors.js';
 import { assertSafeDockerImage } from '../utils/docker-ref.js';
-import { buildVmAccess, enrichDeploymentUrl } from '../utils/publicUrl.js';
+import { buildVmAccess, buildVmPortAccess, enrichDeploymentUrl } from '../utils/publicUrl.js';
 import { getLabPublicConfig } from './settings.service.js';
 import { notifyUser } from './notification.service.js';
 
@@ -444,4 +444,66 @@ export function getLabOverview(userId, handle) {
       },
     },
   };
+}
+
+function requireOwnVm(userId) {
+  const lab = db.prepare('SELECT * FROM user_labs WHERE user_id = ?').get(userId);
+  if (!lab?.proxmox_vmid) throw new NotFoundError('Машина ще не створена');
+  return lab;
+}
+
+export async function getVmSystemInfo(userId) {
+  const lab = requireOwnVm(userId);
+  return proxmox.getSystemInfo(lab.proxmox_vmid, lab.node);
+}
+
+export async function listVmFiles(userId, path) {
+  const lab = requireOwnVm(userId);
+  const cleanPath = path?.trim() || '/root';
+  return { path: cleanPath, entries: await proxmox.agentListDir(lab.proxmox_vmid, lab.node, cleanPath) };
+}
+
+export async function readVmFile(userId, path) {
+  const lab = requireOwnVm(userId);
+  if (!path?.trim()) throw new ValidationError('Вкажіть шлях до файлу');
+  return proxmox.agentReadFile(lab.proxmox_vmid, lab.node, path.trim());
+}
+
+export async function writeVmFile(userId, path, content) {
+  const lab = requireOwnVm(userId);
+  if (!path?.trim()) throw new ValidationError('Вкажіть шлях до файлу');
+  return proxmox.agentWriteFile(lab.proxmox_vmid, lab.node, path.trim(), content ?? '');
+}
+
+const MAX_EXPOSED_PORTS = 5;
+
+export function listExposedPorts(userId) {
+  const lab = db.prepare('SELECT ip FROM user_labs WHERE user_id = ?').get(userId);
+  const rows = db.prepare('SELECT * FROM vm_exposed_ports WHERE user_id = ? ORDER BY port').all(userId);
+  return rows.map((r) => ({
+    ...r,
+    ...buildVmPortAccess(lab?.ip, r.port, undefined, { userId, resourceId: r.id }),
+  }));
+}
+
+export function addExposedPort(userId, port, label) {
+  requireOwnVm(userId);
+  const p = parseInt(port, 10);
+  if (!Number.isInteger(p) || p < 1 || p > 65535) throw new ValidationError('Некоректний порт (1-65535)');
+
+  const count = db.prepare('SELECT COUNT(*) as c FROM vm_exposed_ports WHERE user_id = ?').get(userId).c;
+  if (count >= MAX_EXPOSED_PORTS) throw new ValidationError(`Максимум ${MAX_EXPOSED_PORTS} портів`);
+
+  try {
+    db.prepare('INSERT INTO vm_exposed_ports (user_id, port, label) VALUES (?, ?, ?)').run(userId, p, label?.trim() || null);
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) throw new ConflictError('Цей порт вже додано');
+    throw err;
+  }
+  return listExposedPorts(userId);
+}
+
+export function removeExposedPort(userId, id) {
+  db.prepare('DELETE FROM vm_exposed_ports WHERE id = ? AND user_id = ?').run(id, userId);
+  return listExposedPorts(userId);
 }

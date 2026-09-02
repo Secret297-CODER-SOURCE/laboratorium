@@ -11,6 +11,7 @@ import * as tabAccessService from '../services/tab-access.service.js';
 import * as paymentService from '../services/payment.service.js';
 import * as labService from '../services/lab.service.js';
 import * as notificationService from '../services/notification.service.js';
+import * as mailService from '../services/mail.service.js';
 import { addBounty } from '../services/bounty.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { isAdminRole } from '../utils/roles.js';
@@ -53,6 +54,7 @@ export async function createUser(req, res) {
     user: userService.toPublic(result.user),
     password: result.password,
     emailSent: result.emailSent,
+    mailReason: result.mailReason,
   });
 }
 
@@ -258,6 +260,31 @@ export async function getLabPublicSettings(req, res) {
 export async function updateLabPublicSettings(req, res) {
   const settings = settingsService.saveLabPublicSettings(req.body);
   res.json({ settings, message: 'Налаштування доступу збережено' });
+}
+
+export async function getSmtpSettings(req, res) {
+  res.json({ settings: settingsService.getSmtpSettingsPublic() });
+}
+
+export async function updateSmtpSettings(req, res) {
+  const settings = settingsService.saveSmtpSettings(req.body);
+  mailService.resetTransporter();
+  res.json({
+    settings,
+    message: settings.configured ? 'SMTP збережено' : 'SMTP вимкнено',
+  });
+}
+
+export async function testSmtpSettings(req, res) {
+  const to = (req.body?.to || req.user?.email || '').trim();
+  if (!to) throw new ValidationError('Вкажіть email для тестового листа');
+  const result = await mailService.testSmtp(to);
+  if (!result.ok) {
+    throw new ValidationError(result.reason === 'no-smtp'
+      ? 'SMTP не налаштовано — збережіть хост і пароль'
+      : `SMTP: ${result.reason}`);
+  }
+  res.json({ ok: true, message: `Тестовий лист надіслано на ${to}` });
 }
 
 export async function getProxmoxSettings(req, res) {

@@ -6,7 +6,7 @@ import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, dashTabAllowed, firstAllowedDashTab, setAllowedTabs } from '/tab-access.js';
 import { initI18n, t, getLocale } from '/i18n.js';
-import { showConfirm } from '/dialog.js';
+import { showConfirm, showForm } from '/dialog.js';
 
 function dateLocale() {
   return { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' }[getLocale()] || 'uk-UA';
@@ -1179,6 +1179,7 @@ async function loadLabPanel() {
     const showStart = vm.status === 'stopped' && !!vm.proxmox_vmid;
     const showStop = vm.status === 'running' && !!vm.proxmox_vmid;
     const showReset = ['running', 'stopped', 'error'].includes(vm.status);
+    const hasVm = !!vm.proxmox_vmid;
 
     content.innerHTML = `
       <div class="lab-vm-grid">
@@ -1198,7 +1199,29 @@ async function loadLabPanel() {
         ${showStart ? `<button type="button" class="btn btn--outline btn--sm" id="lab-start">${t('Запустити')}</button>` : ''}
         ${showStop ? `<button type="button" class="btn btn--outline btn--sm" id="lab-stop">${t('Зупинити')}</button>` : ''}
         ${showReset ? `<button type="button" class="btn btn--ghost btn--sm" id="lab-reset">${t('Пересоздати')}</button>` : ''}
-      </div>`;
+      </div>
+      ${hasVm ? `
+        <div class="lab-section">
+          <div class="lab-section-head">
+            <h4>${icon('server', 'ico ico--sm')}${t('Система')}</h4>
+            <button type="button" class="btn btn--ghost btn--sm" id="lab-system-refresh" title="${t('Оновити')}">${icon('loader', 'ico ico--sm')}</button>
+          </div>
+          <div id="lab-system-content"><p class="empty-state">${t('Завантаження...')}</p></div>
+        </div>
+        <div class="lab-section">
+          <div class="lab-section-head">
+            <h4>${icon('notes', 'ico ico--sm')}${t('Файлова система')}</h4>
+          </div>
+          <div id="lab-files-content"><p class="empty-state">${t('Завантаження...')}</p></div>
+        </div>
+        <div class="lab-section">
+          <div class="lab-section-head">
+            <h4>${icon('globe', 'ico ico--sm')}${t('Веб-доступ')}</h4>
+            <button type="button" class="btn btn--outline btn--sm" id="lab-port-add">${icon('plus', 'ico ico--sm')}${t('Додати порт')}</button>
+          </div>
+          <p class="lab-hint">${t('Підняли сервіс на порту у своїй VM? Додайте його тут — отримаєте безпечне посилання без відкриття портів назовні.')}</p>
+          <div id="lab-ports-content"><p class="empty-state">${t('Завантаження...')}</p></div>
+        </div>` : ''}`;
 
     document.getElementById('lab-start')?.addEventListener('click', () => labAction('start'));
     document.getElementById('lab-stop')?.addEventListener('click', () => labAction('stop'));
@@ -1214,9 +1237,177 @@ async function loadLabPanel() {
     }
 
     renderDockerList(dockerDeployments || []);
+
+    if (hasVm) {
+      loadSystemInfo();
+      loadFileBrowser('/root');
+      loadPorts();
+      document.getElementById('lab-system-refresh')?.addEventListener('click', loadSystemInfo);
+      document.getElementById('lab-port-add')?.addEventListener('click', addPortFlow);
+    }
   } catch (err) {
     content.innerHTML = `<p class="empty-state">${escapeHtml(err.message)}</p>`;
   }
+}
+
+function fmtBytes(n) {
+  if (n == null || !Number.isFinite(n)) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0; let v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+}
+
+function fmtUptime(sec) {
+  if (!sec) return '—';
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `${d}${t('д')} ${h}${t('г')}`;
+  if (h > 0) return `${h}${t('г')} ${m}${t('хв')}`;
+  return `${m}${t('хв')}`;
+}
+
+async function loadSystemInfo() {
+  const el = document.getElementById('lab-system-content');
+  if (!el) return;
+  try {
+    const { info } = await api('/lab/vm/system');
+    const cpuPct = info.cpu != null ? Math.round(info.cpu * 100) : null;
+    const memPct = info.mem != null && info.maxmem ? Math.round((info.mem / info.maxmem) * 100) : null;
+    const fsRows = (info.filesystems || []).filter((f) => f['total-bytes']);
+    el.innerHTML = `
+      <div class="lab-vm-grid">
+        <div class="lab-vm-stat"><span class="lab-vm-label">CPU</span><span class="lab-vm-val">${cpuPct != null ? `${cpuPct}%` : '—'}</span></div>
+        <div class="lab-vm-stat"><span class="lab-vm-label">RAM</span><span class="lab-vm-val">${fmtBytes(info.mem)} / ${fmtBytes(info.maxmem)}${memPct != null ? ` (${memPct}%)` : ''}</span></div>
+        <div class="lab-vm-stat"><span class="lab-vm-label">${t('Аптайм')}</span><span class="lab-vm-val">${fmtUptime(info.uptime)}</span></div>
+        ${info.os ? `<div class="lab-vm-stat"><span class="lab-vm-label">OS</span><span class="lab-vm-val">${escapeHtml(info.os['pretty-name'] || info.os.name || '—')}</span></div>` : ''}
+      </div>
+      ${fsRows.length ? `<div class="lab-fs-list">${fsRows.map((f) => {
+        const pct = f['total-bytes'] ? Math.round((f['used-bytes'] / f['total-bytes']) * 100) : 0;
+        return `<div class="lab-fs-row">
+          <span class="lab-fs-name">${escapeHtml(f.mountpoint || f.name || '/')}</span>
+          <div class="lab-fs-bar"><div class="lab-fs-bar-fill" style="width:${pct}%"></div></div>
+          <span class="lab-fs-meta">${fmtBytes(f['used-bytes'])} / ${fmtBytes(f['total-bytes'])}</span>
+        </div>`;
+      }).join('')}</div>` : ''}
+      ${!info.agentAvailable ? `<p class="lab-hint ico-inline">${icon('info', 'ico ico--sm')}<span>${t('Встановіть qemu-guest-agent у гостьовій ОС, щоб бачити деталі системи та файлову систему')}</span></p>` : ''}
+    `;
+  } catch (err) {
+    el.innerHTML = `<p class="empty-state">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+let labCurrentPath = '/root';
+
+async function loadFileBrowser(path) {
+  labCurrentPath = path || labCurrentPath;
+  const el = document.getElementById('lab-files-content');
+  if (!el) return;
+  el.innerHTML = `<p class="empty-state">${t('Завантаження...')}</p>`;
+  try {
+    const { entries } = await api(`/lab/vm/files?path=${encodeURIComponent(labCurrentPath)}`);
+    const parent = labCurrentPath.replace(/\/[^/]+\/?$/, '') || '/';
+    el.innerHTML = `
+      <div class="lab-file-path">
+        <button type="button" class="btn btn--ghost btn--sm" id="lab-file-up" ${labCurrentPath === '/' ? 'disabled' : ''}>${icon('chevron-left', 'ico ico--sm')}</button>
+        <code>${escapeHtml(labCurrentPath)}</code>
+      </div>
+      <div class="lab-file-list">
+        ${entries.length ? entries.map((e) => `
+          <div class="lab-file-row${e.type === 'd' ? ' is-dir' : ''}" data-name="${escapeHtml(e.name)}" data-type="${e.type}">
+            ${icon(e.type === 'd' ? 'grid' : 'notes', 'ico ico--sm')}
+            <span class="lab-file-name">${escapeHtml(e.name)}</span>
+            ${e.type !== 'd' ? `<span class="lab-file-size">${fmtBytes(e.size)}</span>` : ''}
+          </div>`).join('') : `<p class="empty-state">${t('Порожньо')}</p>`}
+      </div>
+      <div id="lab-file-viewer" hidden></div>
+    `;
+
+    document.getElementById('lab-file-up')?.addEventListener('click', () => loadFileBrowser(parent));
+    el.querySelectorAll('.lab-file-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const fullPath = `${labCurrentPath.replace(/\/$/, '')}/${row.dataset.name}`;
+        if (row.dataset.type === 'd') loadFileBrowser(fullPath);
+        else openFileViewer(fullPath);
+      });
+    });
+  } catch (err) {
+    el.innerHTML = `<p class="empty-state">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function openFileViewer(path) {
+  const viewer = document.getElementById('lab-file-viewer');
+  if (!viewer) return;
+  viewer.hidden = false;
+  viewer.innerHTML = `<p class="empty-state">${t('Завантаження...')}</p>`;
+  try {
+    const { content, truncated } = await api(`/lab/vm/file?path=${encodeURIComponent(path)}`);
+    viewer.innerHTML = `
+      <div class="lab-file-viewer-head">
+        <code>${escapeHtml(path)}</code>
+        <button type="button" class="btn btn--ghost btn--sm" id="lab-file-close">${icon('x', 'ico ico--sm')}</button>
+      </div>
+      ${truncated ? `<p class="lab-hint">${t('Показано частково — файл завеликий')}</p>` : ''}
+      <textarea class="lab-file-textarea" id="lab-file-textarea" spellcheck="false">${escapeHtml(content)}</textarea>
+      <div class="lab-file-viewer-actions">
+        <button type="button" class="btn btn--primary btn--sm" id="lab-file-save">${t('Зберегти')}</button>
+      </div>`;
+
+    document.getElementById('lab-file-close').addEventListener('click', () => {
+      viewer.hidden = true;
+      viewer.innerHTML = '';
+    });
+    document.getElementById('lab-file-save').addEventListener('click', async () => {
+      try {
+        const newContent = document.getElementById('lab-file-textarea').value;
+        await api('/lab/vm/file', { method: 'PUT', body: JSON.stringify({ path, content: newContent }) });
+        showToast(t('Файл збережено'));
+      } catch (err) { showToast(err.message, 'error'); }
+    });
+  } catch (err) {
+    viewer.innerHTML = `<p class="empty-state">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function loadPorts() {
+  const el = document.getElementById('lab-ports-content');
+  if (!el) return;
+  try {
+    const { ports } = await api('/lab/vm/ports');
+    el.innerHTML = ports.length ? ports.map((p) => `
+      <div class="lab-port-row">
+        <div>
+          <strong>${p.port}</strong>${p.label ? ` — ${escapeHtml(p.label)}` : ''}
+          ${p.url ? `<div><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.url)}</a></div>` : `<div class="lab-hint">${t('Немає IP — машина ще не готова')}</div>`}
+        </div>
+        <button type="button" class="btn btn--ghost btn--sm lab-port-del" data-id="${p.id}">${icon('trash', 'ico ico--sm')}</button>
+      </div>`).join('') : `<p class="empty-state">${t('Портів ще не додано')}</p>`;
+
+    el.querySelectorAll('.lab-port-del').forEach((btn) => btn.addEventListener('click', async () => {
+      if (!(await showConfirm(t('Видалити порт?')))) return;
+      try {
+        await api(`/lab/vm/ports/${btn.dataset.id}`, { method: 'DELETE' });
+        loadPorts();
+      } catch (err) { showToast(err.message, 'error'); }
+    }));
+  } catch (err) {
+    el.innerHTML = `<p class="empty-state">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function addPortFlow() {
+  const result = await showForm(t('Додати порт'), [
+    { id: 'port', label: t('Порт'), type: 'text', placeholder: '8080' },
+    { id: 'label', label: t("Мітка (необов'язково)"), type: 'text', placeholder: 'my-app' },
+  ]);
+  if (!result?.port) return;
+  try {
+    await api('/lab/vm/ports', { method: 'POST', body: JSON.stringify(result) });
+    showToast(t('Порт додано'));
+    loadPorts();
+  } catch (err) { showToast(err.message, 'error'); }
 }
 
 async function labAction(action) {

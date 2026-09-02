@@ -308,7 +308,11 @@ async function load() {
     } else if (ownerTab === 'ctf') {
       html += renderCtfPanel(ctfAdminData.challenges, ctfAdminData.programs);
     } else if (ownerTab === 'users') {
-      html += renderUsersPanelExtended(users, role);
+      let smtpSettings = { configured: false };
+      try {
+        ({ settings: smtpSettings } = await api('/admin/settings/smtp'));
+      } catch { /* ignore */ }
+      html += renderUsersPanelExtended(users, role, smtpSettings);
     } else if (ownerTab === 'billing') {
       try {
         const params = new URLSearchParams(location.search);
@@ -532,7 +536,11 @@ async function updateApp(id, status) {
       if (res.account.emailSent) {
         showToast('Заявку схвалено, акаунт створено, пароль надіслано на email');
       } else {
-        await showCopyDialog(`Email НЕ надіслано (SMTP не налаштовано або збій). Скопіюйте пароль і передайте учню (${res.account.user.email}) вручну:`, res.account.password, { title: 'Пароль учня' });
+        await showCopyDialog(
+          `Email НЕ надіслано (${res.account.mailReason && res.account.mailReason !== 'no-smtp' ? res.account.mailReason : 'SMTP не налаштовано — збережіть хост на вкладці «Користувачі»'}). Скопіюйте пароль і передайте учню (${res.account.user.email}) вручну:`,
+          res.account.password,
+          { title: 'Пароль учня' },
+        );
       }
     } else {
       showToast('Заявку оновлено');

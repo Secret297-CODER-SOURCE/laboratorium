@@ -82,9 +82,11 @@ export async function adminCreateUser({ name, email, role = 'student', handle, p
 
   const user = findById(result.lastInsertRowid);
   let emailSent = false;
+  let mailReason = null;
   if (sendEmail) {
     const mailResult = await mailService.sendWelcomeCredentialsEmail(user, plainPassword);
     emailSent = mailResult.sent;
+    mailReason = mailResult.sent ? null : (mailResult.reason || 'no-smtp');
   }
 
   if (validRole === 'student') {
@@ -95,7 +97,7 @@ export async function adminCreateUser({ name, email, role = 'student', handle, p
   // go out (no SMTP configured, or delivery failed), this is the only place
   // it exists; the admin UI falls back to showing it directly so the
   // account is never created with a password nobody knows.
-  return { user, password: plainPassword, emailSent };
+  return { user, password: plainPassword, emailSent, mailReason };
 }
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('laboratorium-timing-dummy', config.bcryptRounds);

@@ -1408,6 +1408,21 @@
   }
 }
 
+.smtp-panel {
+  margin-top: 16px;
+}
+
+.smtp-warn {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #ffaa00 45%, var(--border));
+  border-radius: var(--radius);
+  background: rgba(255, 170, 0, 0.08);
+  color: #ffcc66;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
 .toast {
   position: fixed;
   top: 88px;

@@ -106,7 +106,7 @@ export async function updateApplicationStatus(id, status, createAccount = false,
   return {
     application: db.prepare('SELECT * FROM applications WHERE id = ?').get(id),
     account: account
-      ? { user: userService.toPublic(account.user), password: account.password, emailSent: account.emailSent }
+      ? { user: userService.toPublic(account.user), password: account.password, emailSent: account.emailSent, mailReason: account.mailReason }
       : null,
   };
 }

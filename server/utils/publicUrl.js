@@ -87,6 +87,26 @@ export function buildVmAccess(ip, cfg, meta = {}) {
   return base;
 }
 
+/** Секюрний доступ до довільного порту на власній VM учня (веб-сервіс, який він сам підняв). */
+export function buildVmPortAccess(ip, port, cfg, meta = {}) {
+  const c = cfg || getLabPublicConfig();
+  if (!ip) return { url: null, direct_url: null };
+
+  const directUrl = buildServiceUrl(ip, port, c);
+  if (!c.useSecureTunnel || !meta.userId) return { url: directUrl, direct_url: directUrl };
+
+  const token = tunnelService.ensureAccessToken({
+    userId: meta.userId,
+    host: ip,
+    port,
+    resourceType: 'vm_port',
+    resourceId: meta.resourceId,
+  });
+  if (!token) return { url: directUrl, direct_url: directUrl };
+
+  return { url: buildTunnelUrl(token, c), direct_url: directUrl, tunnel_token: token };
+}
+
 function parseExtraPorts(raw) {
   if (!raw) return [];
   try {

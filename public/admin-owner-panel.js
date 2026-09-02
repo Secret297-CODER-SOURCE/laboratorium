@@ -81,13 +81,15 @@ export function renderProgramsPanel(programs, directions) {
   </section>`;
 }
 
-export function renderUsersPanelExtended(users, role) {
+export function renderUsersPanelExtended(users, role, smtp = {}) {
   const roles = ['student', 'teacher', 'owner'];
+  const mailOk = !!smtp.configured;
   return `<section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
       <h2>${icon('users', 'ico ico--md')}Користувачі</h2>
       <button type="button" class="btn btn--outline btn--sm" id="add-user-btn">${icon('plus', 'ico ico--sm')}Створити акаунт</button>
     </div>
+    ${mailOk ? '' : `<p class="smtp-warn">SMTP не налаштовано — пароль не піде на email. Заповніть форму пошти нижче, або скопіюйте пароль і передайте учню вручну.</p>`}
     <div id="create-user-form" class="admin-inline-form" hidden>
       <input class="admin-inp" id="new-user-name" placeholder="Ім'я">
       <input class="admin-inp" id="new-user-email" type="email" placeholder="Email">
@@ -114,6 +116,40 @@ export function renderUsersPanelExtended(users, role) {
         </tr>`).join('')}
       </tbody>
     </table>
+  </section>
+  <section class="admin-panel admin-panel--wide smtp-panel">
+    <div class="admin-panel-head">
+      <h2>${icon('send', 'ico ico--md')}Пошта (SMTP)</h2>
+      <span class="status-pill ${mailOk ? 'running' : 'stopped'}">${mailOk ? 'налаштовано' : 'не налаштовано'}</span>
+    </div>
+    <p class="empty-state" style="padding:0 0 16px;text-align:left">
+      Листи з паролем і скиданням доступу. Для Gmail: <code>smtp.gmail.com</code>, порт 587, пароль додатку (не звичайний пароль акаунта).
+    </p>
+    <form id="smtp-settings-form" class="admin-form-grid">
+      <label>SMTP хост
+        <input class="admin-inp" id="smtp-host" placeholder="smtp.gmail.com" value="${esc(smtp.host || '')}">
+      </label>
+      <label>Порт
+        <input class="admin-inp" id="smtp-port" type="number" value="${smtp.port || 587}">
+      </label>
+      <label>Логін
+        <input class="admin-inp" id="smtp-user" placeholder="noreply@laboratorium.club" value="${esc(smtp.user || '')}" autocomplete="off">
+      </label>
+      <label>Пароль
+        <input class="admin-inp" id="smtp-pass" type="password" placeholder="${smtp.hasPassword ? '•••••••• (залиште порожнім, щоб не змінювати)' : 'пароль SMTP'}" autocomplete="new-password">
+      </label>
+      <label>Від кого (From)
+        <input class="admin-inp" id="smtp-from" placeholder="noreply@laboratorium.club" value="${esc(smtp.from || '')}">
+      </label>
+      <label class="admin-check">
+        <input type="checkbox" id="smtp-secure" ${smtp.secure ? 'checked' : ''}>
+        SSL (порт 465)
+      </label>
+      <div class="admin-form-actions">
+        <button type="submit" class="btn btn--primary btn--sm">${icon('check', 'ico ico--sm')}Зберегти SMTP</button>
+        <button type="button" class="btn btn--outline btn--sm" id="smtp-test-btn">${icon('send', 'ico ico--sm')}Надіслати тест</button>
+      </div>
+    </form>
   </section>`;
 }
 
@@ -354,6 +390,13 @@ function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
+function mailFailMessage(prefix, reason) {
+  const detail = !reason || reason === 'no-smtp'
+    ? 'SMTP не налаштовано — збережіть хост на цій вкладці.'
+    : reason;
+  return `${prefix} (${detail})`;
+}
+
 function rowData(row) {
   const data = {};
   row.querySelectorAll('[data-field]').forEach(el => {
@@ -457,7 +500,7 @@ export function bindOwnerPanelEvents(showToast, reload) {
       if (res.emailSent) {
         showToast('Акаунт створено, пароль надіслано на email');
       } else {
-        await showCopyDialog(`Акаунт створено, але email НЕ надіслано (SMTP не налаштовано або збій). Скопіюйте пароль і передайте учню (${email}) вручну:`, res.password, { title: 'Пароль учня' });
+        await showCopyDialog(mailFailMessage(`Акаунт створено, але email НЕ надіслано. Скопіюйте пароль і передайте учню (${email}) вручну.`, res.mailReason), res.password, { title: 'Пароль учня' });
       }
       reload();
     } catch (err) { showToast(err.message, 'error'); }
@@ -470,7 +513,7 @@ export function bindOwnerPanelEvents(showToast, reload) {
         if (res.emailSent) {
           showToast('Посилання для скидання надіслано');
         } else {
-          await showCopyDialog('Email НЕ надіслано (SMTP не налаштовано або збій). Скопіюйте посилання і передайте учню вручну:', res.resetUrl, { title: 'Посилання для скидання' });
+          await showCopyDialog(mailFailMessage('Email НЕ надіслано. Скопіюйте посилання і передайте учню вручну.', res.mailReason), res.resetUrl, { title: 'Посилання для скидання' });
         }
       } catch (err) { showToast(err.message, 'error'); }
     });
@@ -484,10 +527,45 @@ export function bindOwnerPanelEvents(showToast, reload) {
         if (res.emailSent) {
           showToast('Новий пароль надіслано');
         } else {
-          await showCopyDialog('Email НЕ надіслано (SMTP не налаштовано або збій). Скопіюйте новий пароль і передайте учню вручну:', res.password, { title: 'Новий пароль' });
+          await showCopyDialog(mailFailMessage('Email НЕ надіслано. Скопіюйте новий пароль і передайте учню вручну.', res.mailReason), res.password, { title: 'Новий пароль' });
         }
       } catch (err) { showToast(err.message, 'error'); }
     });
+  });
+
+  document.getElementById('smtp-settings-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api('/admin/settings/smtp', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          host: document.getElementById('smtp-host').value,
+          port: document.getElementById('smtp-port').value,
+          user: document.getElementById('smtp-user').value,
+          pass: document.getElementById('smtp-pass').value,
+          from: document.getElementById('smtp-from').value,
+          secure: document.getElementById('smtp-secure').checked,
+        }),
+      });
+      showToast(res.message || 'Збережено');
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('smtp-test-btn')?.addEventListener('click', async () => {
+    const to = await showPrompt('Куди надіслати тестовий лист?', document.getElementById('smtp-user')?.value || '', {
+      title: 'Тест SMTP',
+      placeholder: 'you@example.com',
+      okText: 'Надіслати',
+    });
+    if (!to?.trim()) return;
+    try {
+      const res = await api('/admin/settings/smtp/test', {
+        method: 'POST',
+        body: JSON.stringify({ to: to.trim() }),
+      });
+      showToast(res.message || 'Надіслано');
+    } catch (err) { showToast(err.message, 'error'); }
   });
 
   document.getElementById('proxmox-settings-form')?.addEventListener('submit', async (e) => {

@@ -313,6 +313,18 @@ export function runMigrations(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
+
+    CREATE TABLE IF NOT EXISTS vm_exposed_ports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      port INTEGER NOT NULL,
+      label TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, port)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_vm_exposed_ports_user ON vm_exposed_ports(user_id);
   `);
 
   const ctfDepCols = db.prepare('PRAGMA table_info(ctf_deployments)').all().map(c => c.name);

@@ -1076,6 +1076,138 @@
   gap: 8px;
 }
 
+.lab-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.lab-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.lab-section-head h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.lab-fs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lab-fs-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.75rem;
+}
+
+.lab-fs-name { color: var(--text-muted); font-family: var(--mono); }
+
+.lab-fs-bar {
+  height: 6px;
+  background: var(--bg);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.lab-fs-bar-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.lab-fs-meta { color: var(--text-dim); white-space: nowrap; font-family: var(--mono); }
+
+.lab-file-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.lab-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.lab-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.lab-file-row:hover { background: var(--bg-card-hover); }
+.lab-file-row.is-dir { color: var(--accent); }
+.lab-file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lab-file-size { color: var(--text-dim); font-size: 0.7rem; font-family: var(--mono); }
+
+.lab-file-viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 8px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.lab-file-textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  resize: vertical;
+}
+
+.lab-file-viewer-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.lab-port-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+}
+
+.lab-port-row a { color: var(--accent); font-size: 0.75rem; word-break: break-all; }
+
 .docker-deploy-form {
   display: grid;
   grid-template-columns: 1fr 1fr auto;

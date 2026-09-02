@@ -14,6 +14,13 @@ router.get('/', requireTab('dash.lab'), asyncHandler(labCtrl.getLabOverview));
 router.post('/vm/start', requireTab('dash.lab'), asyncHandler(labCtrl.startVm));
 router.post('/vm/stop', requireTab('dash.lab'), asyncHandler(labCtrl.stopVm));
 router.post('/vm/reset', requireTab('dash.lab'), asyncHandler(labCtrl.resetVm));
+router.get('/vm/system', requireTab('dash.lab'), asyncHandler(labCtrl.getVmSystem));
+router.get('/vm/files', requireTab('dash.lab'), asyncHandler(labCtrl.listVmFiles));
+router.get('/vm/file', requireTab('dash.lab'), asyncHandler(labCtrl.readVmFile));
+router.put('/vm/file', requireTab('dash.lab'), asyncHandler(labCtrl.writeVmFile));
+router.get('/vm/ports', requireTab('dash.lab'), asyncHandler(labCtrl.listVmPorts));
+router.post('/vm/ports', requireTab('dash.lab'), asyncHandler(labCtrl.addVmPort));
+router.delete('/vm/ports/:id', requireTab('dash.lab'), asyncHandler(labCtrl.removeVmPort));
 
 router.post('/docker/deploy', requireTab('dash.lab'), asyncHandler(labCtrl.deployDocker));
 router.post('/docker/:id/stop', requireTab('dash.lab'), asyncHandler(labCtrl.stopDocker));

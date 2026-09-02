@@ -96,6 +96,10 @@ router.delete('/challenges/:id/stages/:stageId/attachments/:attachmentId', async
 router.get('/settings/lab-public', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getLabPublicSettings));
 router.patch('/settings/lab-public', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateLabPublicSettings));
 
+router.get('/settings/smtp', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getSmtpSettings));
+router.patch('/settings/smtp', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateSmtpSettings));
+router.post('/settings/smtp/test', requireRole('owner', 'developer'), asyncHandler(adminCtrl.testSmtpSettings));
+
 router.get('/settings/proxmox', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getProxmoxSettings));
 router.patch('/settings/proxmox', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateProxmoxSettings));
 router.post('/settings/proxmox/provision-missing', requireRole('owner', 'developer'), asyncHandler(adminCtrl.provisionMissingLabs));

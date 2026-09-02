@@ -225,3 +225,85 @@ export function saveLabPublicSettings(data) {
 
   return getLabPublicSettingsPublic();
 }
+
+const SMTP_KEY = 'smtp';
+
+function smtpEnvDefaults() {
+  return {
+    host: config.smtp.host || '',
+    port: config.smtp.port || 587,
+    secure: !!config.smtp.secure,
+    user: config.smtp.user || '',
+    pass: config.smtp.pass || '',
+    from: config.smtp.from || 'noreply@laboratorium.club',
+  };
+}
+
+function loadSmtpRaw() {
+  const row = db.prepare('SELECT value FROM platform_settings WHERE key = ?').get(SMTP_KEY);
+  if (!row?.value) return null;
+  try {
+    return JSON.parse(row.value);
+  } catch {
+    return null;
+  }
+}
+
+export function getSmtpConfig() {
+  const stored = loadSmtpRaw();
+  const defaults = smtpEnvDefaults();
+  const src = stored ? { ...defaults, ...stored } : defaults;
+  return {
+    host: (src.host || '').trim(),
+    port: parseInt(src.port, 10) || 587,
+    secure: !!src.secure,
+    user: (src.user || '').trim(),
+    pass: src.pass || '',
+    from: (src.from || '').trim() || 'noreply@laboratorium.club',
+  };
+}
+
+export function getSmtpSettingsPublic() {
+  const cfg = getSmtpConfig();
+  return {
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    user: cfg.user,
+    from: cfg.from,
+    hasPassword: !!cfg.pass,
+    configured: !!cfg.host,
+  };
+}
+
+export function saveSmtpSettings(data) {
+  const merged = getSmtpConfig();
+  const host = data.host !== undefined ? data.host.trim() : merged.host;
+  const user = data.user !== undefined ? data.user.trim() : merged.user;
+  const from = data.from !== undefined ? (data.from.trim() || 'noreply@laboratorium.club') : merged.from;
+  const port = data.port !== undefined ? (parseInt(data.port, 10) || 587) : merged.port;
+  const secure = data.secure !== undefined ? !!data.secure : (port === 465 ? true : merged.secure);
+  const pass = data.pass?.trim() ? data.pass.trim() : merged.pass;
+
+  if (host && user && !pass) {
+    throw new ValidationError('Вкажіть пароль SMTP');
+  }
+
+  const payload = {
+    host: host || '',
+    port,
+    secure,
+    user: user || '',
+    pass: pass || '',
+    from,
+    updatedBy: 'owner',
+  };
+
+  db.prepare(`
+    INSERT INTO platform_settings (key, value, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(SMTP_KEY, JSON.stringify(payload));
+
+  return getSmtpSettingsPublic();
+}
