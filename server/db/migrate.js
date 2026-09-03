@@ -788,6 +788,16 @@ export function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_code_files_workspace ON code_files(workspace_id);
     CREATE INDEX IF NOT EXISTS idx_code_runs_workspace ON code_runs(workspace_id);
   `);
+
+  // Groups: a direct direction tag, independent of program_id — a group
+  // doesn't have to be tied to a specific course to be organized under a
+  // broad direction (e.g. a pure "Cybersecurity" cohort with no program
+  // assigned yet). Falls back to the program's direction when unset.
+  const groupCols = db.prepare('PRAGMA table_info(study_groups)').all().map(c => c.name);
+  if (!groupCols.includes('direction_id')) {
+    db.exec('ALTER TABLE study_groups ADD COLUMN direction_id INTEGER REFERENCES directions(id) ON DELETE SET NULL');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_study_groups_direction ON study_groups(direction_id)');
+  }
 }
 
 function bootstrapCurrentMonthPayments(db) {

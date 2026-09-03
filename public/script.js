@@ -1,5 +1,6 @@
 import { api, initTheme } from '/auth.js';
 import { icon } from '/icons.js';
+import { getCurrentAccentColor } from '/theme-engine.js';
 
 try {
   initTheme();
@@ -72,7 +73,7 @@ typeTerminal();
   }
   function draw() {
     ctx.clearRect(0, 0, W, H);
-    const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#00ff88';
+    const accent = getCurrentAccentColor();
     const projected = vertices.map(v => { const r = rotate(v, angleX, angleY); return { pos: project(r), z: r[2] }; });
     edges.forEach(([a,b]) => {
       const pa = projected[a], pb = projected[b];

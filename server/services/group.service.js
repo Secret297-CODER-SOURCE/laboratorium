@@ -13,14 +13,21 @@ function assertTeacherAccess(group, actorId, actorRole) {
   if (group.teacher_id !== actorId) throw new ForbiddenError('Немає доступу до цієї групи');
 }
 
+const GROUP_SELECT = `
+  SELECT g.*, p.name as program_name,
+    COALESCE(gd.name, pd.name) as direction_name,
+    COALESCE(g.direction_id, p.direction_id) as effective_direction_id,
+    u.name as teacher_name, u.handle as teacher_handle,
+    (SELECT COUNT(*) FROM study_group_members gm WHERE gm.group_id = g.id) as member_count
+  FROM study_groups g
+  LEFT JOIN programs p ON p.id = g.program_id
+  LEFT JOIN directions gd ON gd.id = g.direction_id
+  LEFT JOIN directions pd ON pd.id = p.direction_id
+  LEFT JOIN users u ON u.id = g.teacher_id
+`;
+
 export function listGroups(actorId, actorRole, { all = false } = {}) {
-  let sql = `
-    SELECT g.*, p.name as program_name,
-      (SELECT COUNT(*) FROM study_group_members gm WHERE gm.group_id = g.id) as member_count
-    FROM study_groups g
-    LEFT JOIN programs p ON p.id = g.program_id
-    WHERE g.is_active = 1
-  `;
+  let sql = `${GROUP_SELECT} WHERE g.is_active = 1`;
   const params = [];
 
   if (!all && actorRole === 'teacher') {
@@ -33,13 +40,7 @@ export function listGroups(actorId, actorRole, { all = false } = {}) {
 }
 
 export function getGroupById(id) {
-  const row = db.prepare(`
-    SELECT g.*, p.name as program_name,
-      (SELECT COUNT(*) FROM study_group_members gm WHERE gm.group_id = g.id) as member_count
-    FROM study_groups g
-    LEFT JOIN programs p ON p.id = g.program_id
-    WHERE g.id = ?
-  `).get(id);
+  const row = db.prepare(`${GROUP_SELECT} WHERE g.id = ?`).get(id);
   return mapGroup(row);
 }
 
@@ -55,13 +56,14 @@ export function createGroup(actorId, actorRole, data) {
   if (!teacher && actorRole === 'teacher') throw new ValidationError('Невірний викладач');
 
   const result = db.prepare(`
-    INSERT INTO study_groups (name, description, teacher_id, program_id, color, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO study_groups (name, description, teacher_id, program_id, direction_id, color, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     name,
     data.description?.trim() || null,
     teacherId,
     data.program_id ? parseInt(data.program_id, 10) : null,
+    data.direction_id ? parseInt(data.direction_id, 10) : null,
     data.color?.trim() || null,
     parseInt(data.sort_order, 10) || 0,
   );
@@ -74,14 +76,22 @@ export function updateGroup(id, actorId, actorRole, data) {
   assertTeacherAccess(group, actorId, actorRole);
 
   const name = data.name?.trim() || group.name;
+  let teacherId = group.teacher_id;
+  if (data.teacher_id !== undefined && (actorRole === 'owner' || actorRole === 'developer')) {
+    const teacher = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('teacher','owner')").get(parseInt(data.teacher_id, 10));
+    if (teacher) teacherId = teacher.id;
+  }
+
   db.prepare(`
-    UPDATE study_groups SET name = ?, description = ?, program_id = ?, color = ?,
-      sort_order = ?, is_active = ?, updated_at = datetime('now')
+    UPDATE study_groups SET name = ?, description = ?, teacher_id = ?, program_id = ?,
+      direction_id = ?, color = ?, sort_order = ?, is_active = ?, updated_at = datetime('now')
     WHERE id = ?
   `).run(
     name,
     data.description !== undefined ? (data.description?.trim() || null) : group.description,
+    teacherId,
     data.program_id !== undefined ? (data.program_id ? parseInt(data.program_id, 10) : null) : group.program_id,
+    data.direction_id !== undefined ? (data.direction_id ? parseInt(data.direction_id, 10) : null) : group.direction_id,
     data.color !== undefined ? (data.color?.trim() || null) : group.color,
     data.sort_order !== undefined ? (parseInt(data.sort_order, 10) || 0) : group.sort_order,
     data.is_active === false ? 0 : 1,

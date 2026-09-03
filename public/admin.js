@@ -84,6 +84,8 @@ let statsAdminData = null;
 let storageAdminData = { servers: [], assets: [] };
 let labsAdminData = [];
 let manualsAdminData = { manuals: [], directions: [] };
+let ownerGroupsData = { groups: [], programs: [], directions: [], teachers: [] };
+let teacherDirections = [];
 let adminLoadSeq = 0;
 
 function isScheduleTab(role) {
@@ -156,6 +158,11 @@ async function load() {
       const res = await api('/programs');
       panelPrograms = res.programs || [];
     } catch { /* ignore */ }
+    if (teacherTab === 'groups') {
+      try {
+        ({ directions: teacherDirections } = await api('/admin/directions'));
+      } catch { teacherDirections = []; }
+    }
     if (teacherTab === 'tasks') {
       try {
         teacherTasksData = await api('/admin/tasks');
@@ -208,6 +215,23 @@ async function load() {
     } catch { manualsAdminData = { manuals: [], directions: [] }; }
   }
 
+  if (role === 'owner' && ownerTab === 'groups') {
+    try {
+      const [{ groups: allGroups }, { programs: allPrograms }, { directions: allDirections }, { users: allUsers }] = await Promise.all([
+        api('/admin/groups?all=1'),
+        api('/admin/programs'),
+        api('/admin/directions'),
+        api('/admin/users'),
+      ]);
+      ownerGroupsData = {
+        groups: allGroups,
+        programs: allPrograms,
+        directions: allDirections,
+        teachers: allUsers.filter((u) => u.role === 'teacher'),
+      };
+    } catch { ownerGroupsData = { groups: [], programs: [], directions: [], teachers: [] }; }
+  }
+
   if (role === 'owner' && ownerTab === 'schedule') {
     try {
       const { groups: allGroups } = await api('/admin/groups?all=1');
@@ -252,7 +276,7 @@ async function load() {
         </section>
       </div>`;
     } else if (teacherTab === 'groups') {
-      html += renderGroupsPanel(groups, panelPrograms);
+      html += renderGroupsPanel(groups, panelPrograms, teacherDirections);
     } else if (teacherTab === 'tasks') {
       html += renderTasksPanel(groups, teacherTasksData);
     } else if (teacherTab === 'schedule') {
@@ -317,6 +341,8 @@ async function load() {
       html += renderProgramsPanel(programs, directions);
     } else if (ownerTab === 'manuals') {
       html += renderManualsPanel(manualsAdminData);
+    } else if (ownerTab === 'groups') {
+      html += renderGroupsPanel(ownerGroupsData.groups, ownerGroupsData.programs, ownerGroupsData.directions, { allGroups: true });
     } else if (ownerTab === 'ctf') {
       html += renderCtfPanel(ctfAdminData.challenges, ctfAdminData.programs);
     } else if (ownerTab === 'users') {
@@ -487,7 +513,13 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
     bindBillingPanelEvents(showToast, load);
   }
   if (role === 'teacher' && teacherTab === 'groups') {
-    bindGroupsPanelEvents(showToast, load, panelPrograms);
+    bindGroupsPanelEvents(showToast, load, panelPrograms, teacherDirections, teacherGroups);
+  }
+  if (role === 'owner' && ownerTab === 'groups') {
+    bindGroupsPanelEvents(showToast, load, ownerGroupsData.programs, ownerGroupsData.directions, ownerGroupsData.groups, {
+      isOwner: true,
+      teachers: ownerGroupsData.teachers,
+    });
   }
   if (role === 'teacher' && teacherTab === 'tasks') {
     bindTasksPanelEvents(showToast, load);

@@ -432,6 +432,13 @@
   margin-bottom: 10px;
 }
 
+.group-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
 .group-card-prog {
   display: inline-block;
   font-size: 0.7rem;
@@ -439,7 +446,6 @@
   background: var(--accent-subtle);
   border-radius: var(--radius);
   color: var(--accent);
-  margin-bottom: 12px;
 }
 
 .group-card-actions {

@@ -47,8 +47,19 @@ function setFlowMode(on) {
   document.body.classList.toggle('theme-flow', on);
 }
 
+// Other on-page canvases (the homepage icosahedron) need the live accent
+// color every frame too. Reading it back via getComputedStyle() right
+// after this loop writes it forces a synchronous style recalculation —
+// Lighthouse flags this as "forced reflow" — so it's exposed as a plain
+// JS value instead; no DOM read required.
+let currentAccentColor = 'rgb(0, 255, 136)';
+export function getCurrentAccentColor() {
+  return currentAccentColor;
+}
+
 function applyColors(accent, accentDim) {
   const root = document.documentElement;
+  currentAccentColor = accent;
   const m = accent.match(/\d+/g).map(Number);
   const vars = {
     '--accent': accent,
@@ -65,8 +76,17 @@ function applyColors(accent, accentDim) {
   renderFavicon(accent, accentDim, lerpT);
 }
 
+// Cross-tab sync only needs to be roughly current, not per-frame — writing
+// to sessionStorage and posting to a BroadcastChannel 60x/sec was pure
+// wasted main-thread work for a feature that tolerates ~1s of drift.
+const SYNC_SAVE_INTERVAL_MS = 1000;
+let lastSyncSaveAt = 0;
+
 function saveSyncState() {
-  const state = { currentIdx, targetIdx, lerpT, ts: Date.now() };
+  const now = Date.now();
+  if (now - lastSyncSaveAt < SYNC_SAVE_INTERVAL_MS) return;
+  lastSyncSaveAt = now;
+  const state = { currentIdx, targetIdx, lerpT, ts: now };
   try {
     sessionStorage.setItem(STORAGE_SYNC, JSON.stringify(state));
     channel?.postMessage(state);
@@ -121,8 +141,9 @@ function cycleFrame() {
   const to = PALETTE[targetIdx];
   const eased = smoothStep(lerpT);
   applyColors(lerpColor(from.hex, to.hex, eased), lerpDim(from, to, eased));
-  document.body.dataset.theme = 'flow';
-  setFlowMode(true);
+  // theme + flow-mode are set once in initTheme() — writing the same
+  // dataset/class value on every frame is pure wasted work, not a no-op
+  // browsers always skip.
   saveSyncState();
   cycleRAF = requestAnimationFrame(cycleFrame);
 }

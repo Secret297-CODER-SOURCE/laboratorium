@@ -1,6 +1,6 @@
 import { api } from '/auth.js';
 import { icon, STUDENT_MEMBER_ROLE_LABELS } from '/icons.js';
-import { showConfirm, showPrompt } from '/dialog.js';
+import { showConfirm, showPrompt, showForm } from '/dialog.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -22,21 +22,23 @@ export function renderTeacherTabs(active = 'overview') {
     </button>`).join('')}</nav>`;
 }
 
-export function renderGroupsPanel(groups, programs = []) {
+export function renderGroupsPanel(groups, programs = [], directions = [], { allGroups = false } = {}) {
   const progOpts = programs.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  const dirOpts = directions.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
   return `<section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
-      <h2>${icon('users', 'ico ico--md')}Мої групи</h2>
+      <h2>${icon('users', 'ico ico--md')}${allGroups ? 'Групи' : 'Мої групи'}</h2>
       <button type="button" class="btn btn--outline btn--sm" id="add-group-btn">${icon('plus', 'ico ico--sm')}Нова група</button>
     </div>
     <div id="create-group-form" class="admin-inline-form" hidden>
       <input class="admin-inp" id="new-group-name" placeholder="Назва групи">
       <input class="admin-inp" id="new-group-desc" placeholder="Опис (необов'язково)">
+      <select class="admin-inp" id="new-group-direction"><option value="">Без напрямку</option>${dirOpts}</select>
       <select class="admin-inp" id="new-group-program"><option value="">Без програми</option>${progOpts}</select>
       <button type="button" class="btn btn--primary btn--sm" id="create-group-submit">Створити</button>
     </div>
     <div class="groups-grid" id="groups-grid">
-      ${(groups || []).length ? groups.map(g => renderGroupCard(g)).join('') : '<p class="empty-state">Ще немає груп. Створіть першу!</p>'}
+      ${(groups || []).length ? groups.map(g => renderGroupCard(g, allGroups)).join('') : '<p class="empty-state">Ще немає груп. Створіть першу!</p>'}
     </div>
   </section>
   <div id="group-modal" class="group-modal" hidden>
@@ -48,14 +50,18 @@ export function renderGroupsPanel(groups, programs = []) {
   </div>`;
 }
 
-function renderGroupCard(g) {
+function renderGroupCard(g, showTeacher) {
   return `<article class="group-card" data-group-id="${g.id}" style="--group-color:${g.color || 'var(--accent)'}">
     <div class="group-card-head">
       <h3>${esc(g.name)}</h3>
       <span class="group-card-count">${g.member_count || 0} учн.</span>
     </div>
     ${g.description ? `<p class="group-card-desc">${esc(g.description)}</p>` : ''}
-    ${g.program_name ? `<span class="group-card-prog">${esc(g.program_name)}</span>` : ''}
+    <div class="group-card-tags">
+      ${g.direction_name ? `<span class="group-card-prog">${esc(g.direction_name)}</span>` : ''}
+      ${g.program_name ? `<span class="group-card-prog">${esc(g.program_name)}</span>` : ''}
+      ${showTeacher && g.teacher_name ? `<span class="group-card-prog">@${esc(g.teacher_handle)}</span>` : ''}
+    </div>
     <div class="group-card-actions">
       <a href="/content-builder.html?type=group&id=${g.id}" class="btn btn--outline btn--sm">${icon('edit', 'ico ico--sm')}Конструктор</a>
       <button type="button" class="btn btn--outline btn--sm group-manage" data-id="${g.id}">${icon('users', 'ico ico--sm')}Учні</button>
@@ -148,7 +154,9 @@ async function openGroupModal(groupId, title, showToast) {
   });
 }
 
-export function bindGroupsPanelEvents(showToast, reload, programs = []) {
+export function bindGroupsPanelEvents(showToast, reload, programs = [], directions = [], groups = [], opts = {}) {
+  const { isOwner = false, teachers = [] } = opts;
+
   document.getElementById('add-group-btn')?.addEventListener('click', () => {
     const form = document.getElementById('create-group-form');
     form.hidden = !form.hidden;
@@ -158,11 +166,12 @@ export function bindGroupsPanelEvents(showToast, reload, programs = []) {
     const name = document.getElementById('new-group-name').value;
     const description = document.getElementById('new-group-desc').value;
     const program_id = document.getElementById('new-group-program').value;
+    const direction_id = document.getElementById('new-group-direction').value;
     if (!name?.trim()) return showToast('Вкажіть назву', 'error');
     try {
       await api('/admin/groups', {
         method: 'POST',
-        body: JSON.stringify({ name, description, program_id: program_id || null }),
+        body: JSON.stringify({ name, description, program_id: program_id || null, direction_id: direction_id || null }),
       });
       showToast('Групу створено');
       reload();
@@ -181,10 +190,49 @@ export function bindGroupsPanelEvents(showToast, reload, programs = []) {
 
   document.querySelectorAll('.group-edit').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const name = await showPrompt('Нова назва групи:');
-      if (!name?.trim()) return;
+      const id = parseInt(btn.dataset.id, 10);
+      const group = groups.find(g => g.id === id);
+      if (!group) return;
+
+      const fields = [
+        { id: 'name', label: 'Назва групи', type: 'text', value: group.name },
+        { id: 'description', label: "Опис (необов'язково)", type: 'text', value: group.description || '' },
+        {
+          id: 'direction_id',
+          label: 'Напрямок',
+          type: 'select',
+          value: String(group.direction_id || ''),
+          options: [{ value: '', label: 'Без напрямку' }, ...directions.map(d => ({ value: String(d.id), label: d.name }))],
+        },
+        {
+          id: 'program_id',
+          label: 'Програма',
+          type: 'select',
+          value: String(group.program_id || ''),
+          options: [{ value: '', label: 'Без програми' }, ...programs.map(p => ({ value: String(p.id), label: p.name }))],
+        },
+      ];
+      if (isOwner) {
+        fields.push({
+          id: 'teacher_id',
+          label: 'Викладач',
+          type: 'select',
+          value: String(group.teacher_id || ''),
+          options: teachers.map(t => ({ value: String(t.id), label: `${t.name} (@${t.handle})` })),
+        });
+      }
+
+      const result = await showForm('Редагувати групу', fields);
+      if (!result) return;
       try {
-        await api(`/admin/groups/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+        await api(`/admin/groups/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            ...result,
+            program_id: result.program_id || null,
+            direction_id: result.direction_id || null,
+          }),
+        });
         showToast('Збережено');
         reload();
       } catch (err) { showToast(err.message, 'error'); }

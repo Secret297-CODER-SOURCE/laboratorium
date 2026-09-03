@@ -289,12 +289,15 @@ export function getContentStatus(targetType, targetId) {
 
 export function listStudentGroupContent(userId) {
   const rows = db.prepare(`
-    SELECT g.id, g.name, g.color, g.program_id, p.direction_id, d.name as direction_name,
+    SELECT g.id, g.name, g.color, g.program_id,
+      COALESCE(g.direction_id, p.direction_id) as direction_id,
+      COALESCE(gd.name, pd.name) as direction_name,
       cp.is_published, cp.updated_at
     FROM study_group_members gm
     JOIN study_groups g ON g.id = gm.group_id AND g.is_active = 1
     LEFT JOIN programs p ON p.id = g.program_id
-    LEFT JOIN directions d ON d.id = p.direction_id
+    LEFT JOIN directions gd ON gd.id = g.direction_id
+    LEFT JOIN directions pd ON pd.id = p.direction_id
     LEFT JOIN content_pages cp ON cp.target_type = 'group' AND cp.target_id = g.id
     WHERE gm.user_id = ?
     ORDER BY g.name

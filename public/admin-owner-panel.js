@@ -8,6 +8,7 @@ export function renderOwnerTabs(active = 'overview') {
     { id: 'directions', label: 'Напрямки', icon: 'book' },
     { id: 'programs', label: 'Програми', icon: 'notes' },
     { id: 'manuals', label: 'Мануали', icon: 'list' },
+    { id: 'groups', label: 'Групи', icon: 'users' },
     { id: 'ctf', label: 'CTF', icon: 'shield' },
     { id: 'users', label: 'Користувачі', icon: 'users' },
     { id: 'billing', label: 'Оплата', icon: 'chart' },
