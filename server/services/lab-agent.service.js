@@ -209,6 +209,12 @@ function collectUsedPorts() {
   for (const row of dockerRows) {
     if (row.host_port) used.add(row.host_port);
   }
+  const sandboxRows = db.prepare(`
+    SELECT host_port FROM code_runs WHERE status = 'running' AND mode = 'web'
+  `).all();
+  for (const row of sandboxRows) {
+    if (row.host_port) used.add(row.host_port);
+  }
   return used;
 }
 

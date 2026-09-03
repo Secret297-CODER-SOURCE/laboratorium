@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" type="image/png" sizes="256x256">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="icon" href="/favicon.png" type="image/png" id="site-favicon">
+  <title>Мануали — laboratorium.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/dashboard.css">
+  <link rel="stylesheet" href="/content-builder.css">
+  <link rel="stylesheet" href="/icons.css">
+</head>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <header class="header" id="site-header"></header>
+
+  <main class="dashboard">
+    <div class="container">
+      <div id="toast" class="toast" hidden></div>
+
+      <section class="dash-panel dash-panel--wide" id="my-manuals-section" hidden>
+        <div class="panel-header">
+          <h2 data-i18n="Мої чернетки">Мої чернетки</h2>
+        </div>
+        <div id="my-manuals-list" class="group-content-list"></div>
+      </section>
+
+      <section class="dash-panel dash-panel--wide">
+        <div class="panel-header">
+          <h2 data-i18n="Мануали">Мануали</h2>
+          <button type="button" class="btn btn--outline btn--sm" id="create-manual-btn">+ <span data-i18n="Створити мануал">Створити мануал</span></button>
+        </div>
+        <div class="manuals-filters" id="manuals-filters" hidden></div>
+        <div id="manuals-list" class="group-content-list">
+          <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="/manuals.js"></script>
+</body>
+</html>

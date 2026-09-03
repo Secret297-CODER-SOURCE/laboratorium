@@ -36,6 +36,9 @@ import {
 import {
   renderLabsPanel, bindLabsPanelEvents,
 } from '/admin-labs-panel.js';
+import {
+  renderManualsPanel, bindManualsPanelEvents, loadManualsAdminData,
+} from '/admin-manuals-panel.js';
 import { initNumberInputs } from '/number-inputs.js';
 
 if (!(await requireAuthAsync())) throw new Error('auth');
@@ -80,6 +83,7 @@ let quizzesAdminData = { quizzes: [] };
 let statsAdminData = null;
 let storageAdminData = { servers: [], assets: [] };
 let labsAdminData = [];
+let manualsAdminData = { manuals: [], directions: [] };
 let adminLoadSeq = 0;
 
 function isScheduleTab(role) {
@@ -198,6 +202,12 @@ async function load() {
     } catch { labsAdminData = []; }
   }
 
+  if (role === 'owner' && ownerTab === 'manuals') {
+    try {
+      manualsAdminData = await loadManualsAdminData();
+    } catch { manualsAdminData = { manuals: [], directions: [] }; }
+  }
+
   if (role === 'owner' && ownerTab === 'schedule') {
     try {
       const { groups: allGroups } = await api('/admin/groups?all=1');
@@ -305,6 +315,8 @@ async function load() {
       html += renderDirectionsPanel(directions);
     } else if (ownerTab === 'programs') {
       html += renderProgramsPanel(programs, directions);
+    } else if (ownerTab === 'manuals') {
+      html += renderManualsPanel(manualsAdminData);
     } else if (ownerTab === 'ctf') {
       html += renderCtfPanel(ctfAdminData.challenges, ctfAdminData.programs);
     } else if (ownerTab === 'users') {
@@ -497,6 +509,9 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
   }
   if (role === 'owner' && (ownerTab === 'labs' || ownerTab === 'proxmox')) {
     bindLabsPanelEvents(labsAdminData, showToast, load);
+  }
+  if (role === 'owner' && ownerTab === 'manuals') {
+    bindManualsPanelEvents(showToast, load);
   }
 
   document.querySelectorAll('.role-select').forEach(sel => {

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
+import db from '../db/index.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
 
 export function signToken(user) {
@@ -10,6 +11,18 @@ export function signToken(user) {
   );
 }
 
+/**
+ * A frozen account keeps its data but must not be usable — checked per
+ * request (not baked into the JWT) so freezing takes effect immediately
+ * against tokens already issued, without a revocation list.
+ */
+function assertNotFrozen(userId) {
+  const row = db.prepare('SELECT is_frozen FROM users WHERE id = ?').get(userId);
+  if (row?.is_frozen) {
+    throw new ForbiddenError('Акаунт заморожено. Зверніться до адміністрації.');
+  }
+}
+
 export function authRequired(req, _res, next) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
@@ -17,8 +30,10 @@ export function authRequired(req, _res, next) {
   }
   try {
     req.user = jwt.verify(header.slice(7), config.jwt.secret);
+    assertNotFrozen(req.user.id);
     next();
-  } catch {
+  } catch (err) {
+    if (err instanceof ForbiddenError) return next(err);
     next(new UnauthorizedError('Сесію закінчено, увійдіть знову'));
   }
 }

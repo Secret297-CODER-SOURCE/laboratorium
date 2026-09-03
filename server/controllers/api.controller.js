@@ -7,6 +7,7 @@ import * as challengeService from '../services/challenge.service.js';
 import * as taskService from '../services/task.service.js';
 import * as articleService from '../services/article.service.js';
 import * as contentService from '../services/content.service.js';
+import * as manualService from '../services/manual.service.js';
 import * as scheduleService from '../services/schedule.service.js';
 import * as quizService from '../services/quiz.service.js';
 import * as applicationService from '../services/application.service.js';
@@ -285,6 +286,46 @@ export async function submitArticle(req, res) {
   const articleId = parseInt(req.params.id, 10);
   const article = articleService.submit(req.user.id, articleId);
   res.json({ article, message: 'Статтю надіслано викладачу' });
+}
+
+export async function listManuals(_req, res) {
+  res.json({ manuals: manualService.listPublished() });
+}
+
+export async function listMyManuals(req, res) {
+  res.json({ manuals: manualService.listMine(req.user.id) });
+}
+
+export async function createManual(req, res) {
+  const manual = manualService.create(req.user.id, req.body);
+  res.status(201).json({ manual, message: 'Мануал створено. Додайте вміст у конструкторі.' });
+}
+
+export async function getManualForActor(req, res) {
+  const manual = manualService.getForActor(req.user.id, req.user.role, parseInt(req.params.id, 10));
+  res.json({ manual });
+}
+
+export async function updateManual(req, res) {
+  const manual = manualService.update(req.user.id, req.user.role, parseInt(req.params.id, 10), req.body);
+  res.json({ manual });
+}
+
+export async function deleteManual(req, res) {
+  const result = manualService.remove(req.user.id, req.user.role, parseInt(req.params.id, 10));
+  res.json(result);
+}
+
+export async function submitManualForReview(req, res) {
+  const manual = manualService.submitForReview(req.user.id, parseInt(req.params.id, 10));
+  res.json({ manual, message: 'Мануал надіслано на перевірку' });
+}
+
+export async function getManualBySlug(req, res) {
+  const manual = manualService.getBySlug(req.params.slug);
+  if (!manual) throw new NotFoundError('Мануал не знайдено');
+  const { page } = contentService.getPageForViewer('manual', manual.id, req.user.id, req.user.role);
+  res.json({ manual, page });
 }
 
 export async function getContentView(req, res) {

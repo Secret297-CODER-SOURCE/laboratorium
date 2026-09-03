@@ -1,4 +1,6 @@
-import { api, requireAuthAsync, initTheme } from '/auth.js';
+import {
+  api, requireAuthAsync, initTheme, getUser,
+} from '/auth.js';
 import {
   BLOCK_PALETTE, renderBlock, renderPage, esc,
 } from '/content-render.js';
@@ -9,12 +11,17 @@ initTheme();
 
 if (!(await requireAuthAsync())) throw new Error('auth');
 
+const STAFF_ROLES = ['owner', 'developer', 'teacher'];
+const user = getUser();
+const isStaff = STAFF_ROLES.includes(user?.role);
+const fallbackHref = isStaff ? '/admin.html' : '/manuals.html';
+
 const params = new URLSearchParams(location.search);
 const targetType = params.get('type');
 const targetId = parseInt(params.get('id'), 10);
 
-if (!['direction', 'group', 'program'].includes(targetType) || !targetId) {
-  location.href = '/admin.html';
+if (!['direction', 'group', 'program', 'manual'].includes(targetType) || !targetId) {
+  location.href = fallbackHref;
 }
 
 let state = { page: null, meta: null };
@@ -449,7 +456,7 @@ async function save() {
   const btn = document.getElementById('builder-save-btn');
   btn.disabled = true;
   try {
-    const res = await api(`/admin/content/${targetType}/${targetId}`, {
+    const res = await api(`/content/${targetType}/${targetId}`, {
       method: 'PUT',
       body: JSON.stringify(state.page),
     });
@@ -463,12 +470,72 @@ async function save() {
     }
     renderCanvas();
     renderProps();
+    updateManualStatusUi();
     showToast(res.message || 'Збережено');
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
     btn.disabled = false;
   }
+}
+
+let manualMeta = null;
+
+function updateManualStatusUi() {
+  if (targetType !== 'manual') return;
+  const pill = document.getElementById('builder-review-pill');
+  const publishField = document.getElementById('builder-publish-field');
+  const submitBtn = document.getElementById('builder-submit-review-btn');
+
+  if (isStaff) {
+    publishField.hidden = false;
+    submitBtn.hidden = true;
+    pill.hidden = true;
+    return;
+  }
+
+  // Self-service author: no direct publish toggle — status pill + a
+  // "submit for review" action instead, matching the server-side gate in
+  // content.service.js (savePage forces is_published for non-staff editors).
+  publishField.hidden = true;
+  submitBtn.hidden = !!state.page.is_published;
+  pill.hidden = false;
+  if (state.page.is_published) {
+    pill.className = 'status-pill running';
+    pill.textContent = 'Опубліковано';
+  } else if (manualMeta?.review_status === 'submitted') {
+    pill.className = 'status-pill pending';
+    pill.textContent = 'На перевірці';
+  } else {
+    pill.className = 'status-pill none';
+    pill.textContent = 'Чернетка';
+  }
+}
+
+async function submitForReview() {
+  const btn = document.getElementById('builder-submit-review-btn');
+  btn.disabled = true;
+  try {
+    await save();
+    const res = await api(`/manuals/${targetId}/submit`, { method: 'POST' });
+    manualMeta = res.manual;
+    updateManualStatusUi();
+    showToast(res.message);
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadDirectionOptions(selectedId) {
+  const select = document.getElementById('page-manual-direction');
+  select.hidden = false;
+  try {
+    const { directions } = await api('/directions');
+    select.innerHTML = '<option value="">Напрямок: не вибрано</option>'
+      + directions.map(d => `<option value="${d.id}" ${String(d.id) === String(selectedId) ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
+  } catch { /* directions optional */ }
 }
 
 function showPreview() {
@@ -484,7 +551,7 @@ function showPreview() {
 }
 
 async function load() {
-  const data = await api(`/admin/content/${targetType}/${targetId}`);
+  const data = await api(`/content/${targetType}/${targetId}/editor`);
   state = data;
   state.page = state.page || {
     title: state.meta.name,
@@ -498,17 +565,40 @@ async function load() {
   document.getElementById('builder-title').textContent = state.meta.name;
   document.getElementById('builder-back').href = targetType === 'group'
     ? '/admin.html?tab=groups'
-    : '/admin.html?tab=directions';
+    : targetType === 'manual'
+      ? (isStaff ? '/admin.html?tab=manuals' : '/manuals.html')
+      : '/admin.html?tab=directions';
 
   document.getElementById('page-title').value = state.page.title || state.meta.name;
   document.getElementById('page-subtitle').value = state.page.subtitle || '';
   document.getElementById('page-gradient').value = state.page.cover_gradient || 'accent';
   document.getElementById('builder-published').checked = !!state.page.is_published;
 
+  if (targetType === 'manual') {
+    manualMeta = await api(`/manuals/${targetId}`).then(r => r.manual).catch(() => null);
+    await loadDirectionOptions(manualMeta?.direction_id || '');
+    updateManualStatusUi();
+  }
+
   renderPalette();
   renderCanvas();
   bindCanvasDelegation();
 }
+
+document.getElementById('page-manual-direction')?.addEventListener('change', async (e) => {
+  try {
+    const res = await api(`/manuals/${targetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ direction_id: e.target.value || null }),
+    });
+    manualMeta = res.manual;
+    showToast('Напрямок оновлено');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+document.getElementById('builder-submit-review-btn')?.addEventListener('click', submitForReview);
 
 document.getElementById('builder-palette').addEventListener('click', (e) => {
   const btn = e.target.closest('.palette-btn');
@@ -541,5 +631,5 @@ document.addEventListener('keydown', (e) => {
 
 load().catch((err) => {
   showToast(err.message || 'Помилка завантаження', 'error');
-  setTimeout(() => { location.href = '/admin.html'; }, 2000);
+  setTimeout(() => { location.href = fallbackHref; }, 2000);
 });

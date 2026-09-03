@@ -3,6 +3,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.
 import * as directionService from './direction.service.js';
 import * as groupService from './group.service.js';
 import * as programService from './program.service.js';
+import * as manualService from './manual.service.js';
 
 const BLOCK_TYPES = new Set([
   'heading', 'text', 'list', 'image', 'video', 'link', 'divider',
@@ -82,7 +83,16 @@ function getTargetMeta(targetType, targetId) {
     if (!p) throw new NotFoundError('Програму не знайдено');
     return { type: 'program', id: targetId, name: p.name, label: 'Програма' };
   }
+  if (targetType === 'manual') {
+    const m = manualService.getById(targetId);
+    if (!m) throw new NotFoundError('Мануал не знайдено');
+    return { type: 'manual', id: targetId, name: m.title, label: 'Мануал' };
+  }
   throw new ValidationError('Невірний тип контенту');
+}
+
+function isStaffRole(role) {
+  return role === 'owner' || role === 'developer' || role === 'teacher';
 }
 
 function assertCanEdit(targetType, targetId, actorId, actorRole) {
@@ -99,6 +109,13 @@ function assertCanEdit(targetType, targetId, actorId, actorRole) {
   if (targetType === 'program') {
     throw new ForbiddenError('Редагувати програми може лише адміністратор');
   }
+  if (targetType === 'manual') {
+    if (isStaffRole(actorRole)) return;
+    const manual = manualService.getById(targetId);
+    if (!manual) throw new NotFoundError('Мануал не знайдено');
+    if (manual.created_by !== actorId) throw new ForbiddenError('Ви можете редагувати лише власні мануали');
+    return;
+  }
   throw new ForbiddenError();
 }
 
@@ -106,6 +123,7 @@ function assertCanRead(targetType, targetId, userId, userRole) {
   if (userRole === 'owner' || userRole === 'developer') return;
   if (targetType === 'direction') return;
   if (targetType === 'program') return;
+  if (targetType === 'manual') return;
   if (targetType === 'group') {
     const member = db.prepare(`
       SELECT 1 FROM study_group_members WHERE group_id = ? AND user_id = ?
@@ -184,6 +202,10 @@ export function getPageForViewer(targetType, targetId, userId, userRole, { allow
     } else if (targetType === 'group') {
       const group = groupService.getGroupById(targetId);
       if (group?.teacher_id !== userId) throw new NotFoundError('Сторінку не опубліковано');
+    } else if (targetType === 'manual' && isStaffRole(userRole)) {
+      // ok — будь-який викладач/адмін може переглянути чернетку на модерації
+    } else if (targetType === 'manual' && manualService.getById(targetId)?.created_by === userId) {
+      // ok — автор переглядає власний чернетковий мануал
     } else {
       throw new NotFoundError('Сторінку не опубліковано');
     }
@@ -200,7 +222,13 @@ export function savePage(targetType, targetId, actorId, actorRole, payload) {
   const title = payload.title?.trim() || pageRow.title;
   const subtitle = payload.subtitle !== undefined ? (payload.subtitle?.trim() || null) : pageRow.subtitle;
   const coverGradient = payload.cover_gradient?.trim() || pageRow.cover_gradient || 'accent';
-  const isPublished = payload.is_published === true ? 1 : (payload.is_published === false ? 0 : pageRow.is_published);
+  // A self-service manual author can toggle everything about their draft
+  // except going live — publishing requires staff review, so any attempt
+  // to flip is_published from a non-staff editor is silently ignored.
+  const canPublish = targetType !== 'manual' || isStaffRole(actorRole);
+  const isPublished = canPublish
+    ? (payload.is_published === true ? 1 : (payload.is_published === false ? 0 : pageRow.is_published))
+    : pageRow.is_published;
 
   const sections = Array.isArray(payload.sections) ? payload.sections : [];
   if (!sections.length) throw new ValidationError('Додайте хоча б один розділ');
@@ -260,18 +288,32 @@ export function getContentStatus(targetType, targetId) {
 }
 
 export function listStudentGroupContent(userId) {
-  return db.prepare(`
-    SELECT g.id, g.name, g.color, cp.is_published, cp.updated_at
+  const rows = db.prepare(`
+    SELECT g.id, g.name, g.color, g.program_id, p.direction_id, d.name as direction_name,
+      cp.is_published, cp.updated_at
     FROM study_group_members gm
     JOIN study_groups g ON g.id = gm.group_id AND g.is_active = 1
+    LEFT JOIN programs p ON p.id = g.program_id
+    LEFT JOIN directions d ON d.id = p.direction_id
     LEFT JOIN content_pages cp ON cp.target_type = 'group' AND cp.target_id = g.id
     WHERE gm.user_id = ?
     ORDER BY g.name
-  `).all(userId).map(r => ({
+  `).all(userId);
+
+  const manualsByDirection = manualService.listPublishedForDirections(rows.map(r => r.direction_id));
+  const grouped = new Map();
+  for (const m of manualsByDirection) {
+    if (!grouped.has(m.direction_id)) grouped.set(m.direction_id, []);
+    grouped.get(m.direction_id).push({ id: m.id, slug: m.slug, title: m.title });
+  }
+
+  return rows.map(r => ({
     id: r.id,
     name: r.name,
     color: r.color,
     has_content: !!r.is_published,
     updated_at: r.updated_at,
+    direction_name: r.direction_name || null,
+    manuals: grouped.get(r.direction_id) || [],
   }));
 }

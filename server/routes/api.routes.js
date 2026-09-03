@@ -6,6 +6,7 @@ import { requireTab } from '../middleware/tab-access.js';
 import { uploadTaskSubmission } from '../middleware/upload.js';
 import * as apiCtrl from '../controllers/api.controller.js';
 import * as notificationCtrl from '../controllers/notification.controller.js';
+import * as contentCtrl from '../controllers/content.controller.js';
 
 const router = Router();
 
@@ -51,7 +52,18 @@ router.post('/articles', requireTab('dash.article'), asyncHandler(apiCtrl.create
 router.patch('/articles/:id', requireTab('dash.article'), asyncHandler(apiCtrl.updateArticle));
 router.post('/articles/:id/submit', requireTab('dash.article'), asyncHandler(apiCtrl.submitArticle));
 
+router.get('/manuals', asyncHandler(apiCtrl.listManuals));
+router.get('/manuals/mine', asyncHandler(apiCtrl.listMyManuals));
+router.post('/manuals', asyncHandler(apiCtrl.createManual));
+router.get('/manuals/:id(\\d+)', asyncHandler(apiCtrl.getManualForActor));
+router.patch('/manuals/:id(\\d+)', asyncHandler(apiCtrl.updateManual));
+router.delete('/manuals/:id(\\d+)', asyncHandler(apiCtrl.deleteManual));
+router.post('/manuals/:id(\\d+)/submit', asyncHandler(apiCtrl.submitManualForReview));
+router.get('/manuals/:slug', asyncHandler(apiCtrl.getManualBySlug));
+
 router.get('/content/:type/:id', asyncHandler(apiCtrl.getContentView));
+router.get('/content/:type/:id/editor', asyncHandler(contentCtrl.getContentEditor));
+router.put('/content/:type/:id', asyncHandler(contentCtrl.saveContent));
 
 router.get('/schedule', asyncHandler(apiCtrl.getStudentSchedule));
 router.post('/schedule/lessons/:lessonId/absence', asyncHandler(apiCtrl.reportAbsence));

@@ -673,6 +673,121 @@ export function runMigrations(db) {
     `);
     db.pragma('foreign_keys = ON');
   }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS manuals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      category TEXT,
+      sort_order INTEGER DEFAULT 0 NOT NULL,
+      created_by INTEGER,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_manuals_sort ON manuals(sort_order);
+  `);
+
+  // SQLite CHECK constraints can't be altered in place — same rebuild dance
+  // as the 'program' target_type addition above, this time adding 'manual'.
+  const contentPagesSql2 = db.prepare(`
+    SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'content_pages'
+  `).get()?.sql || '';
+  if (contentPagesSql2 && !contentPagesSql2.includes(`'manual'`)) {
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE content_pages_new2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        target_type TEXT NOT NULL CHECK(target_type IN ('direction','group','program','manual')),
+        target_id INTEGER NOT NULL,
+        title TEXT,
+        subtitle TEXT,
+        cover_gradient TEXT DEFAULT 'accent',
+        is_published INTEGER DEFAULT 0 NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+        updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+        UNIQUE(target_type, target_id)
+      );
+      INSERT INTO content_pages_new2 SELECT * FROM content_pages;
+      DROP TABLE content_pages;
+      ALTER TABLE content_pages_new2 RENAME TO content_pages;
+      CREATE INDEX IF NOT EXISTS idx_content_pages_target ON content_pages(target_type, target_id);
+    `);
+    db.pragma('foreign_keys = ON');
+  }
+
+  // Manuals: direction tag (so a manual auto-surfaces on groups of that
+  // direction) + review_status (self-service authors submit for staff
+  // review; is_published in content_pages remains the sole "live" gate).
+  const manualCols = db.prepare('PRAGMA table_info(manuals)').all().map(c => c.name);
+  if (!manualCols.includes('direction_id')) {
+    db.exec('ALTER TABLE manuals ADD COLUMN direction_id INTEGER REFERENCES directions(id) ON DELETE SET NULL');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_manuals_direction ON manuals(direction_id)');
+  }
+  if (!manualCols.includes('review_status')) {
+    db.exec(`ALTER TABLE manuals ADD COLUMN review_status TEXT DEFAULT 'draft' NOT NULL`);
+  }
+
+  // Directions: tag which ones are "programming" directions — gates the
+  // code-editor/sandbox feature to relevant groups only.
+  const directionCols = db.prepare('PRAGMA table_info(directions)').all().map(c => c.name);
+  if (!directionCols.includes('is_programming')) {
+    db.exec('ALTER TABLE directions ADD COLUMN is_programming INTEGER DEFAULT 0 NOT NULL');
+  }
+
+  // Users: freeze (block login/access without destroying data) as a safer
+  // alternative to hard delete.
+  const userColsFreeze = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userColsFreeze.includes('is_frozen')) {
+    db.exec('ALTER TABLE users ADD COLUMN is_frozen INTEGER DEFAULT 0 NOT NULL');
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS code_workspaces (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      group_id INTEGER,
+      name TEXT NOT NULL,
+      language TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (group_id) REFERENCES study_groups(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS code_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace_id INTEGER NOT NULL,
+      path TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (workspace_id) REFERENCES code_workspaces(id) ON DELETE CASCADE,
+      UNIQUE(workspace_id, path)
+    );
+
+    CREATE TABLE IF NOT EXISTS code_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace_id INTEGER NOT NULL,
+      mode TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running',
+      stdout TEXT,
+      stderr TEXT,
+      exit_code INTEGER,
+      target_url TEXT,
+      container_name TEXT,
+      host_port INTEGER,
+      work_dir TEXT,
+      started_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      finished_at TEXT,
+      FOREIGN KEY (workspace_id) REFERENCES code_workspaces(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_code_workspaces_user ON code_workspaces(user_id);
+    CREATE INDEX IF NOT EXISTS idx_code_files_workspace ON code_files(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_code_runs_workspace ON code_runs(workspace_id);
+  `);
 }
 
 function bootstrapCurrentMonthPayments(db) {

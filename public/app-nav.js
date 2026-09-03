@@ -8,6 +8,7 @@ const ADMIN_LINKS = [
   { href: '/portal.html', label: 'Головна', icon: 'home' },
   { href: '/admin.html', label: 'Панель', icon: 'grid', roles: ['teacher', 'owner', 'developer'] },
   { href: '/dashboard.html', label: 'Кабінет', icon: 'book', roles: ['teacher', 'owner', 'developer', 'student'] },
+  { href: '/manuals.html', label: 'Мануали', icon: 'notes' },
   { href: '/conferences.html', label: 'Конференції', icon: 'calendar' },
   { href: '/recordings.html', label: 'Записи', icon: 'video' },
   { href: '/groups-chat.html', label: 'Чати', icon: 'chat', roles: ['student', 'teacher', 'owner', 'developer'] },
@@ -16,6 +17,7 @@ const ADMIN_LINKS = [
 const STUDENT_LINKS = [
   { href: '/portal.html', label: 'Головна', icon: 'home' },
   { href: '/dashboard.html', label: 'Кабінет', icon: 'book' },
+  { href: '/manuals.html', label: 'Мануали', icon: 'notes' },
   { href: '/conferences.html', label: 'Конференції', icon: 'calendar' },
   { href: '/recordings.html', label: 'Записи', icon: 'video' },
   { href: '/groups-chat.html', label: 'Чати', icon: 'chat' },

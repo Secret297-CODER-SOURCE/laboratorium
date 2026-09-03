@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" type="image/png" sizes="256x256">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="icon" href="/favicon.png" type="image/png" id="site-favicon">
   <title>Особистий кабінет — laboratorium.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +14,9 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/dashboard.css">
   <link rel="stylesheet" href="/icons.css">
+  <link rel="stylesheet" href="/vendor/codemirror/lib/codemirror.css">
+  <link rel="stylesheet" href="/vendor/codemirror/theme/material-darker.css">
+  <link rel="stylesheet" href="/code-editor.css">
 </head>
 <body data-theme="flow">
   <div class="noise" aria-hidden="true"></div>
@@ -28,6 +34,7 @@
         <button type="button" class="dash-tab" data-tab="ctf">CTF</button>
         <button type="button" class="dash-tab" data-tab="tests" data-i18n="Тести">Тести</button>
         <button type="button" class="dash-tab" data-tab="lab" data-i18n="Лабораторія">Лабораторія</button>
+        <button type="button" class="dash-tab" data-tab="code" id="tab-code-btn" hidden data-i18n="Редактор коду">Редактор коду</button>
         <button type="button" class="dash-tab" data-tab="article" id="tab-article-btn" hidden data-i18n="Написати статтю">Написати статтю</button>
       </nav>
 
@@ -259,6 +266,18 @@
         </div>
       </div>
 
+      <div id="dash-panel-code" hidden>
+        <section class="dash-panel dash-panel--wide code-editor-panel">
+          <div class="panel-header">
+            <h2 data-i18n="Редактор коду">Редактор коду</h2>
+            <span class="panel-tag" id="code-sandbox-tag">—</span>
+          </div>
+          <div id="code-editor-root" class="code-editor-layout">
+            <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
+          </div>
+        </section>
+      </div>
+
       <div id="dash-panel-article" hidden>
         <section class="dash-panel dash-panel--wide">
           <div class="panel-header">
@@ -319,6 +338,16 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/codemirror/lib/codemirror.js"></script>
+  <script src="/vendor/codemirror/mode/python/python.js"></script>
+  <script src="/vendor/codemirror/mode/javascript/javascript.js"></script>
+  <script src="/vendor/codemirror/mode/clike/clike.js"></script>
+  <script src="/vendor/codemirror/mode/shell/shell.js"></script>
+  <script src="/vendor/codemirror/mode/xml/xml.js"></script>
+  <script src="/vendor/codemirror/mode/css/css.js"></script>
+  <script src="/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+  <script src="/vendor/codemirror/addon/edit/matchbrackets.js"></script>
+  <script src="/vendor/codemirror/addon/edit/closebrackets.js"></script>
   <script type="module" src="/dashboard.js"></script>
 </body>
 </html>

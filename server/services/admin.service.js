@@ -16,9 +16,9 @@ export function getPlatformStats() {
 
 export function listUsers(actorRole) {
   const users = db.prepare(`
-    SELECT id, email, name, handle, role, bounty_points, created_at
+    SELECT id, email, name, handle, role, bounty_points, is_frozen, created_at
     FROM users ORDER BY created_at DESC
-  `).all();
+  `).all().map(u => ({ ...u, is_frozen: !!u.is_frozen }));
   if (actorRole === 'owner') {
     return users.filter(u => u.role !== 'developer');
   }
@@ -72,6 +72,53 @@ export function updateUserRole(actorId, actorRole, userId, newRole) {
 
   db.prepare(`UPDATE users SET role = ?, updated_at = datetime('now') WHERE id = ?`).run(newRole, userId);
   return sanitizeUser(db.prepare('SELECT * FROM users WHERE id = ?').get(userId));
+}
+
+function assertCanTargetUser(actorId, actorRole, target) {
+  if (!target) throw new NotFoundError('Користувача не знайдено');
+  if (target.id === actorId) throw new ForbiddenError('Не можна застосувати цю дію до власного акаунта');
+  if (actorRole === 'owner' && target.role === 'developer') {
+    throw new ForbiddenError('Немає доступу до цього користувача');
+  }
+}
+
+export function setUserFrozen(actorId, actorRole, userId, frozen) {
+  const target = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  assertCanTargetUser(actorId, actorRole, target);
+
+  db.prepare(`UPDATE users SET is_frozen = ?, updated_at = datetime('now') WHERE id = ?`)
+    .run(frozen ? 1 : 0, userId);
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  // sanitizeUser() is a public-facing allowlist that doesn't carry is_frozen —
+  // this response is for the admin panel, so it needs to survive the sanitize.
+  return { ...sanitizeUser(updated), is_frozen: !!updated.is_frozen };
+}
+
+/**
+ * Hard delete. Cascades cleanly for a user's own data (enrollments, tasks,
+ * notifications, labs, ...) via ON DELETE CASCADE — but a teacher who still
+ * owns study_groups would silently cascade-delete those groups and their
+ * members too, so that case is blocked with a clear message instead of a
+ * surprise mass-delete. Freezing is the safer default for anyone with
+ * owned data; this is for genuinely empty/unused accounts.
+ */
+export function deleteUser(actorId, actorRole, userId) {
+  const target = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  assertCanTargetUser(actorId, actorRole, target);
+
+  if (target.role === 'owner' || target.role === 'developer') {
+    throw new ForbiddenError('Акаунти owner/developer можна лише заморозити, не видалити');
+  }
+
+  if (target.role === 'teacher') {
+    const groupCount = db.prepare('SELECT COUNT(*) as c FROM study_groups WHERE teacher_id = ?').get(userId).c;
+    if (groupCount > 0) {
+      throw new ValidationError(`Спочатку передайте або видаліть групи цього викладача (${groupCount})`);
+    }
+  }
+
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  return { ok: true };
 }
 
 export function listApplications(status) {

@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" type="image/png" sizes="256x256">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="icon" href="/favicon.png" type="image/png" id="site-favicon">
   <title>Конструктор — laboratorium.</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
@@ -26,10 +29,12 @@
       </div>
     </div>
     <div class="builder-topbar-actions">
-      <label class="builder-publish">
+      <span class="status-pill" id="builder-review-pill" hidden></span>
+      <label class="builder-publish" id="builder-publish-field">
         <input type="checkbox" id="builder-published">
         <span>Опубліковано</span>
       </label>
+      <button type="button" class="btn btn--outline btn--sm" id="builder-submit-review-btn" hidden>Надіслати на перевірку</button>
       <button type="button" class="btn btn--outline btn--sm" id="builder-preview-btn">Перегляд</button>
       <button type="button" class="btn btn--primary btn--sm" id="builder-save-btn" title="Ctrl+S">Зберегти</button>
     </div>
@@ -53,6 +58,9 @@
           <option value="blue">Синій</option>
           <option value="green">Зелений</option>
           <option value="orange">Помаранчевий</option>
+        </select>
+        <select class="builder-inp" id="page-manual-direction" hidden>
+          <option value="">Напрямок: не вибрано</option>
         </select>
       </div>
       <div class="builder-canvas" id="builder-canvas"></div>

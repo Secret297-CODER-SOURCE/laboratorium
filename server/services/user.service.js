@@ -112,6 +112,9 @@ export function login({ email, password }) {
   if (!user || !matches) {
     throw new UnauthorizedError('Невірний email або пароль');
   }
+  if (user.is_frozen) {
+    throw new UnauthorizedError('Акаунт заморожено. Зверніться до адміністрації.');
+  }
 
   return user;
 }

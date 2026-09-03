@@ -7,6 +7,7 @@ import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, dashTabAllowed, firstAllowedDashTab, setAllowedTabs } from '/tab-access.js';
 import { initI18n, t, getLocale } from '/i18n.js';
 import { showConfirm, showForm } from '/dialog.js';
+import { loadSandboxInfo, initCodeEditor } from '/code-editor.js';
 
 function dateLocale() {
   return { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' }[getLocale()] || 'uk-UA';
@@ -221,18 +222,22 @@ function renderDashboard(data) {
   if (activeDashTab === 'ctf') loadCtfPanel();
   if (activeDashTab === 'tests') loadQuizzesPanel();
   if (activeDashTab === 'lab') loadLabPanel();
+  if (activeDashTab === 'code') initCodeEditor();
 }
 
-const ALL_TABS = ['home', 'ctf', 'tests', 'lab', 'article'];
+const ALL_TABS = ['home', 'ctf', 'tests', 'lab', 'code', 'article'];
 
 function setupDashTabs(canWriteArticles) {
   const tabsEl = document.getElementById('dash-tabs');
   const articleBtn = document.getElementById('tab-article-btn');
+  const codeBtn = document.getElementById('tab-code-btn');
   const articleAllowed = canWriteArticles && dashTabAllowed('article');
+  const codeAllowed = canUseCode && dashTabAllowed('code');
 
   if (!ALL_TABS.includes(activeDashTab)) activeDashTab = 'home';
   if (!dashTabAllowed(activeDashTab)) activeDashTab = firstAllowedDashTab('home');
   if (activeDashTab === 'article' && !articleAllowed) activeDashTab = firstAllowedDashTab('home');
+  if (activeDashTab === 'code' && !codeAllowed) activeDashTab = firstAllowedDashTab('home');
 
   tabsEl.hidden = false;
   tabsEl.querySelectorAll('.dash-tab').forEach(tab => {
@@ -240,6 +245,8 @@ function setupDashTabs(canWriteArticles) {
     const allowed = dashTabAllowed(id);
     if (id === 'article') {
       tab.hidden = !articleAllowed;
+    } else if (id === 'code') {
+      tab.hidden = !codeAllowed;
     } else {
       tab.hidden = !allowed;
     }
@@ -247,11 +254,13 @@ function setupDashTabs(canWriteArticles) {
   });
 
   if (articleBtn) articleBtn.hidden = !articleAllowed;
+  if (codeBtn) codeBtn.hidden = !codeAllowed;
 
   document.getElementById('dash-panel-home').hidden = activeDashTab !== 'home';
   document.getElementById('dash-panel-ctf').hidden = activeDashTab !== 'ctf';
   document.getElementById('dash-panel-tests').hidden = activeDashTab !== 'tests';
   document.getElementById('dash-panel-lab').hidden = activeDashTab !== 'lab';
+  document.getElementById('dash-panel-code').hidden = activeDashTab !== 'code';
   document.getElementById('dash-panel-article').hidden = activeDashTab !== 'article';
 }
 
@@ -270,6 +279,7 @@ if (!window.__dashTabsBound) {
     if (activeDashTab === 'ctf') loadCtfPanel();
     if (activeDashTab === 'tests') loadQuizzesPanel();
     if (activeDashTab === 'lab') loadLabPanel();
+    if (activeDashTab === 'code') initCodeEditor();
   });
 }
 
@@ -533,18 +543,26 @@ function renderGroupContent(groups) {
   const el = document.getElementById('group-content-list');
   if (!panel || !el) return;
 
-  const withContent = groups.filter(g => g.has_content);
-  if (!withContent.length) {
+  const relevant = groups.filter(g => g.has_content || g.manuals?.length);
+  if (!relevant.length) {
     panel.hidden = true;
     return;
   }
 
   panel.hidden = false;
-  el.innerHTML = withContent.map(g => `
-    <a href="/content.html?type=group&id=${g.id}" class="group-content-card" style="--group-color:${g.color || 'var(--accent)'}">
-      <span class="group-content-name">${escapeHtml(g.name)}</span>
-      <span class="group-content-arrow">${icon('chevron-right', 'ico ico--sm')}</span>
-    </a>`).join('');
+  el.innerHTML = relevant.map(g => `
+    <div class="group-content-card group-content-card--stack" style="--group-color:${g.color || 'var(--accent)'}">
+      ${g.has_content ? `
+        <a href="/content.html?type=group&id=${g.id}" class="group-content-link">
+          <span class="group-content-name">${escapeHtml(g.name)}</span>
+          <span class="group-content-arrow">${icon('chevron-right', 'ico ico--sm')}</span>
+        </a>` : `<span class="group-content-name">${escapeHtml(g.name)}</span>`}
+      ${g.manuals?.length ? `
+        <div class="group-content-manuals">
+          <span class="group-content-manuals-label">${escapeHtml(g.direction_name || 'Мануали')}</span>
+          ${g.manuals.map(m => `<a href="/manual.html?slug=${encodeURIComponent(m.slug)}">${escapeHtml(m.title)}</a>`).join('')}
+        </div>` : ''}
+    </div>`).join('');
 }
 
 function renderChallenges(challenges) {
@@ -747,11 +765,16 @@ async function loadPrograms() {
       .join('');
 }
 
+let canUseCode = false;
+
 async function loadDashboard() {
   await loadTabAccess();
   refreshAppNav();
   const data = await api('/dashboard');
   setAllowedTabs(data.tabAccess);
+  try {
+    canUseCode = (await loadSandboxInfo()).canUse;
+  } catch { canUseCode = false; }
   renderDashboard(data);
   await loadPrograms();
 }

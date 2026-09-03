@@ -289,6 +289,19 @@
   padding: 24px;
 }
 
+.manuals-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.manual-filter.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
 .enroll-form {
   display: flex;
   gap: 8px;

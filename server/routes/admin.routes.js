@@ -18,6 +18,8 @@ router.get('/overview', asyncHandler(adminCtrl.getOverview));
 router.get('/users', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listUsers));
 router.post('/users', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createUser));
 router.patch('/users/:id/role', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateUserRole));
+router.patch('/users/:id/freeze', requireRole('owner', 'developer'), asyncHandler(adminCtrl.freezeUser));
+router.delete('/users/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteUser));
 router.post('/users/:id/send-reset', requireRole('owner', 'developer'), asyncHandler(adminCtrl.sendUserPasswordReset));
 router.post('/users/:id/send-password', requireRole('owner', 'developer'), asyncHandler(adminCtrl.sendUserNewPassword));
 
@@ -33,6 +35,12 @@ router.get('/programs', requireRole('owner', 'developer'), asyncHandler(adminCtr
 router.post('/programs', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createProgram));
 router.patch('/programs/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateProgram));
 router.delete('/programs/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteProgram));
+
+router.get('/manuals', asyncHandler(adminCtrl.listManuals));
+router.post('/manuals', asyncHandler(adminCtrl.createManual));
+router.patch('/manuals/:id', asyncHandler(adminCtrl.updateManual));
+router.delete('/manuals/:id', asyncHandler(adminCtrl.deleteManual));
+router.post('/manuals/:id/return', asyncHandler(adminCtrl.returnManualToDraft));
 
 router.get('/groups', asyncHandler(adminCtrl.listGroups));
 router.post('/groups', asyncHandler(adminCtrl.createGroup));
@@ -129,8 +137,6 @@ router.post('/billing/users/:userId/payments', requireRole('owner', 'developer')
 router.patch('/billing/users/:userId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateBillingUser));
 router.delete('/billing/payments/:paymentId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteBillingPayment));
 
-router.get('/content/:type/:id', asyncHandler(contentCtrl.getContentEditor));
-router.put('/content/:type/:id', asyncHandler(contentCtrl.saveContent));
 router.get('/content/:type/:id/status', asyncHandler(contentCtrl.getContentStatus));
 
 export default router;

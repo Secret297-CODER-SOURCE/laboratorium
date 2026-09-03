@@ -10,7 +10,7 @@ function slugify(text) {
 
 function mapDirection(row) {
   if (!row) return null;
-  return { ...row, is_active: !!row.is_active };
+  return { ...row, is_active: !!row.is_active, is_programming: !!row.is_programming };
 }
 
 export function getAllActive() {
@@ -63,11 +63,12 @@ export function create(data) {
   }
 
   const result = db.prepare(`
-    INSERT INTO directions (slug, name, description, icon, sort_order, is_active)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO directions (slug, name, description, icon, sort_order, is_active, is_programming)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     slug, name, data.description?.trim() || null, data.icon?.trim() || null,
     parseInt(data.sort_order, 10) || 0, data.is_active === false ? 0 : 1,
+    data.is_programming === true ? 1 : 0,
   );
 
   return getById(result.lastInsertRowid);
@@ -86,7 +87,7 @@ export function update(id, data) {
 
   db.prepare(`
     UPDATE directions SET slug = ?, name = ?, description = ?, icon = ?,
-      sort_order = ?, is_active = ?, updated_at = datetime('now')
+      sort_order = ?, is_active = ?, is_programming = ?, updated_at = datetime('now')
     WHERE id = ?
   `).run(
     slug, name,
@@ -94,6 +95,7 @@ export function update(id, data) {
     data.icon !== undefined ? (data.icon?.trim() || null) : existing.icon,
     data.sort_order !== undefined ? (parseInt(data.sort_order, 10) || 0) : existing.sort_order,
     data.is_active === false ? 0 : (data.is_active === true ? 1 : (existing.is_active ? 1 : 0)),
+    data.is_programming === false ? 0 : (data.is_programming === true ? 1 : (existing.is_programming ? 1 : 0)),
     id,
   );
 

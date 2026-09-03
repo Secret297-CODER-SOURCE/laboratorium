@@ -7,6 +7,7 @@ export function renderOwnerTabs(active = 'overview') {
     { id: 'overview', label: 'Огляд', icon: 'grid' },
     { id: 'directions', label: 'Напрямки', icon: 'book' },
     { id: 'programs', label: 'Програми', icon: 'notes' },
+    { id: 'manuals', label: 'Мануали', icon: 'list' },
     { id: 'ctf', label: 'CTF', icon: 'shield' },
     { id: 'users', label: 'Користувачі', icon: 'users' },
     { id: 'billing', label: 'Оплата', icon: 'chart' },
@@ -30,19 +31,20 @@ export function renderDirectionsPanel(directions) {
       <button type="button" class="btn btn--outline btn--sm" id="add-direction-btn">${icon('plus', 'ico ico--sm')}Додати</button>
     </div>
     <table class="admin-table">
-      <thead><tr><th>Назва</th><th>Slug</th><th>Порядок</th><th>Активний</th><th></th></tr></thead>
+      <thead><tr><th>Назва</th><th>Slug</th><th>Порядок</th><th>Активний</th><th title="Показує вкладку «Редактор коду» учням груп цього напрямку">Програмування</th><th></th></tr></thead>
       <tbody>${(directions || []).map(d => `
         <tr data-direction-id="${d.id}">
           <td><input class="admin-inp" data-field="name" value="${esc(d.name)}"></td>
           <td><input class="admin-inp admin-inp--sm" data-field="slug" value="${esc(d.slug)}"></td>
           <td><input class="admin-inp admin-inp--xs" type="number" data-field="sort_order" value="${d.sort_order}"></td>
           <td><input type="checkbox" data-field="is_active" ${d.is_active ? 'checked' : ''}></td>
+          <td><input type="checkbox" data-field="is_programming" ${d.is_programming ? 'checked' : ''}></td>
           <td>
             <a href="/content-builder.html?type=direction&id=${d.id}" class="btn btn--outline btn--sm" title="Конструктор">${icon('edit', 'ico ico--sm')}</a>
             <button class="btn btn--ghost btn--sm dir-save" data-id="${d.id}">${icon('check', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm dir-del" data-id="${d.id}">${icon('trash', 'ico ico--sm')}</button>
           </td>
-        </tr>`).join('') || '<tr><td colspan="5" class="empty-state">Немає напрямків</td></tr>'}
+        </tr>`).join('') || '<tr><td colspan="6" class="empty-state">Немає напрямків</td></tr>'}
       </tbody>
     </table>
   </section>`;
@@ -100,8 +102,8 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
     <table class="admin-table">
       <thead><tr><th>Handle</th><th>Ім'я</th><th>Email</th><th>Роль</th><th>Дії</th></tr></thead>
       <tbody>${(users || []).map(u => `
-        <tr data-search="${esc(`${u.handle} ${u.name} ${u.email}`.toLowerCase())}">
-          <td>@${u.handle}</td>
+        <tr data-search="${esc(`${u.handle} ${u.name} ${u.email}`.toLowerCase())}"${u.is_frozen ? ' style="opacity:0.55"' : ''}>
+          <td>@${u.handle}${u.is_frozen ? ` <span class="status-pill error" style="margin-left:4px">заморожено</span>` : ''}</td>
           <td>${esc(u.name)}</td>
           <td>${esc(u.email)}</td>
           <td>
@@ -112,6 +114,8 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
           <td class="admin-actions">
             <button class="btn btn--ghost btn--sm user-send-reset" data-id="${u.id}" title="Посилання скидання">${icon('notes', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm user-send-pwd" data-id="${u.id}" title="Новий пароль на email">${icon('shield', 'ico ico--sm')}</button>
+            <button class="btn btn--ghost btn--sm user-freeze" data-id="${u.id}" data-frozen="${u.is_frozen ? '1' : '0'}" title="${u.is_frozen ? 'Розморозити' : 'Заморозити'}">${icon(u.is_frozen ? 'play' : 'lock', 'ico ico--sm')}</button>
+            <button class="btn btn--ghost btn--sm user-delete" data-id="${u.id}" title="Видалити">${icon('trash', 'ico ico--sm')}</button>
           </td>
         </tr>`).join('')}
       </tbody>
@@ -539,6 +543,29 @@ export function bindOwnerPanelEvents(showToast, reload) {
         } else {
           await showCopyDialog(mailFailMessage('Email НЕ надіслано. Скопіюйте новий пароль і передайте учню вручну.', res.mailReason), res.password, { title: 'Новий пароль' });
         }
+      } catch (err) { showToast(err.message, 'error'); }
+    });
+  });
+
+  document.querySelectorAll('.user-freeze').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const nextFrozen = btn.dataset.frozen !== '1';
+      if (nextFrozen && !(await showConfirm('Заморозити акаунт? Користувач не зможе увійти, дані збережуться.', { danger: true }))) return;
+      try {
+        const res = await api(`/admin/users/${btn.dataset.id}/freeze`, { method: 'PATCH', body: JSON.stringify({ frozen: nextFrozen }) });
+        showToast(res.message);
+        reload();
+      } catch (err) { showToast(err.message, 'error'); }
+    });
+  });
+
+  document.querySelectorAll('.user-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!(await showConfirm('Видалити користувача остаточно? Усі його дані (прогрес, здачі, машини) буде втрачено. Це не можна скасувати.', { danger: true, confirmText: 'Видалити' }))) return;
+      try {
+        const res = await api(`/admin/users/${btn.dataset.id}`, { method: 'DELETE' });
+        showToast(res.message);
+        reload();
       } catch (err) { showToast(err.message, 'error'); }
     });
   });

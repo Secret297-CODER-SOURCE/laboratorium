@@ -10,6 +10,7 @@ import * as settingsService from '../services/settings.service.js';
 import * as tabAccessService from '../services/tab-access.service.js';
 import * as paymentService from '../services/payment.service.js';
 import * as labService from '../services/lab.service.js';
+import * as manualService from '../services/manual.service.js';
 import * as notificationService from '../services/notification.service.js';
 import * as mailService from '../services/mail.service.js';
 import { addBounty } from '../services/bounty.service.js';
@@ -68,6 +69,21 @@ export async function updateUserRole(req, res) {
   res.json({ user });
 }
 
+export async function freezeUser(req, res) {
+  const user = adminService.setUserFrozen(
+    req.user.id,
+    req.user.role,
+    parseInt(req.params.id, 10),
+    req.body.frozen !== false,
+  );
+  res.json({ user, message: user.is_frozen ? 'Акаунт заморожено' : 'Акаунт розморожено' });
+}
+
+export async function deleteUser(req, res) {
+  const result = adminService.deleteUser(req.user.id, req.user.role, parseInt(req.params.id, 10));
+  res.json({ ...result, message: 'Користувача видалено' });
+}
+
 export async function sendUserPasswordReset(req, res) {
   const result = await passwordService.adminSendPasswordReset(parseInt(req.params.id, 10));
   res.json(result);
@@ -106,6 +122,29 @@ export async function updateDirection(req, res) {
 
 export async function deleteDirection(req, res) {
   res.json(await directionService.remove(parseInt(req.params.id, 10)));
+}
+
+export async function listManuals(req, res) {
+  res.json({ manuals: manualService.listAdmin() });
+}
+
+export async function createManual(req, res) {
+  res.status(201).json({ manual: manualService.create(req.user.id, req.body) });
+}
+
+export async function updateManual(req, res) {
+  const manual = manualService.update(req.user.id, req.user.role, parseInt(req.params.id, 10), req.body);
+  res.json({ manual });
+}
+
+export async function deleteManual(req, res) {
+  const result = manualService.remove(req.user.id, req.user.role, parseInt(req.params.id, 10));
+  res.json(result);
+}
+
+export async function returnManualToDraft(req, res) {
+  const manual = manualService.returnToDraft(req.user.id, req.user.role, parseInt(req.params.id, 10));
+  res.json({ manual, message: 'Мануал повернено автору на доопрацювання' });
 }
 
 export async function listPrograms(req, res) {
