@@ -236,6 +236,7 @@ function smtpEnvDefaults() {
     user: config.smtp.user || '',
     pass: config.smtp.pass || '',
     from: config.smtp.from || 'noreply@laboratorium.club',
+    insecureTls: false,
   };
 }
 
@@ -260,6 +261,7 @@ export function getSmtpConfig() {
     user: (src.user || '').trim(),
     pass: src.pass || '',
     from: (src.from || '').trim() || 'noreply@laboratorium.club',
+    insecureTls: !!src.insecureTls,
   };
 }
 
@@ -272,6 +274,7 @@ export function getSmtpSettingsPublic() {
     user: cfg.user,
     from: cfg.from,
     hasPassword: !!cfg.pass,
+    insecureTls: cfg.insecureTls,
     configured: !!cfg.host,
   };
 }
@@ -284,6 +287,7 @@ export function saveSmtpSettings(data) {
   const port = data.port !== undefined ? (parseInt(data.port, 10) || 587) : merged.port;
   const secure = data.secure !== undefined ? !!data.secure : (port === 465 ? true : merged.secure);
   const pass = data.pass?.trim() ? data.pass.trim() : merged.pass;
+  const insecureTls = data.insecureTls !== undefined ? !!data.insecureTls : merged.insecureTls;
 
   if (host && user && !pass) {
     throw new ValidationError('Вкажіть пароль SMTP');
@@ -296,6 +300,7 @@ export function saveSmtpSettings(data) {
     user: user || '',
     pass: pass || '',
     from,
+    insecureTls,
     updatedBy: 'owner',
   };
 

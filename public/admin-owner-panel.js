@@ -145,6 +145,13 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
         <input type="checkbox" id="smtp-secure" ${smtp.secure ? 'checked' : ''}>
         SSL (порт 465)
       </label>
+      <label class="admin-check">
+        <input type="checkbox" id="smtp-insecure-tls" ${smtp.insecureTls ? 'checked' : ''}>
+        Не перевіряти TLS-сертифікат
+      </label>
+      <p class="empty-state" style="padding:0;text-align:left;grid-column:1/-1;font-size:0.72rem">
+        Увімкніть, якщо власний поштовий сервер налаштовано по внутрішній IP-адресі (наприклад Docker gateway) — сертифікат випущено на домен, а не на IP, і без цього SMTP видаватиме помилку "Hostname/IP does not match certificate's altnames".
+      </p>
       <div class="admin-form-actions">
         <button type="submit" class="btn btn--primary btn--sm">${icon('check', 'ico ico--sm')}Зберегти SMTP</button>
         <button type="button" class="btn btn--outline btn--sm" id="smtp-test-btn">${icon('send', 'ico ico--sm')}Надіслати тест</button>
@@ -545,6 +552,7 @@ export function bindOwnerPanelEvents(showToast, reload) {
           pass: document.getElementById('smtp-pass').value,
           from: document.getElementById('smtp-from').value,
           secure: document.getElementById('smtp-secure').checked,
+          insecureTls: document.getElementById('smtp-insecure-tls').checked,
         }),
       });
       showToast(res.message || 'Збережено');

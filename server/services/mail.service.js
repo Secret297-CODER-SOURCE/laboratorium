@@ -6,7 +6,7 @@ let transporter = null;
 let transporterKey = '';
 
 function transportFingerprint(c) {
-  return `${c.host}|${c.port}|${c.secure}|${c.user}|${c.pass}|${c.from}`;
+  return `${c.host}|${c.port}|${c.secure}|${c.user}|${c.pass}|${c.from}|${c.insecureTls}`;
 }
 
 function getTransporter() {
@@ -24,6 +24,11 @@ function getTransporter() {
     port: c.port,
     secure: c.secure || c.port === 465,
     auth: c.user ? { user: c.user, pass: c.pass } : undefined,
+    // Self-hosted mail servers reached via a raw internal IP (e.g. the Docker
+    // bridge gateway) will never match a cert issued for the real hostname —
+    // that's a benign mismatch on a private network, not a MITM risk, so this
+    // opt-in flag skips hostname/chain verification instead of failing every send.
+    tls: c.insecureTls ? { rejectUnauthorized: false } : undefined,
   });
   transporterKey = key;
   return transporter;
