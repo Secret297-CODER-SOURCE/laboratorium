@@ -12,8 +12,7 @@ const ROLES = [
 ];
 
 export function renderAccessPanel(data = {}) {
-  const { rules = [], tabs = [] } = data;
-  const groups = [...new Set(tabs.map(t => t.group))];
+  const { rules = [], tabs = [], directions = [] } = data;
 
   return `<section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
@@ -21,11 +20,12 @@ export function renderAccessPanel(data = {}) {
       <button type="button" class="btn btn--outline btn--sm" id="access-add-rule">${icon('plus', 'ico ico--sm')}Додати правило</button>
     </div>
     <p class="empty-state" style="padding:0 0 16px;text-align:left">
-      Приховує вкладки та кнопки в кабінеті/порталі для обраних ролей або користувачів. API-доступ до цих розділів також блокується.
+      Приховує вкладки, кнопки та напрямки в кабінеті/порталі для обраних ролей або користувачів. API-доступ до цих розділів також блокується.
+      Приховування напрямку тут діє лише для нового запису (кому саме недоступний вибір) — щоб закрити напрямок геть для всіх, вимкніть «Активний» у вкладці «Напрямки»; існуючі групи й мануали цього напрямку в обох випадках продовжують працювати як раніше.
       Власник і розробник завжди мають повний доступ.
     </p>
     <div id="access-rules-list" class="access-rules-list">
-      ${rules.length ? rules.map((r, idx) => renderRuleCard(r, tabs, idx)).join('') : '<p class="empty-state">Правил поки немає — усі вкладки доступні</p>'}
+      ${rules.length ? rules.map((r, idx) => renderRuleCard(r, tabs, directions, idx)).join('') : '<p class="empty-state">Правил поки немає — усі вкладки доступні</p>'}
     </div>
     <div class="admin-form-actions">
       <button type="button" class="btn btn--primary btn--sm" id="access-save-btn">${icon('check', 'ico ico--sm')}Зберегти правила</button>
@@ -33,7 +33,7 @@ export function renderAccessPanel(data = {}) {
   </section>`;
 }
 
-function renderRuleCard(rule, tabs, idx) {
+function renderRuleCard(rule, tabs, directions, idx) {
   const groups = [...new Set(tabs.map(t => t.group))];
   return `<article class="access-rule-card" data-rule-idx="${idx}">
     <div class="access-rule-head">
@@ -61,6 +61,15 @@ function renderRuleCard(rule, tabs, idx) {
           `).join('')}
         </div>
       </div>`).join('')}
+    ${directions.length ? `
+      <div class="access-tab-group">
+        <span class="access-label" title="Забороняє запис на програми цього напрямку для обраних ролей/користувачів. Уже записані учні й існуючі групи не постраждають.">Напрямки — приховати запис</span>
+        <div class="access-checks access-checks--tabs">
+          ${directions.map(d => `
+            <label class="admin-check"><input type="checkbox" data-field="deny" value="direction:${d.id}" ${rule.deny?.includes(`direction:${d.id}`) ? 'checked' : ''}> ${esc(d.name)}${d.is_active ? '' : ' (неактивний)'}</label>
+          `).join('')}
+        </div>
+      </div>` : ''}
   </article>`;
 }
 
@@ -102,7 +111,7 @@ export function bindAccessPanelEvents(showToast, reload) {
     const data = await loadAccessAdminData();
     const rules = collectRules();
     rules.push({ id: `rule-${rules.length + 1}`, name: `Правило ${rules.length + 1}`, roles: ['student'], userIds: [], deny: [] });
-    document.getElementById('access-rules-list').innerHTML = rules.map((r, idx) => renderRuleCard(r, data.tabs, idx)).join('');
+    document.getElementById('access-rules-list').innerHTML = rules.map((r, idx) => renderRuleCard(r, data.tabs, data.directions, idx)).join('');
     bindAccessPanelEvents(showToast, reload);
   });
 
@@ -112,7 +121,7 @@ export function bindAccessPanelEvents(showToast, reload) {
       const rules = collectRules();
       rules.splice(parseInt(btn.dataset.idx, 10), 1);
       document.getElementById('access-rules-list').innerHTML = rules.length
-        ? rules.map((r, idx) => renderRuleCard(r, data.tabs, idx)).join('')
+        ? rules.map((r, idx) => renderRuleCard(r, data.tabs, data.directions, idx)).join('')
         : '<p class="empty-state">Правил поки немає — усі вкладки доступні</p>';
       bindAccessPanelEvents(showToast, reload);
     });

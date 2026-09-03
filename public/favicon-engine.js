@@ -1,10 +1,18 @@
 const SIZE = 128;
 const EMBLEM_SCALE = 1.28;
 const CENTER = 20;
+// Browsers throttle/ignore favicon <link href> swaps that happen too often,
+// especially for data: URIs — repainting on every requestAnimationFrame
+// (~60/s) mostly gets silently dropped, which is why the tab icon looked
+// static instead of following the site's color cycle. ~8 updates/s is
+// still visually smooth for a slow multi-second color drift, and is a rate
+// browsers reliably pick up.
+const MIN_UPDATE_INTERVAL_MS = 120;
 let canvas;
 let ctx;
 let faviconLink;
 let lastDataUrl = '';
+let lastUpdateAt = -Infinity;
 
 const FACES = [
   [[20, 4], [35, 12], [35, 28], [20, 36], [5, 28], [5, 12]],
@@ -30,7 +38,7 @@ function rgba(color, alpha) {
 }
 
 function ensureFaviconLink() {
-  if (faviconLink) return faviconLink;
+  if (faviconLink && faviconLink.isConnected) return faviconLink;
   faviconLink = document.querySelector('link#site-favicon')
     || document.querySelector('link[rel="icon"]');
   if (!faviconLink) {
@@ -41,6 +49,23 @@ function ensureFaviconLink() {
     document.head.appendChild(faviconLink);
   }
   return faviconLink;
+}
+
+/**
+ * Swaps in a fresh <link> node instead of mutating .href on the existing
+ * one. Some browsers (Chrome in particular) only re-check the favicon when
+ * a new link element is inserted — repeatedly changing .href on the same
+ * node is exactly the update pattern that gets silently dropped.
+ */
+function swapFaviconHref(dataUrl) {
+  const old = ensureFaviconLink();
+  const next = document.createElement('link');
+  next.id = 'site-favicon';
+  next.rel = 'icon';
+  next.type = 'image/png';
+  next.href = dataUrl;
+  old.replaceWith(next);
+  faviconLink = next;
 }
 
 function ensureCanvas() {
@@ -77,8 +102,10 @@ function strokeLine(a, b, color, width, alpha) {
  * @param {number} flow — lerpT 0..1, синхронно з переливом емблеми
  */
 export function renderFavicon(accent, accentDim, flow = 0) {
+  const now = performance.now();
+  if (now - lastUpdateAt < MIN_UPDATE_INTERVAL_MS) return;
+
   ensureCanvas();
-  const link = ensureFaviconLink();
   const eased = 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, flow)));
   const px = SIZE / 40;
   const half = SIZE / 2;
@@ -111,8 +138,8 @@ export function renderFavicon(accent, accentDim, flow = 0) {
   const dataUrl = canvas.toDataURL('image/png');
   if (dataUrl === lastDataUrl) return;
   lastDataUrl = dataUrl;
-  link.type = 'image/png';
-  link.href = dataUrl;
+  lastUpdateAt = now;
+  swapFaviconHref(dataUrl);
 }
 
 export function initFavicon() {

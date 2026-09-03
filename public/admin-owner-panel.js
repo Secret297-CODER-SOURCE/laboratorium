@@ -31,7 +31,7 @@ export function renderDirectionsPanel(directions) {
       <button type="button" class="btn btn--outline btn--sm" id="add-direction-btn">${icon('plus', 'ico ico--sm')}Додати</button>
     </div>
     <table class="admin-table">
-      <thead><tr><th>Назва</th><th>Slug</th><th>Порядок</th><th>Активний</th><th title="Показує вкладку «Редактор коду» учням груп цього напрямку">Програмування</th><th></th></tr></thead>
+      <thead><tr><th>Назва</th><th>Slug</th><th>Порядок</th><th title="Ховає напрямок з головної сторінки та із запису на нові програми для всіх. Існуючі групи, записи учнів і мануали цього напрямку продовжують працювати — нічого не видаляється.">Активний</th><th title="Показує вкладку «Редактор коду» учням груп цього напрямку">Програмування</th><th></th></tr></thead>
       <tbody>${(directions || []).map(d => `
         <tr data-direction-id="${d.id}">
           <td><input class="admin-inp" data-field="name" value="${esc(d.name)}"></td>

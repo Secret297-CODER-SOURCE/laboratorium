@@ -31,8 +31,18 @@ export async function health(_req, res) {
   });
 }
 
-export async function getPrograms(_req, res) {
-  res.json({ programs: programService.getAll() });
+const STAFF_ROLES = new Set(['owner', 'developer', 'teacher']);
+
+export async function getPrograms(req, res) {
+  // Staff (teacher/owner/developer) manage groups against the full list —
+  // filtering it by direction status would make a group tied to a since-
+  // closed direction look broken in their own dropdowns even though the
+  // group itself keeps working fine. Students only see what's newly
+  // enrollable.
+  const programs = STAFF_ROLES.has(req.user.role)
+    ? programService.getAll()
+    : programService.getAvailableForEnrollment(req.user);
+  res.json({ programs });
 }
 
 export async function getDirections(_req, res) {
@@ -197,7 +207,7 @@ export async function getDashboard(req, res) {
 }
 
 export async function enroll(req, res) {
-  const result = programService.enroll(req.user.id, req.body.programId);
+  const result = programService.enroll(req.user.id, req.body.programId, req.user);
   if (result.error === 'not_found') throw new NotFoundError('Програму не знайдено');
   if (result.error === 'conflict') throw new ConflictError('Ви вже записані на цю програму');
 

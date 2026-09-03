@@ -4,7 +4,7 @@ x-app-env: &app-env
   HOST: 0.0.0.0
   APP_URL: ${APP_URL:-https://laboratorium.club}
   SITE_URL: ${SITE_URL:-https://laboratorium.club}
-  CONTACT_EMAIL: ${CONTACT_EMAIL:-hello@laboratorium.club}
+  CONTACT_EMAIL: ${CONTACT_EMAIL:-admin@laboratorium.club}
   JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
   JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
   DATABASE_PATH: /app/data/laboratorium.db

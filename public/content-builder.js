@@ -532,9 +532,12 @@ async function loadDirectionOptions(selectedId) {
   const select = document.getElementById('page-manual-direction');
   select.hidden = false;
   try {
-    const { directions } = await api('/directions');
+    // Staff can see/manage a manual already tagged to a since-closed
+    // direction (full list); self-service authors only get active ones —
+    // matches the public directions endpoint they're allowed to hit.
+    const { directions } = await api(isStaff ? '/admin/directions' : '/directions');
     select.innerHTML = '<option value="">Напрямок: не вибрано</option>'
-      + directions.map(d => `<option value="${d.id}" ${String(d.id) === String(selectedId) ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
+      + directions.map(d => `<option value="${d.id}" ${String(d.id) === String(selectedId) ? 'selected' : ''}>${esc(d.name)}${d.is_active === false ? ' (неактивний)' : ''}</option>`).join('');
   } catch { /* directions optional */ }
 }
 

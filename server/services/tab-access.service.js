@@ -1,5 +1,6 @@
 import db from '../db/index.js';
 import { ForbiddenError, ValidationError } from '../utils/errors.js';
+import * as directionService from './direction.service.js';
 
 const SETTINGS_KEY = 'tab_access';
 
@@ -35,12 +36,23 @@ function loadRaw() {
   }
 }
 
-function normalizeRule(rule, idx) {
+/** `direction:<id>` deny keys are dynamic (directions are admin-created data,
+ * not a fixed list like TAB_DEFINITIONS) — valid as long as the id refers to
+ * a direction that still exists. A direction later marked inactive keeps
+ * its existing deny rules valid (an admin re-activating it shouldn't have
+ * silently lost the rule), it just becomes redundant with the is_active flag. */
+function isValidDenyKey(key, directionIds) {
+  if (ALL_KEYS.includes(key)) return true;
+  const m = /^direction:(\d+)$/.exec(key);
+  return !!m && directionIds.has(Number(m[1]));
+}
+
+function normalizeRule(rule, idx, directionIds) {
   const roles = Array.isArray(rule.roles) ? rule.roles.filter(r => typeof r === 'string') : [];
   const userIds = Array.isArray(rule.userIds)
     ? rule.userIds.map(id => parseInt(id, 10)).filter(Number.isFinite)
     : [];
-  const deny = Array.isArray(rule.deny) ? rule.deny.filter(k => ALL_KEYS.includes(k)) : [];
+  const deny = Array.isArray(rule.deny) ? rule.deny.filter(k => isValidDenyKey(k, directionIds)) : [];
   return {
     id: rule.id || `rule-${idx + 1}`,
     name: String(rule.name || `Правило ${idx + 1}`).trim(),
@@ -50,17 +62,27 @@ function normalizeRule(rule, idx) {
   };
 }
 
+function currentDirectionIds() {
+  return new Set(directionService.getAll().map(d => d.id));
+}
+
 export function getTabAccessSettings() {
   const data = loadRaw();
+  const directionIds = currentDirectionIds();
   return {
-    rules: data.rules.map(normalizeRule),
+    rules: data.rules.map((r, idx) => normalizeRule(r, idx, directionIds)),
     tabs: TAB_DEFINITIONS,
+    // Full list (incl. inactive) so an existing rule tied to a closed
+    // direction stays visible/manageable in the admin UI instead of
+    // silently disappearing.
+    directions: directionService.getAll(),
   };
 }
 
 export function saveTabAccessSettings({ rules }) {
   if (!Array.isArray(rules)) throw new ValidationError('rules має бути масивом');
-  const normalized = rules.map(normalizeRule);
+  const directionIds = currentDirectionIds();
+  const normalized = rules.map((r, idx) => normalizeRule(r, idx, directionIds));
   const payload = JSON.stringify({ rules: normalized });
   db.prepare(`
     INSERT INTO platform_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
@@ -78,8 +100,9 @@ function userMatchesRule(user, rule) {
 
 export function getDeniedTabs(user) {
   if (!user || BYPASS_ROLES.has(user.role)) return new Set();
+  const directionIds = currentDirectionIds();
   const denied = new Set();
-  for (const rule of loadRaw().rules.map(normalizeRule)) {
+  for (const rule of loadRaw().rules.map((r, idx) => normalizeRule(r, idx, directionIds))) {
     if (!userMatchesRule(user, rule)) continue;
     for (const key of rule.deny) denied.add(key);
   }
@@ -95,6 +118,13 @@ export function isTabAllowed(user, tabKey) {
 export function getAllowedTabs(user) {
   const denied = getDeniedTabs(user);
   return ALL_KEYS.filter(k => !denied.has(k));
+}
+
+/** Directions denied for this user via a role/user-scoped access rule — on
+ * top of (not instead of) the direction's own global is_active flag. */
+export function isDirectionAllowed(user, directionId) {
+  if (!directionId) return true;
+  return isTabAllowed(user, `direction:${directionId}`);
 }
 
 export function assertTabAccess(user, tabKey) {

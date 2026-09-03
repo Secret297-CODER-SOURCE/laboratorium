@@ -26,7 +26,7 @@ router.post('/users/:id/send-password', requireRole('owner', 'developer'), async
 router.get('/applications', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listApplications));
 router.patch('/applications/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateApplication));
 
-router.get('/directions', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listDirections));
+router.get('/directions', asyncHandler(adminCtrl.listDirections));
 router.post('/directions', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createDirection));
 router.patch('/directions/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateDirection));
 router.delete('/directions/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteDirection));

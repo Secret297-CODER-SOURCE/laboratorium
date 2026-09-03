@@ -86,7 +86,7 @@ export const config = {
 
   appUrl: env('APP_URL', 'https://laboratorium.club'),
   siteUrl: env('SITE_URL', 'https://laboratorium.club'),
-  contactEmail: env('CONTACT_EMAIL', 'hello@laboratorium.club'),
+  contactEmail: env('CONTACT_EMAIL', 'admin@laboratorium.club'),
 
   auth: {
     allowPublicRegistration: envBool('ALLOW_PUBLIC_REGISTRATION', false),
@@ -161,7 +161,7 @@ export const config = {
     // first boot and persists it in platform_settings so it survives restarts.
     publicKey: env('VAPID_PUBLIC_KEY', ''),
     privateKey: env('VAPID_PRIVATE_KEY', ''),
-    subject: env('VAPID_SUBJECT', `mailto:${env('CONTACT_EMAIL', 'hello@laboratorium.club')}`),
+    subject: env('VAPID_SUBJECT', `mailto:${env('CONTACT_EMAIL', 'admin@laboratorium.club')}`),
   },
 
   staticVersion: env('STATIC_VERSION', readPackageVersion()),

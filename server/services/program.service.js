@@ -1,5 +1,7 @@
 import db from '../db/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
+import * as directionService from './direction.service.js';
+import * as tabAccessService from './tab-access.service.js';
 
 function slugify(text) {
   return text.toLowerCase()
@@ -41,6 +43,23 @@ export function getById(id) {
   return mapProgram(db.prepare('SELECT * FROM programs WHERE id = ?').get(id));
 }
 
+/**
+ * Programs a student may newly discover/enroll in: excludes programs under
+ * a closed direction (direction.is_active = 0) or one denied for this user
+ * via a tab-access rule. Deliberately NOT used for already-enrolled
+ * students (getEnrollments) or for teacher/owner group management (getAll)
+ * — closing a direction must stop *new* engagement without touching
+ * existing enrollments or groups already tied to it.
+ */
+export function getAvailableForEnrollment(user) {
+  return getAll().filter((p) => {
+    if (!p.direction_id) return true;
+    const direction = directionService.getById(p.direction_id);
+    if (direction && !direction.is_active) return false;
+    return tabAccessService.isDirectionAllowed(user, p.direction_id);
+  });
+}
+
 export function getEnrollments(userId) {
   return db.prepare(`
     SELECT e.*, p.name as program_name, p.slug, p.level, p.duration, p.bounty_reward
@@ -51,9 +70,14 @@ export function getEnrollments(userId) {
   `).all(userId);
 }
 
-export function enroll(userId, programId) {
+export function enroll(userId, programId, user) {
   const program = getById(programId);
   if (!program || !program.is_active) return { error: 'not_found' };
+  if (program.direction_id) {
+    const direction = directionService.getById(program.direction_id);
+    if (direction && !direction.is_active) return { error: 'not_found' };
+    if (!tabAccessService.isDirectionAllowed(user, program.direction_id)) return { error: 'not_found' };
+  }
 
   const existing = db.prepare('SELECT id FROM enrollments WHERE user_id = ? AND program_id = ?')
     .get(userId, programId);

@@ -9,7 +9,7 @@ function esc(s) {
 export async function loadManualsAdminData() {
   const [{ manuals }, { directions }] = await Promise.all([
     api('/admin/manuals'),
-    api('/directions'),
+    api('/admin/directions'),
   ]);
   return { manuals, directions };
 }
@@ -22,7 +22,7 @@ function statusPill(m) {
 
 function directionOptions(directions, selectedId) {
   return '<option value="">—</option>' + (directions || []).map(d => `
-    <option value="${d.id}" ${String(d.id) === String(selectedId || '') ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
+    <option value="${d.id}" ${String(d.id) === String(selectedId || '') ? 'selected' : ''}>${esc(d.name)}${d.is_active ? '' : ' (неактивний)'}</option>`).join('');
 }
 
 export function renderManualsPanel({ manuals, directions } = {}) {
