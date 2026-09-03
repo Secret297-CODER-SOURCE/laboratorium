@@ -141,6 +141,9 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
       <label>Від кого (From)
         <input class="admin-inp" id="smtp-from" placeholder="noreply@laboratorium.club" value="${esc(smtp.from || '')}">
       </label>
+      <label>Ім'я відправника (Display Name)
+        <input class="admin-inp" id="smtp-from-name" placeholder="Laboratorium" value="${esc(smtp.fromName || '')}">
+      </label>
       <label class="admin-check">
         <input type="checkbox" id="smtp-secure" ${smtp.secure ? 'checked' : ''}>
         SSL (порт 465)
@@ -551,6 +554,7 @@ export function bindOwnerPanelEvents(showToast, reload) {
           user: document.getElementById('smtp-user').value,
           pass: document.getElementById('smtp-pass').value,
           from: document.getElementById('smtp-from').value,
+          fromName: document.getElementById('smtp-from-name').value,
           secure: document.getElementById('smtp-secure').checked,
           insecureTls: document.getElementById('smtp-insecure-tls').checked,
         }),

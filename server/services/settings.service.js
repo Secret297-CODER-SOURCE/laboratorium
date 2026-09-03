@@ -236,6 +236,7 @@ function smtpEnvDefaults() {
     user: config.smtp.user || '',
     pass: config.smtp.pass || '',
     from: config.smtp.from || 'noreply@laboratorium.club',
+    fromName: 'Laboratorium',
     insecureTls: false,
   };
 }
@@ -261,6 +262,7 @@ export function getSmtpConfig() {
     user: (src.user || '').trim(),
     pass: src.pass || '',
     from: (src.from || '').trim() || 'noreply@laboratorium.club',
+    fromName: (src.fromName || '').trim(),
     insecureTls: !!src.insecureTls,
   };
 }
@@ -273,6 +275,7 @@ export function getSmtpSettingsPublic() {
     secure: cfg.secure,
     user: cfg.user,
     from: cfg.from,
+    fromName: cfg.fromName,
     hasPassword: !!cfg.pass,
     insecureTls: cfg.insecureTls,
     configured: !!cfg.host,
@@ -284,6 +287,7 @@ export function saveSmtpSettings(data) {
   const host = data.host !== undefined ? data.host.trim() : merged.host;
   const user = data.user !== undefined ? data.user.trim() : merged.user;
   const from = data.from !== undefined ? (data.from.trim() || 'noreply@laboratorium.club') : merged.from;
+  const fromName = data.fromName !== undefined ? data.fromName.trim() : merged.fromName;
   const port = data.port !== undefined ? (parseInt(data.port, 10) || 587) : merged.port;
   const secure = data.secure !== undefined ? !!data.secure : (port === 465 ? true : merged.secure);
   const pass = data.pass?.trim() ? data.pass.trim() : merged.pass;
@@ -300,6 +304,7 @@ export function saveSmtpSettings(data) {
     user: user || '',
     pass: pass || '',
     from,
+    fromName,
     insecureTls,
     updatedBy: 'owner',
   };

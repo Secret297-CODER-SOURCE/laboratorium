@@ -51,7 +51,11 @@ export function isMailConfigured() {
  */
 export async function sendMail({ to, subject, html, text }) {
   const transport = getTransporter();
-  const from = settings.getSmtpConfig().from || config.smtp.from;
+  const smtpCfg = settings.getSmtpConfig();
+  const fromAddress = smtpCfg.from || config.smtp.from;
+  // nodemailer handles quoting/encoding of the display name itself — safer
+  // than building the `"Name" <addr>` string by hand.
+  const from = smtpCfg.fromName ? { name: smtpCfg.fromName, address: fromAddress } : fromAddress;
 
   if (!transport) {
     console.log(`[mail] (no SMTP configured) To: ${to}\nSubject: ${subject}\n${text || html}`);
