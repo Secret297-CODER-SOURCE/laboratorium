@@ -1,5 +1,5 @@
 import {
-  api, getUser, clearSession, requireAuthAsync, handleSessionError, isAuthError, isPaymentError,
+  api, getUser, clearSession, requireUnrestrictedAsync, handleSessionError, isAuthError, isPaymentError,
   initTheme,
 } from '/auth.js';
 import { isAdminUser } from '/roles.js';
@@ -8,7 +8,7 @@ import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, portalHrefAllowed, setAllowedTabs } from '/tab-access.js';
 import { initI18n, t, getLocale } from '/i18n.js';
 
-if (!(await requireAuthAsync())) throw new Error('auth');
+if (!(await requireUnrestrictedAsync())) throw new Error('auth');
 
 initTheme();
 initI18n();

@@ -15,6 +15,7 @@ export function renderTeacherTabs(active = 'overview') {
     { id: 'quizzes', label: 'Тести', icon: 'book' },
     { id: 'stats', label: 'Статистика', icon: 'chart' },
     { id: 'schedule', label: 'Розклад', icon: 'calendar' },
+    { id: 'attendance', label: 'Відвідуваність', icon: 'video' },
   ];
   return `<nav class="admin-tabs">${tabs.map(t => `
     <button type="button" class="admin-tab${active === t.id ? ' active' : ''}" data-tab="${t.id}">

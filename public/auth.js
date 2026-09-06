@@ -1,5 +1,5 @@
 import { initTheme as startThemes, getAccentColor } from '/theme-engine.js';
-import { isAdminUser } from '/roles.js';
+import { isAdminUser, isRestrictedUser } from '/roles.js';
 import { t, getLocale } from '/i18n.js';
 
 const TOKEN_KEY = 'lab_token';
@@ -116,6 +116,19 @@ export async function requireAuthAsync() {
   if (await validateSession()) return true;
   redirectToLogin();
   return false;
+}
+
+/** Like requireAuthAsync(), but also bounces restricted (not-yet-approved)
+ * accounts back to their cabinet — used by pages the API already blocks
+ * for them (conferences, recordings, chats, lab...), so they land somewhere
+ * useful instead of seeing a raw 403. */
+export async function requireUnrestrictedAsync() {
+  if (!(await requireAuthAsync())) return false;
+  if (isRestrictedUser(getUser())) {
+    window.location.replace('/dashboard.html');
+    return false;
+  }
+  return true;
 }
 
 export function getSiteHome() {

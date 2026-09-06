@@ -50,7 +50,7 @@
             <span class="tier-badge" id="user-tier">—</span>
           </div>
         </div>
-        <div class="dash-stats">
+        <div class="dash-stats" id="dash-stats-row">
           <div class="dash-stat">
             <span class="dash-stat-val accent" id="stat-points">0</span>
             <span class="dash-stat-label">bounty pts</span>
@@ -70,7 +70,7 @@
         </div>
       </section>
 
-      <div class="tier-progress-wrap">
+      <div class="tier-progress-wrap" id="tier-progress-wrap">
         <div class="tier-progress-header">
           <span id="tier-current">Script Kiddie</span>
           <span id="tier-next-label">до Grey Hat: 500 pts</span>
@@ -182,6 +182,30 @@
             </label>
             <button type="submit" class="btn btn--primary btn--sm" data-i18n="Зберегти">Зберегти</button>
           </form>
+        </section>
+      </div>
+
+      <div id="dash-restricted-view" hidden>
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2 data-i18n="Подати заявку на курс">Подати заявку на курс</h2>
+          </div>
+          <p class="empty-state" data-i18n="Оберіть напрямок, який вас цікавить — повний доступ до кабінету (CTF, конференції, лабораторія тощо) відкриється після підтвердження заявки.">Оберіть напрямок, який вас цікавить — повний доступ до кабінету (CTF, конференції, лабораторія тощо) відкриється після підтвердження заявки.</p>
+          <form id="restricted-application-form" class="enroll-form">
+            <select id="restricted-direction-select" required>
+              <option value="" data-i18n="Оберіть напрямок">Оберіть напрямок</option>
+            </select>
+            <textarea id="restricted-application-message" rows="3" data-i18n-placeholder="Коментар (необов'язково)" placeholder="Коментар (необов'язково)"></textarea>
+            <button type="submit" class="btn btn--primary btn--sm" data-i18n="Подати заявку">Подати заявку</button>
+          </form>
+        </section>
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2 data-i18n="Мої заявки">Мої заявки</h2>
+          </div>
+          <div id="restricted-applications-list">
+            <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
+          </div>
         </section>
       </div>
       </div>

@@ -7,6 +7,7 @@ import * as scheduleCtrl from '../controllers/schedule.controller.js';
 import * as learningCtrl from '../controllers/learning.controller.js';
 import * as storageCtrl from '../controllers/storage.controller.js';
 import * as statsCtrl from '../controllers/stats.controller.js';
+import * as attendanceCtrl from '../controllers/attendance.controller.js';
 import { uploadCtfAttachment } from '../middleware/upload.js';
 
 const router = Router();
@@ -19,6 +20,7 @@ router.get('/users', requireRole('owner', 'developer'), asyncHandler(adminCtrl.l
 router.post('/users', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createUser));
 router.patch('/users/:id/role', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateUserRole));
 router.patch('/users/:id/freeze', requireRole('owner', 'developer'), asyncHandler(adminCtrl.freezeUser));
+router.patch('/users/:id/restrict', requireRole('owner', 'developer'), asyncHandler(adminCtrl.restrictUser));
 router.delete('/users/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteUser));
 router.post('/users/:id/send-reset', requireRole('owner', 'developer'), asyncHandler(adminCtrl.sendUserPasswordReset));
 router.post('/users/:id/send-password', requireRole('owner', 'developer'), asyncHandler(adminCtrl.sendUserNewPassword));
@@ -72,6 +74,9 @@ router.get('/schedule/stats', asyncHandler(scheduleCtrl.getStats));
 router.get('/quizzes', asyncHandler(learningCtrl.listQuizzes));
 router.post('/quizzes', asyncHandler(learningCtrl.createQuiz));
 router.delete('/quizzes/:id', asyncHandler(learningCtrl.deleteQuiz));
+
+router.get('/attendance/groups/:groupId', asyncHandler(attendanceCtrl.getGroupOverview));
+router.get('/attendance/conferences/:id', asyncHandler(attendanceCtrl.getConferenceAttendance));
 
 router.get('/stats', asyncHandler(statsCtrl.getStatsOverview));
 router.get('/stats/students/:id', asyncHandler(statsCtrl.getStudentStats));

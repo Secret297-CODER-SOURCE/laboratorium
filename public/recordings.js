@@ -1,4 +1,4 @@
-import { api, initTheme, requireAuthAsync, getToken } from '/auth.js';
+import { api, initTheme, requireUnrestrictedAsync, getToken } from '/auth.js';
 import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, pageAllowed } from '/tab-access.js';
@@ -7,7 +7,7 @@ import { showConfirm, showPrompt } from '/dialog.js';
 initTheme();
 initSiteHeader({ showLogout: true, navMode: 'app' });
 initNavIcons();
-if (!(await requireAuthAsync())) throw new Error('auth');
+if (!(await requireUnrestrictedAsync())) throw new Error('auth');
 
 (async () => {
   await loadTabAccess();
@@ -108,7 +108,10 @@ function setPlayerVisible(visible) {
 }
 
 async function loadRecording(id) {
+  flushWatchProgress();
   currentRecordingId = id;
+  watchPlayedSinceFlush = 0;
+  watchLastTime = 0;
   renderSidebar();
 
   const { recording, notes } = await api(`/recordings/${id}`);
@@ -229,3 +232,37 @@ document.getElementById('note-input').addEventListener('keydown', (e) => {
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+// Watch-progress tracking — lets a teacher see who actually watched a
+// recording (and how far), including students who missed the live lesson.
+let watchPlayedSinceFlush = 0;
+let watchLastTime = 0;
+
+function flushWatchProgress() {
+  const p = document.getElementById('rec-player');
+  if (!currentRecordingId || !p || Number.isNaN(p.currentTime)) return;
+  const played = watchPlayedSinceFlush;
+  watchPlayedSinceFlush = 0;
+  if (played <= 0 && p.currentTime <= 0) return;
+  api(`/recordings/${currentRecordingId}/progress`, {
+    method: 'POST',
+    body: JSON.stringify({ positionSeconds: p.currentTime, playedSeconds: played }),
+  }).catch(() => { /* best-effort, not user-facing */ });
+}
+
+(() => {
+  const p = document.getElementById('rec-player');
+  if (!p) return;
+  p.addEventListener('timeupdate', () => {
+    const delta = p.currentTime - watchLastTime;
+    watchLastTime = p.currentTime;
+    // A positive, small delta is normal playback; anything else (seek,
+    // loop, pause/resume gap) isn't "watched" time, so it's not counted.
+    if (delta > 0 && delta < 2) watchPlayedSinceFlush += delta;
+  });
+  p.addEventListener('play', () => { watchLastTime = p.currentTime; });
+  p.addEventListener('seeked', () => { watchLastTime = p.currentTime; });
+  p.addEventListener('pause', flushWatchProgress);
+  p.addEventListener('ended', flushWatchProgress);
+  setInterval(() => { if (!p.paused) flushWatchProgress(); }, 15000);
+})();

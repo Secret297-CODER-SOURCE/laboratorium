@@ -89,7 +89,7 @@ export const config = {
   contactEmail: env('CONTACT_EMAIL', 'admin@laboratorium.club'),
 
   auth: {
-    allowPublicRegistration: envBool('ALLOW_PUBLIC_REGISTRATION', false),
+    allowPublicRegistration: envBool('ALLOW_PUBLIC_REGISTRATION', true),
     resetTokenHours: envInt('RESET_TOKEN_HOURS', 24),
   },
 

@@ -1,4 +1,4 @@
-import { api, initTheme, requireAuthAsync, getUser } from '/auth.js';
+import { api, initTheme, requireUnrestrictedAsync, getUser } from '/auth.js';
 import { isAdminUser } from '/roles.js';
 import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
@@ -9,7 +9,7 @@ initTheme();
 initNumberInputs();
 initSiteHeader({ showLogout: true, navMode: 'app' });
 initNavIcons();
-if (!(await requireAuthAsync())) throw new Error('auth');
+if (!(await requireUnrestrictedAsync())) throw new Error('auth');
 
 (async () => {
   await loadTabAccess();

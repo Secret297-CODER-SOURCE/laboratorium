@@ -18,6 +18,7 @@ export function renderOwnerTabs(active = 'overview') {
     { id: 'labs', label: 'Машини', icon: 'database' },
     { id: 'storage', label: 'Сховище', icon: 'upload' },
     { id: 'schedule', label: 'Розклад', icon: 'calendar' },
+    { id: 'attendance', label: 'Відвідуваність', icon: 'video' },
   ];
   return `<nav class="admin-tabs">${tabs.map(t => `
     <button type="button" class="admin-tab${active === t.id ? ' active' : ''}" data-tab="${t.id}">
@@ -104,7 +105,7 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
       <thead><tr><th>Handle</th><th>Ім'я</th><th>Email</th><th>Роль</th><th>Дії</th></tr></thead>
       <tbody>${(users || []).map(u => `
         <tr data-search="${esc(`${u.handle} ${u.name} ${u.email}`.toLowerCase())}"${u.is_frozen ? ' style="opacity:0.55"' : ''}>
-          <td>@${u.handle}${u.is_frozen ? ` <span class="status-pill error" style="margin-left:4px">заморожено</span>` : ''}</td>
+          <td>@${u.handle}${u.is_frozen ? ` <span class="status-pill error" style="margin-left:4px">заморожено</span>` : ''}${u.is_restricted ? ` <span class="status-pill pending" style="margin-left:4px">очікує заявки</span>` : ''}</td>
           <td>${esc(u.name)}</td>
           <td>${esc(u.email)}</td>
           <td>
@@ -116,6 +117,9 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
             <button class="btn btn--ghost btn--sm user-send-reset" data-id="${u.id}" title="Посилання скидання">${icon('notes', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm user-send-pwd" data-id="${u.id}" title="Новий пароль на email">${icon('shield', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm user-freeze" data-id="${u.id}" data-frozen="${u.is_frozen ? '1' : '0'}" title="${u.is_frozen ? 'Розморозити' : 'Заморозити'}">${icon(u.is_frozen ? 'play' : 'lock', 'ico ico--sm')}</button>
+            ${u.is_restricted
+              ? `<button class="btn btn--ghost btn--sm user-restrict" data-id="${u.id}" data-restricted="1" title="Відкрити повний доступ">${icon('check', 'ico ico--sm')}</button>`
+              : ''}
             <button class="btn btn--ghost btn--sm user-delete" data-id="${u.id}" title="Видалити">${icon('trash', 'ico ico--sm')}</button>
           </td>
         </tr>`).join('')}
@@ -554,6 +558,16 @@ export function bindOwnerPanelEvents(showToast, reload) {
       if (nextFrozen && !(await showConfirm('Заморозити акаунт? Користувач не зможе увійти, дані збережуться.', { danger: true }))) return;
       try {
         const res = await api(`/admin/users/${btn.dataset.id}/freeze`, { method: 'PATCH', body: JSON.stringify({ frozen: nextFrozen }) });
+        showToast(res.message);
+        reload();
+      } catch (err) { showToast(err.message, 'error'); }
+    });
+  });
+
+  document.querySelectorAll('.user-restrict').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        const res = await api(`/admin/users/${btn.dataset.id}/restrict`, { method: 'PATCH', body: JSON.stringify({ restricted: false }) });
         showToast(res.message);
         reload();
       } catch (err) { showToast(err.message, 'error'); }

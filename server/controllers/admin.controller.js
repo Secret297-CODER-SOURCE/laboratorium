@@ -105,7 +105,17 @@ export async function updateApplication(req, res) {
     req.body.createAccount,
     req.user,
   );
-  res.json({ application: app.application, account: app.account });
+  res.json({ application: app.application, account: app.account, liftedUser: app.liftedUser });
+}
+
+export async function restrictUser(req, res) {
+  const user = adminService.setUserRestricted(
+    req.user.id,
+    req.user.role,
+    parseInt(req.params.id, 10),
+    req.body.restricted !== false,
+  );
+  res.json({ user, message: user.is_restricted ? 'Акаунт обмежено' : 'Обмеження знято' });
 }
 
 export async function listDirections(req, res) {

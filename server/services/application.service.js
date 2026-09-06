@@ -27,6 +27,12 @@ export function create({ name, email, program, message, userId = null, direction
   return true;
 }
 
+export function listForUser(userId) {
+  return db.prepare(`
+    SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC
+  `).all(userId);
+}
+
 export function getLeaderboard(limit = 20) {
   return db.prepare(`
     SELECT id, handle, name, bounty_points FROM users

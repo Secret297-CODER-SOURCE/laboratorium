@@ -772,11 +772,102 @@ async function loadDashboard() {
   refreshAppNav();
   const data = await api('/dashboard');
   setAllowedTabs(data.tabAccess);
+  if (data.user.is_restricted) {
+    renderRestrictedDashboard(data);
+    return;
+  }
   try {
     canUseCode = (await loadSandboxInfo()).canUse;
   } catch { canUseCode = false; }
   renderDashboard(data);
   await loadPrograms();
+}
+
+const APPLICATION_STATUS_LABELS = {
+  pending: 'На розгляді',
+  approved: 'Підтверджено',
+  rejected: 'Відхилено',
+};
+
+function renderRestrictedDashboard(data) {
+  dashboardData = data;
+  const { user } = data;
+
+  document.getElementById('avatar').textContent = user.name.charAt(0).toUpperCase();
+  document.getElementById('user-name').textContent = user.name;
+  document.getElementById('user-handle').textContent = `@${user.handle}`;
+
+  document.getElementById('dash-tabs').hidden = true;
+  document.getElementById('dash-stats-row').hidden = true;
+  document.getElementById('tier-progress-wrap').hidden = true;
+  document.querySelector('#dash-panel-home .dash-grid').hidden = true;
+  document.getElementById('dash-panel-home').hidden = false;
+  ['dash-panel-ctf', 'dash-panel-tests', 'dash-panel-lab', 'dash-panel-code', 'dash-panel-article'].forEach(id => {
+    document.getElementById(id).hidden = true;
+  });
+  document.getElementById('dash-restricted-view').hidden = false;
+
+  loadRestrictedDirections();
+  loadMyApplications();
+}
+
+async function loadRestrictedDirections() {
+  const select = document.getElementById('restricted-direction-select');
+  try {
+    const { directions } = await api('/directions');
+    select.innerHTML = `<option value="">${t('Оберіть напрямок')}</option>` +
+      (directions || []).map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+  } catch {
+    /* keep the empty placeholder option */
+  }
+}
+
+async function loadMyApplications() {
+  const el = document.getElementById('restricted-applications-list');
+  try {
+    const { applications } = await api('/applications/mine');
+    if (!applications?.length) {
+      el.innerHTML = `<p class="empty-state" data-i18n="Ви ще не подавали заявок">${t('Ви ще не подавали заявок')}</p>`;
+      return;
+    }
+    el.innerHTML = applications.map(a => `
+      <div class="restricted-application-item">
+        <div>
+          <strong>${escapeHtml(a.program)}</strong>
+          ${a.message ? `<p class="empty-state" style="text-align:left;padding:4px 0">${escapeHtml(a.message)}</p>` : ''}
+        </div>
+        <span class="status-pill ${a.status}">${t(APPLICATION_STATUS_LABELS[a.status] || a.status)}</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    el.innerHTML = `<p class="empty-state">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+if (!window.__restrictedFormBound) {
+  window.__restrictedFormBound = true;
+  document.getElementById('restricted-application-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    const direction_id = document.getElementById('restricted-direction-select').value;
+    const message = document.getElementById('restricted-application-message').value;
+    if (!direction_id) return showToast(t('Оберіть напрямок'), 'error');
+
+    btn.disabled = true;
+    try {
+      const res = await api('/applications', {
+        method: 'POST',
+        body: JSON.stringify({ direction_id: parseInt(direction_id, 10), message }),
+      });
+      e.target.reset();
+      showToast(res.message);
+      await loadMyApplications();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 
 document.getElementById('logout-btn')?.addEventListener('click', () => {

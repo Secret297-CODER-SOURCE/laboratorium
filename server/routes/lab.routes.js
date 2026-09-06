@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { authRequired } from '../middleware/auth.js';
+import { authRequired, requireUnrestricted } from '../middleware/auth.js';
 import { requirePlatformAccess } from '../middleware/platform-access.js';
 import { requireTab } from '../middleware/tab-access.js';
 import * as labCtrl from '../controllers/lab.controller.js';
@@ -9,6 +9,7 @@ const router = Router();
 
 router.use(authRequired);
 router.use(requirePlatformAccess);
+router.use(requireUnrestricted);
 
 router.get('/', requireTab('dash.lab'), asyncHandler(labCtrl.getLabOverview));
 router.post('/vm/start', requireTab('dash.lab'), asyncHandler(labCtrl.startVm));

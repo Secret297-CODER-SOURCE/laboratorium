@@ -1,10 +1,10 @@
-import { getToken, getUser, initTheme, requireAuthAsync } from '/auth.js';
+import { getToken, getUser, initTheme, requireUnrestrictedAsync } from '/auth.js';
 import { icon, setIcon, initNavIcons } from '/icons.js';
-import { showAlert } from '/dialog.js';
+import { showAlert, showConfirm, showCopyDialog } from '/dialog.js';
 
 initTheme();
 initNavIcons();
-if (!(await requireAuthAsync())) throw new Error('no auth');
+if (!(await requireUnrestrictedAsync())) throw new Error('no auth');
 
 function setMicState(on) {
   setIcon('local-mic-icon', on ? 'mic' : 'mic-off');
@@ -42,6 +42,7 @@ let camEnabled = false;
 let screenSharing = false;
 let startTime = null;
 let timerInterval = null;
+let isHost = false;
 
 const peers = new Map();
 
@@ -234,6 +235,8 @@ function removePeer(socketId) {
 socket.on('room:joined', ({ conference, participants, messages }) => {
   document.getElementById('room-title').textContent = conference.title;
   document.getElementById('room-code').textContent = `Код: ${conference.room_code}`;
+  isHost = conference.host_user_id === USER.id;
+  document.getElementById('leave-ctrl-btn').title = isHost ? 'Завершити для всіх' : 'Покинути';
   startTime = new Date();
   timerInterval = setInterval(updateTimer, 1000);
 
@@ -286,6 +289,13 @@ socket.on('chat:message', (msg) => addChatMessage(msg));
 socket.on('recording:status', ({ isRecording: rec, userName }) => {
   document.getElementById('rec-badge').style.display = rec ? 'flex' : 'none';
   addSystemMessage(rec ? `${userName} почав запис` : `${userName} зупинив запис`);
+});
+
+// Broadcast to everyone in the room once the host ends it (see 'room:end'
+// below) — each client, including the host's own, reacts by leaving the
+// same way a manual leave would, so cleanup only lives in one place.
+socket.on('conference:ended', () => {
+  leaveRoom();
 });
 
 socket.on('error', async ({ message }) => {
@@ -364,14 +374,7 @@ document.getElementById('cam-btn').addEventListener('click', () => {
 
 document.getElementById('screen-btn').addEventListener('click', async () => {
   if (screenSharing) {
-    screenStream?.getTracks().forEach(t => t.stop());
-    screenSharing = false;
-    document.getElementById('screen-btn').classList.remove('active');
-    socket.emit('media:toggle', { screenSharing: false });
-
-    const screenTile = document.getElementById('tile-screen');
-    if (screenTile) screenTile.remove();
-    updateGridClass();
+    await stopScreenShare();
     return;
   }
 
@@ -389,11 +392,36 @@ document.getElementById('screen-btn').addEventListener('click', async () => {
     videoGrid.appendChild(tile);
     updateGridClass();
 
-    screenStream.getVideoTracks()[0].onended = () => {
+    // The tile above only renders the screen locally — remote peers only
+    // ever see whatever track occupies the shared 'video' sender (the same
+    // one the camera uses), so the screen has to be pushed onto it too.
+    const screenTrack = screenStream.getVideoTracks()[0];
+    await addTrackToAllPeers(screenTrack);
+    screenTrack.onended = () => {
       document.getElementById('screen-btn').click();
     };
   } catch { addSystemMessage('Демонстрація екрана скасована'); }
 });
+
+async function stopScreenShare() {
+  screenStream?.getTracks().forEach(t => t.stop());
+  screenSharing = false;
+  document.getElementById('screen-btn').classList.remove('active');
+  socket.emit('media:toggle', { screenSharing: false });
+
+  const screenTile = document.getElementById('tile-screen');
+  if (screenTile) screenTile.remove();
+  updateGridClass();
+
+  // The screen track was occupying the shared video sender — hand it back
+  // to the camera (if still on) or clear it so peers stop seeing the screen.
+  if (camEnabled) {
+    const camTrack = localStream.getVideoTracks()[0];
+    if (camTrack) await addTrackToAllPeers(camTrack);
+  } else {
+    await removeTrackFromAllPeers('video');
+  }
+}
 
 document.getElementById('rec-btn').addEventListener('click', async () => {
   if (isRecording) {
@@ -483,6 +511,16 @@ document.querySelectorAll('.sidebar-tab').forEach(tab => {
   });
 });
 
+document.getElementById('copy-link-btn').addEventListener('click', async () => {
+  const link = `${location.origin}/room.html?id=${CONF_ID}`;
+  try {
+    await navigator.clipboard.writeText(link);
+    addSystemMessage('Посилання на конференцію скопійовано');
+  } catch {
+    await showCopyDialog('Посилання на конференцію', link, { title: 'Копіювати посилання' });
+  }
+});
+
 document.getElementById('sidebar-toggle').addEventListener('click', () => {
   document.getElementById('sidebar').classList.toggle('open');
 });
@@ -502,9 +540,30 @@ function leaveRoom() {
   location.href = '/conferences.html';
 }
 
-document.getElementById('leave-ctrl-btn').addEventListener('click', leaveRoom);
-document.getElementById('leave-btn').addEventListener('click', (e) => { e.preventDefault(); leaveRoom(); });
+async function handleLeaveClick() {
+  if (isHost) {
+    const ok = await showConfirm('Завершити конференцію для всіх учасників?', {
+      confirmText: 'Завершити', danger: true,
+    });
+    if (!ok) return;
+    // Cleanup happens uniformly via the 'conference:ended' broadcast this
+    // socket also receives — not called directly here.
+    socket.emit('room:end');
+    return;
+  }
+  leaveRoom();
+}
+
+document.getElementById('leave-ctrl-btn').addEventListener('click', handleLeaveClick);
+document.getElementById('leave-btn').addEventListener('click', (e) => { e.preventDefault(); handleLeaveClick(); });
 
 window.addEventListener('beforeunload', () => socket.emit('room:leave'));
+
+// Lets the teacher's attendance view see who switched away to another tab
+// during the lesson — the server no-ops this while the socket isn't in a
+// room, so no local guard is needed here.
+document.addEventListener('visibilitychange', () => {
+  socket.emit('presence:visibility', { hidden: document.hidden });
+});
 
 initMedia();

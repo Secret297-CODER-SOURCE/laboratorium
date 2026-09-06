@@ -1,10 +1,10 @@
-import { api, getToken, getUser, requireAuthAsync, initTheme } from '/auth.js';
+import { api, getToken, getUser, requireUnrestrictedAsync, initTheme } from '/auth.js';
 import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, pageAllowed } from '/tab-access.js';
 import { showPrompt, showAlert } from '/dialog.js';
 
-if (!(await requireAuthAsync())) throw new Error('auth');
+if (!(await requireUnrestrictedAsync())) throw new Error('auth');
 initTheme();
 initSiteHeader({ showLogout: true, navMode: 'app' });
 initNavIcons();

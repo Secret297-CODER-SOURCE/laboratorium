@@ -639,6 +639,60 @@
 
 .sched-badge--warn { background: rgba(249,115,22,0.15); color: #fb923c; }
 
+.attend-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+.attend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.attend-conf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.attend-conf-row:hover { border-color: var(--accent); }
+.attend-conf-row.active { border-color: var(--accent); background: var(--accent-subtle); }
+
+.attend-conf-counts {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.attend-detail {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  min-height: 200px;
+}
+
+.attend-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 16px;
+}
+
+@media (max-width: 900px) {
+  .attend-layout { grid-template-columns: 1fr; }
+}
+
 .sched-lesson-list,
 .sched-absence-list {
   display: flex;

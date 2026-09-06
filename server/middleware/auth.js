@@ -14,13 +14,17 @@ export function signToken(user) {
 /**
  * A frozen account keeps its data but must not be usable — checked per
  * request (not baked into the JWT) so freezing takes effect immediately
- * against tokens already issued, without a revocation list.
+ * against tokens already issued, without a revocation list. is_restricted
+ * (self-registered, not yet approved) is read the same way for the same
+ * reason: an admin's approval must take effect on the student's existing
+ * session, not just on their next login.
  */
-function assertNotFrozen(userId) {
-  const row = db.prepare('SELECT is_frozen FROM users WHERE id = ?').get(userId);
+function loadAccessFlags(userId) {
+  const row = db.prepare('SELECT is_frozen, is_restricted FROM users WHERE id = ?').get(userId);
   if (row?.is_frozen) {
     throw new ForbiddenError('Акаунт заморожено. Зверніться до адміністрації.');
   }
+  return row;
 }
 
 export function authRequired(req, _res, next) {
@@ -30,12 +34,22 @@ export function authRequired(req, _res, next) {
   }
   try {
     req.user = jwt.verify(header.slice(7), config.jwt.secret);
-    assertNotFrozen(req.user.id);
+    const flags = loadAccessFlags(req.user.id);
+    req.user.isRestricted = !!flags?.is_restricted;
     next();
   } catch (err) {
     if (err instanceof ForbiddenError) return next(err);
     next(new UnauthorizedError('Сесію закінчено, увійдіть знову'));
   }
+}
+
+/** Self-registered accounts stay locked to the application-only cabinet
+ * view until an admin approves their course application. */
+export function requireUnrestricted(req, _res, next) {
+  if (req.user?.isRestricted) {
+    return next(new ForbiddenError('Доступ буде відкрито після підтвердження заявки.'));
+  }
+  next();
 }
 
 export function optionalAuth(req, _res, next) {

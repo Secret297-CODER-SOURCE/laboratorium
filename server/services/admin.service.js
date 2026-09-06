@@ -16,9 +16,9 @@ export function getPlatformStats() {
 
 export function listUsers(actorRole) {
   const users = db.prepare(`
-    SELECT id, email, name, handle, role, bounty_points, is_frozen, created_at
+    SELECT id, email, name, handle, role, bounty_points, is_frozen, is_restricted, created_at
     FROM users ORDER BY created_at DESC
-  `).all().map(u => ({ ...u, is_frozen: !!u.is_frozen }));
+  `).all().map(u => ({ ...u, is_frozen: !!u.is_frozen, is_restricted: !!u.is_restricted }));
   if (actorRole === 'owner') {
     return users.filter(u => u.role !== 'developer');
   }
@@ -95,6 +95,25 @@ export function setUserFrozen(actorId, actorRole, userId, frozen) {
 }
 
 /**
+ * Manual override for the self-registration restriction — mirrors
+ * setUserFrozen(). Normally lifted automatically when an admin approves the
+ * account's course application (see updateApplicationStatus), this exists
+ * for cases with no formal application (or to re-restrict an account).
+ */
+export function setUserRestricted(actorId, actorRole, userId, restricted) {
+  const target = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  assertCanTargetUser(actorId, actorRole, target);
+
+  if (restricted) {
+    db.prepare(`UPDATE users SET is_restricted = 1, updated_at = datetime('now') WHERE id = ?`).run(userId);
+  } else {
+    userService.liftRestriction(userId);
+  }
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  return { ...sanitizeUser(updated), is_restricted: !!updated.is_restricted };
+}
+
+/**
  * Hard delete. Cascades cleanly for a user's own data (enrollments, tasks,
  * notifications, labs, ...) via ON DELETE CASCADE — but a teacher who still
  * owns study_groups would silently cascade-delete those groups and their
@@ -122,12 +141,12 @@ export function deleteUser(actorId, actorRole, userId) {
 }
 
 export function listApplications(status) {
-  let sql = `SELECT a.*, u.name as user_name, u.handle as user_handle
+  let sql = `SELECT a.*, u.name as user_name, u.handle as user_handle, u.is_restricted as user_is_restricted
     FROM applications a LEFT JOIN users u ON u.id = a.user_id WHERE 1=1`;
   const params = [];
   if (status) { sql += ' AND a.status = ?'; params.push(status); }
   sql += ' ORDER BY a.created_at DESC';
-  return db.prepare(sql).all(...params);
+  return db.prepare(sql).all(...params).map(a => ({ ...a, user_is_restricted: !!a.user_is_restricted }));
 }
 
 export async function updateApplicationStatus(id, status, createAccount = false, actor = null) {
@@ -138,9 +157,21 @@ export async function updateApplicationStatus(id, status, createAccount = false,
   db.prepare(`UPDATE applications SET status = ? WHERE id = ?`).run(status, id);
 
   let account = null;
-  if (createAccount && status === 'approved' && actor) {
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(app.email);
-    if (!existing) {
+  let liftedUser = null;
+  if (status === 'approved' && actor) {
+    // A self-registered applicant already has an account (linked via
+    // user_id); approving just lifts their restriction instead of creating
+    // a duplicate. Only a guest submission (no account yet) goes through
+    // adminCreateUser, and only when the admin opted into createAccount.
+    const existing = app.user_id
+      ? db.prepare('SELECT * FROM users WHERE id = ?').get(app.user_id)
+      : db.prepare('SELECT * FROM users WHERE email = ?').get(app.email);
+
+    if (existing) {
+      if (existing.is_restricted) {
+        liftedUser = userService.liftRestriction(existing.id);
+      }
+    } else if (createAccount) {
       account = await userService.adminCreateUser({
         name: app.name,
         email: app.email,
@@ -155,6 +186,7 @@ export async function updateApplicationStatus(id, status, createAccount = false,
     account: account
       ? { user: userService.toPublic(account.user), password: account.password, emailSent: account.emailSent, mailReason: account.mailReason }
       : null,
+    liftedUser: liftedUser ? userService.toPublic(liftedUser) : null,
   };
 }
 

@@ -289,6 +289,31 @@
   padding: 24px;
 }
 
+.status-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+}
+
+.status-pill.pending { color: #ffaa00; background: rgba(255,170,0,0.1); }
+.status-pill.approved { color: var(--accent); background: var(--accent-subtle); }
+.status-pill.rejected { color: #ff4466; background: rgba(255,68,102,0.1); }
+
+.restricted-application-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.restricted-application-item:last-child {
+  border-bottom: none;
+}
+
 .manuals-filters {
   display: flex;
   gap: 8px;

@@ -22,6 +22,9 @@ import {
   renderSchedulePanel, bindSchedulePanelEvents, loadScheduleData,
 } from '/admin-schedule-panel.js';
 import {
+  renderAttendancePanel, bindAttendancePanelEvents, loadAttendanceData, loadConferenceAttendance,
+} from '/admin-attendance-panel.js';
+import {
   renderCtfPanel, bindCtfPanelEvents, loadCtfAdminData,
 } from '/admin-ctf-panel.js';
 import {
@@ -92,6 +95,10 @@ function isScheduleTab(role) {
   return (role === 'owner' && ownerTab === 'schedule') || (role === 'teacher' && teacherTab === 'schedule');
 }
 
+function isAttendanceTab(role) {
+  return (role === 'owner' && ownerTab === 'attendance') || (role === 'teacher' && teacherTab === 'attendance');
+}
+
 function showAdminLoading(message = 'Завантаження...') {
   const el = document.getElementById('admin-content');
   if (!el) return;
@@ -132,10 +139,49 @@ async function loadScheduleView(role) {
   }
 }
 
+async function loadAttendanceView(role) {
+  const seq = ++adminLoadSeq;
+  document.getElementById('admin-title').textContent = TITLES[role] || 'Панель керування';
+  renderNav(role);
+  showAdminLoading('Завантаження відвідуваності...');
+
+  try {
+    const gf = new URLSearchParams(location.search).get('groupId') || '';
+    const confId = new URLSearchParams(location.search).get('conferenceId') || '';
+    const groupsRes = await api(role === 'owner' ? '/admin/groups?all=1' : '/admin/groups');
+    if (seq !== adminLoadSeq) return;
+    const attendGroups = groupsRes.groups || [];
+
+    const data = await loadAttendanceData(gf);
+    if (seq !== adminLoadSeq) return;
+
+    let detail = null;
+    if (confId) {
+      try { detail = await loadConferenceAttendance(confId); } catch { detail = null; }
+      if (seq !== adminLoadSeq) return;
+    }
+
+    const el = document.getElementById('admin-content');
+    const tabs = role === 'owner' ? renderOwnerTabs('attendance') : renderTeacherTabs('attendance');
+    el.innerHTML = tabs + renderAttendancePanel(attendGroups, data, gf, detail, confId);
+    bindTabHandlers(role);
+    bindAttendancePanelEvents(() => loadAttendanceView(role));
+  } catch (err) {
+    if (seq !== adminLoadSeq) return;
+    const el = document.getElementById('admin-content');
+    const tabs = role === 'owner' ? renderOwnerTabs('attendance') : renderTeacherTabs('attendance');
+    el.innerHTML = `${tabs}<p class="empty-state">${err.message}</p>`;
+    bindTabHandlers(role);
+  }
+}
+
 async function load() {
   const role = getUser()?.role;
   if (role && isScheduleTab(role)) {
     return loadScheduleView(role);
+  }
+  if (role && isAttendanceTab(role)) {
+    return loadAttendanceView(role);
   }
 
   const seq = ++adminLoadSeq;
@@ -407,7 +453,8 @@ function bindTabHandlers(role) {
       if (role === 'teacher') teacherTab = t;
       const url = new URL(location.href);
       url.searchParams.set('tab', t);
-      if (t !== 'schedule') url.searchParams.delete('groupId');
+      if (t !== 'schedule' && t !== 'attendance') url.searchParams.delete('groupId');
+      if (t !== 'attendance') url.searchParams.delete('conferenceId');
       history.replaceState(null, '', url);
       load();
     });
@@ -485,15 +532,18 @@ function renderApplicationsPanel(apps) {
   return `<section class="admin-panel admin-panel--wide">
     <h2>${icon('notes', 'ico ico--md')}Заявки</h2>
     <table class="admin-table">
-      <thead><tr><th>Ім'я</th><th>Email</th><th>Програма</th><th>Статус</th><th></th></tr></thead>
+      <thead><tr><th>Ім'я</th><th>Email</th><th>Програма</th><th>Акаунт</th><th>Статус</th><th></th></tr></thead>
       <tbody>${apps.map(a => `
         <tr>
           <td>${a.name}</td>
           <td>${a.email}</td>
           <td>${a.program}</td>
+          <td>${a.user_name
+            ? (a.user_is_restricted ? `<span class="status-pill pending">очікує (@${a.user_handle})</span>` : `<span class="status-pill approved">активний (@${a.user_handle})</span>`)
+            : '<span class="status-pill">немає</span>'}</td>
           <td><span class="status-pill ${a.status}">${a.status}</span></td>
           <td>${a.status === 'pending' ? `
-            <button class="btn btn--ghost btn--sm app-approve" data-id="${a.id}">${icon('check', 'ico ico--sm')}</button>
+            <button class="btn btn--ghost btn--sm app-approve" data-id="${a.id}" data-has-account="${a.user_name ? '1' : '0'}" title="${a.user_name ? (a.user_is_restricted ? 'Відкрити доступ' : 'Схвалити') : 'Схвалити і створити акаунт'}">${icon('check', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm app-reject" data-id="${a.id}">${icon('trash', 'ico ico--sm')}</button>
           ` : ''}</td>
         </tr>`).join('')}
@@ -562,17 +612,22 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
   });
 
   document.querySelectorAll('.app-approve').forEach(btn => {
-    btn.addEventListener('click', () => updateApp(btn.dataset.id, 'approved'));
+    btn.addEventListener('click', () => updateApp(btn.dataset.id, 'approved', btn.dataset.hasAccount === '1'));
   });
   document.querySelectorAll('.app-reject').forEach(btn => {
     btn.addEventListener('click', () => updateApp(btn.dataset.id, 'rejected'));
   });
 }
 
-async function updateApp(id, status) {
+async function updateApp(id, status, hasAccount = false) {
   let createAccount = false;
   if (status === 'approved') {
-    if (!(await showConfirm('Схвалити заявку і створити акаунт з паролем на email?'))) return;
+    // A self-registered applicant already has an account — approving just
+    // lifts their restriction, it doesn't provision a new login/password.
+    const confirmMsg = hasAccount
+      ? 'Схвалити заявку і відкрити акаунту повний доступ?'
+      : 'Схвалити заявку і створити акаунт з паролем на email?';
+    if (!(await showConfirm(confirmMsg))) return;
     createAccount = true;
   } else if (status === 'rejected' && !(await showConfirm('Відхилити заявку?', { danger: true }))) {
     return;
@@ -589,6 +644,8 @@ async function updateApp(id, status) {
           { title: 'Пароль учня' },
         );
       }
+    } else if (res.liftedUser) {
+      showToast(`Заявку схвалено, доступ відкрито для @${res.liftedUser.handle}`);
     } else {
       showToast('Заявку оновлено');
     }

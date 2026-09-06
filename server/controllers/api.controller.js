@@ -138,14 +138,21 @@ export async function getSiteInfo(_req, res) {
 }
 
 export async function submitApplication(req, res) {
-  await applicationService.create({
-    ...req.body,
-    userId: req.user?.id || null,
-  });
+  const body = { ...req.body, userId: req.user?.id || null };
+  if (req.user) {
+    const me = userService.findById(req.user.id);
+    if (!body.name && me) body.name = me.name;
+    if (!body.email && me) body.email = me.email;
+  }
+  await applicationService.create(body);
   res.status(201).json({
     ok: true,
     message: 'Заявку прийнято. Ми зв\'яжемося з вами протягом 24 годин.',
   });
+}
+
+export async function listMyApplications(req, res) {
+  res.json({ applications: applicationService.listForUser(req.user.id) });
 }
 
 export async function getBillingStatus(req, res) {

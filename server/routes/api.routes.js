@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { authRequired } from '../middleware/auth.js';
+import { authRequired, requireUnrestricted } from '../middleware/auth.js';
 import { requirePlatformAccess } from '../middleware/platform-access.js';
 import { requireTab } from '../middleware/tab-access.js';
 import { uploadTaskSubmission } from '../middleware/upload.js';
@@ -28,10 +28,17 @@ router.post('/notifications/push/unsubscribe', asyncHandler(notificationCtrl.uns
 
 router.use(requirePlatformAccess);
 
-router.get('/programs', asyncHandler(apiCtrl.getPrograms));
-
+// Restricted (self-registered, not-yet-approved) accounts still need their
+// own cabinet data and applications, so these three stay reachable ahead of
+// the requireUnrestricted gate below — everything else is the "other tabs"
+// a restricted student must not reach.
 router.get('/dashboard', asyncHandler(apiCtrl.getDashboard));
 router.get('/tab-access', asyncHandler(apiCtrl.getTabAccess));
+router.get('/applications/mine', asyncHandler(apiCtrl.listMyApplications));
+
+router.use(requireUnrestricted);
+
+router.get('/programs', asyncHandler(apiCtrl.getPrograms));
 router.post('/enroll', asyncHandler(apiCtrl.enroll));
 router.patch('/profile', asyncHandler(apiCtrl.updateProfile));
 router.post('/challenges/:id/complete', asyncHandler(apiCtrl.completeChallenge));

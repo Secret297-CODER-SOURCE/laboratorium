@@ -744,6 +744,13 @@ export function runMigrations(db) {
     db.exec('ALTER TABLE users ADD COLUMN is_frozen INTEGER DEFAULT 0 NOT NULL');
   }
 
+  // Self-registered accounts start restricted (application-only cabinet)
+  // until an admin approves their course application.
+  const userColsRestrict = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userColsRestrict.includes('is_restricted')) {
+    db.exec('ALTER TABLE users ADD COLUMN is_restricted INTEGER DEFAULT 0 NOT NULL');
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS code_workspaces (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -798,6 +805,36 @@ export function runMigrations(db) {
     db.exec('ALTER TABLE study_groups ADD COLUMN direction_id INTEGER REFERENCES directions(id) ON DELETE SET NULL');
     db.exec('CREATE INDEX IF NOT EXISTS idx_study_groups_direction ON study_groups(direction_id)');
   }
+
+  // Attendance: append-only presence event log for conferences (join/leave/
+  // tab-switch) — unlike conference_participants.joined_at/left_at, this is
+  // never overwritten, so full multi-session/focus-change history survives.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS conference_attendance_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conference_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      event_type TEXT NOT NULL CHECK(event_type IN ('join','leave','tab_hidden','tab_visible')),
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (conference_id) REFERENCES conferences(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_attendance_events_conf ON conference_attendance_events(conference_id);
+
+    CREATE TABLE IF NOT EXISTS recording_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recording_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      max_position_seconds INTEGER DEFAULT 0 NOT NULL,
+      watched_seconds INTEGER DEFAULT 0 NOT NULL,
+      completed INTEGER DEFAULT 0 NOT NULL,
+      first_watched_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      last_watched_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      UNIQUE(recording_id, user_id),
+      FOREIGN KEY (recording_id) REFERENCES recordings(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
 }
 
 function bootstrapCurrentMonthPayments(db) {

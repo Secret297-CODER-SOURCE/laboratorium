@@ -1,11 +1,11 @@
 import {
-  api, requireAuthAsync, handleSessionError, initTheme,
+  api, requireUnrestrictedAsync, handleSessionError, initTheme,
 } from '/auth.js';
 import { icon } from '/icons.js';
 import { initSiteHeader } from '/site-header.js';
 import { showForm } from '/dialog.js';
 
-if (!(await requireAuthAsync())) throw new Error('auth');
+if (!(await requireUnrestrictedAsync())) throw new Error('auth');
 
 initTheme();
 initSiteHeader({ showLogout: true, navMode: 'app' });

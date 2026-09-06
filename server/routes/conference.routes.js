@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { authRequired } from '../middleware/auth.js';
+import { authRequired, requireUnrestricted } from '../middleware/auth.js';
 import { requirePlatformAccess } from '../middleware/platform-access.js';
 import { requireTab } from '../middleware/tab-access.js';
 import * as confCtrl from '../controllers/conference.controller.js';
@@ -9,6 +9,7 @@ const router = Router();
 
 router.use(authRequired);
 router.use(requirePlatformAccess);
+router.use(requireUnrestricted);
 router.use(requireTab('page.conferences'));
 
 router.get('/', asyncHandler(confCtrl.list));

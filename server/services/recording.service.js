@@ -192,3 +192,38 @@ export function deleteNote(noteId, userId) {
   db.prepare('DELETE FROM recording_notes WHERE id = ?').run(noteId);
   return true;
 }
+
+/**
+ * Watch-progress ping from the player. max_position_seconds only ever moves
+ * forward (furthest point reached — the "did they actually watch this"
+ * signal); watched_seconds is a rough cumulative-play-time counter, capped
+ * per call so a stuck/looping ping can't inflate it past the recording's
+ * own length.
+ */
+export function recordProgress(recordingId, userId, { positionSeconds = 0, playedSeconds = 0 } = {}) {
+  const rec = getById(recordingId);
+  if (!rec) throw new NotFoundError('Запис не знайдено');
+
+  const pos = Math.max(0, Math.round(positionSeconds));
+  const played = Math.max(0, Math.min(Math.round(playedSeconds), rec.duration_seconds || played));
+  const existing = db.prepare('SELECT * FROM recording_views WHERE recording_id = ? AND user_id = ?').get(recordingId, userId);
+
+  const maxPosition = Math.max(existing?.max_position_seconds || 0, pos);
+  const watched = (existing?.watched_seconds || 0) + played;
+  const completed = rec.duration_seconds > 0 && maxPosition >= rec.duration_seconds * 0.9;
+
+  if (existing) {
+    db.prepare(`
+      UPDATE recording_views SET
+        max_position_seconds = ?, watched_seconds = ?, completed = ?, last_watched_at = datetime('now')
+      WHERE recording_id = ? AND user_id = ?
+    `).run(maxPosition, watched, completed ? 1 : 0, recordingId, userId);
+  } else {
+    db.prepare(`
+      INSERT INTO recording_views (recording_id, user_id, max_position_seconds, watched_seconds, completed)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(recordingId, userId, maxPosition, watched, completed ? 1 : 0);
+  }
+
+  return db.prepare('SELECT * FROM recording_views WHERE recording_id = ? AND user_id = ?').get(recordingId, userId);
+}

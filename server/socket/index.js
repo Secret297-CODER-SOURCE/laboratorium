@@ -3,6 +3,7 @@ import config from '../config/index.js';
 import * as conferenceService from '../services/conference.service.js';
 import * as chatService from '../services/chat.service.js';
 import * as userService from '../services/user.service.js';
+import * as attendanceService from '../services/attendance.service.js';
 import { getAccessStatus } from '../services/payment.service.js';
 
 const roomSockets = new Map();
@@ -75,6 +76,7 @@ export function initSocket(io) {
         }
 
         conferenceService.join(conferenceId, socket.user.id, socket.user.role || 'student');
+        attendanceService.logEvent(conferenceId, socket.user.id, 'join');
 
         if (conf.status === 'scheduled' && conf.host_user_id === socket.user.id) {
           conferenceService.start(conferenceId, socket.user.id);
@@ -119,6 +121,11 @@ export function initSocket(io) {
 
     socket.on('signal:ice-candidate', ({ targetSocketId, candidate }) => {
       io.to(targetSocketId).emit('signal:ice-candidate', { from: socket.id, candidate });
+    });
+
+    socket.on('presence:visibility', ({ hidden }) => {
+      if (!currentRoom) return;
+      attendanceService.logEvent(parseInt(currentRoom, 10), socket.user.id, hidden ? 'tab_hidden' : 'tab_visible');
     });
 
     socket.on('media:toggle', ({ audioEnabled, videoEnabled, screenSharing }) => {
@@ -196,6 +203,20 @@ export function initSocket(io) {
       });
     });
 
+    // Host-only "end for everyone" — conferenceService.end() itself throws
+    // if the caller isn't the host, so that check isn't duplicated here.
+    // Cleanup for every participant (including the host) happens uniformly
+    // once each client's 'conference:ended' listener reacts by leaving.
+    socket.on('room:end', () => {
+      if (!currentRoom) return;
+      try {
+        conferenceService.end(parseInt(currentRoom, 10), socket.user.id);
+        io.to(currentRoom).emit('conference:ended', {});
+      } catch (err) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
     function leaveRoom() {
       if (!currentRoom) return;
       const room = getRoom(currentRoom);
@@ -204,6 +225,7 @@ export function initSocket(io) {
 
       if (participant) {
         conferenceService.leave(parseInt(currentRoom, 10), socket.user.id);
+        attendanceService.logEvent(parseInt(currentRoom, 10), socket.user.id, 'leave');
         broadcastRoom(io, currentRoom, 'participant:left', { participant });
         broadcastRoom(io, currentRoom, 'participants:update', { participants: getOnlineParticipants(currentRoom) });
       }

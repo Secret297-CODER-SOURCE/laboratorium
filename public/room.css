@@ -19,6 +19,7 @@
 
 .room-info h1 { font-size: 1rem; font-weight: 600; }
 .room-code { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); }
+#copy-link-btn { margin-left: 8px; padding: 4px 6px; }
 
 .room-timer {
   font-family: var(--mono);

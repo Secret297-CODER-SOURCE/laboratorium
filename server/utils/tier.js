@@ -22,6 +22,7 @@ export function sanitizeUser(user) {
     role: user.role || 'student',
     bounty_points: user.bounty_points,
     tier: tier.name,
+    is_restricted: !!user.is_restricted,
     created_at: user.created_at,
   };
 }

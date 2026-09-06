@@ -117,3 +117,12 @@ export async function deleteNote(req, res) {
   recordingService.deleteNote(parseInt(req.params.noteId, 10), req.user.id);
   res.json({ ok: true });
 }
+
+export async function progress(req, res) {
+  recordingService.assertCanAccessRecording(parseInt(req.params.id, 10), req.user.id, req.user.role);
+  const view = recordingService.recordProgress(parseInt(req.params.id, 10), req.user.id, {
+    positionSeconds: req.body.positionSeconds,
+    playedSeconds: req.body.playedSeconds,
+  });
+  res.json({ ok: true, view });
+}

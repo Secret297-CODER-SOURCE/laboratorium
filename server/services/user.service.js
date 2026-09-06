@@ -48,15 +48,29 @@ export function register({ name, email, password, handle }) {
 
   const password_hash = bcrypt.hashSync(password, config.bcryptRounds);
   const result = db.prepare(`
-    INSERT INTO users (email, password_hash, name, handle, bounty_points, role)
-    VALUES (?, ?, ?, ?, 0, 'student')
+    INSERT INTO users (email, password_hash, name, handle, bounty_points, role, is_restricted)
+    VALUES (?, ?, ?, ?, 0, 'student', 1)
   `).run(email.toLowerCase(), password_hash, name.trim(), userHandle);
 
   const userId = result.lastInsertRowid;
   addBounty(userId, 100, 'Реєстрація в laboratorium.');
 
-  scheduleProvisionForStudent(userId, userHandle);
+  // Self-registered accounts start restricted (see is_restricted) — no lab
+  // VM until an admin approves their course application and lifts it.
 
+  return findById(userId);
+}
+
+/**
+ * Called when an admin approves a self-registered account's application —
+ * mirrors what adminCreateUser() already does for staff-provisioned
+ * students (lab VM provisioning), deferred until now instead of at signup.
+ */
+export function liftRestriction(userId) {
+  const user = findById(userId);
+  if (!user || !user.is_restricted) return user;
+  db.prepare(`UPDATE users SET is_restricted = 0, updated_at = datetime('now') WHERE id = ?`).run(userId);
+  scheduleProvisionForStudent(userId, user.handle);
   return findById(userId);
 }
 

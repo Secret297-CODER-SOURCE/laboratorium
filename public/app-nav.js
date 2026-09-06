@@ -1,6 +1,6 @@
 import { getUser } from '/auth.js';
 import { icon } from '/icons.js';
-import { isAdminUser } from '/roles.js';
+import { isAdminUser, isRestrictedUser } from '/roles.js';
 import { canAccessTab, pageAllowed } from '/tab-access.js';
 import { t } from '/i18n.js';
 
@@ -33,6 +33,9 @@ function linkAllowed(href) {
 }
 
 export function getAppNavLinks(user = getUser()) {
+  if (isRestrictedUser(user)) {
+    return STUDENT_LINKS.filter(link => link.href === '/dashboard.html');
+  }
   const role = user?.role || 'student';
   const pool = isAdminUser(user) ? ADMIN_LINKS : STUDENT_LINKS;
   return pool.filter(link => {

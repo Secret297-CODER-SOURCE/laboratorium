@@ -2,11 +2,112 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0;url=/login.html">
-  <title>Реєстрація закрита — laboratorium.</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
+  <link rel="alternate icon" type="image/png" href="/favicon.png">
+  <link rel="alternate icon" href="/favicon.ico">
+  <title>Реєстрація — laboratorium.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/auth-pages.css">
 </head>
-<body>
-  <p>Реєстрація закрита. Доступ надається після оплати. <a href="/login.html">Увійти</a></p>
-  <script>location.replace('/login.html');</script>
+<body data-theme="flow">
+  <div class="noise" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <div class="auth-page">
+    <div class="auth-topbar">
+      <a href="/" class="auth-logo"><span class="logo-text">laboratorium<em>.</em></span></a>
+      <span id="auth-lang-switch"></span>
+    </div>
+    <div class="auth-card">
+      <div class="auth-header">
+        <span class="section-tag">// auth.register</span>
+        <h1 data-i18n="Створити акаунт">Створити акаунт</h1>
+        <p data-i18n="Зареєструйтесь і подайте заявку на курс — повний доступ до кабінету відкриється після підтвердження.">Зареєструйтесь і подайте заявку на курс — повний доступ до кабінету відкриється після підтвердження.</p>
+      </div>
+      <form id="register-form" class="auth-form">
+        <div id="form-error" class="form-error" hidden></div>
+        <label>
+          <span data-i18n="Ім'я">Ім'я</span>
+          <input type="text" name="name" required placeholder="Іван Петренко" autocomplete="name">
+        </label>
+        <label>
+          <span>Email</span>
+          <input type="email" name="email" required placeholder="you@email.com" autocomplete="email">
+        </label>
+        <label>
+          <span data-i18n="Пароль">Пароль</span>
+          <input type="password" name="password" required minlength="6" placeholder="••••••••" autocomplete="new-password">
+        </label>
+        <button type="submit" class="btn btn--primary btn--full" data-i18n="Зареєструватися">Зареєструватися</button>
+      </form>
+      <p class="auth-footer">
+        <a href="/login.html" data-i18n="Вже є акаунт? Увійти">Вже є акаунт? Увійти</a>
+      </p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { api, setSession, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
+    import { initI18n, t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
+    initTheme();
+    initI18n();
+    document.getElementById('auth-lang-switch').innerHTML = renderLangSwitch();
+    bindLangSwitch(document);
+    window.addEventListener('localechange', () => {
+      document.getElementById('auth-lang-switch').innerHTML = renderLangSwitch();
+      bindLangSwitch(document);
+    });
+
+    const params = new URLSearchParams(location.search);
+
+    (async () => {
+      if (await validateSession()) {
+        window.location.replace(resolveLoginRedirect(params.get('next'), getUser()?.role));
+        return;
+      }
+
+      checkServerReady().then(ok => {
+        if (!ok) {
+          const el = document.getElementById('form-error');
+          el.textContent = 'Сервер не оновлений. У терміналі: lsof -ti :3000 | xargs kill -9 && cd /Users/worker/websites/laboratorium && npm start';
+          el.hidden = false;
+        }
+      });
+
+      document.getElementById('register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('form-error');
+        const btn = e.target.querySelector('button');
+        const fd = new FormData(e.target);
+        errEl.hidden = true;
+        btn.disabled = true;
+        btn.textContent = t('Реєстрація...');
+        try {
+          const data = await api('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: fd.get('name'),
+              email: fd.get('email'),
+              password: fd.get('password'),
+            }),
+          });
+          setSession(data.token, data.user);
+          window.location.replace('/dashboard.html');
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.hidden = false;
+          btn.disabled = false;
+          btn.textContent = t('Зареєструватися');
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
