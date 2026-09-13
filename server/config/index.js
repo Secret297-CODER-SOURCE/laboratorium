@@ -71,6 +71,13 @@ export const config = {
     seed: envBool('SEED_DATABASE', true),
   },
 
+  // Set true, redeploy, then unset — prints a fresh owner login+password to
+  // the boot log (and OWNER_CREDENTIALS.txt) on next start even if an owner
+  // already exists. The one way to recover a lost owner password on a
+  // platform like Coolify/Docker where only the deploy log is convenient to
+  // check, without needing shell/terminal access to the container.
+  resetOwnerPasswordOnBoot: envBool('RESET_OWNER_PASSWORD', false),
+
   cors: {
     origin: env('CORS_ORIGIN', ''),
   },

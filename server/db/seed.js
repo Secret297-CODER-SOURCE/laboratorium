@@ -108,9 +108,57 @@ function ensureExtraPrograms(db) {
   ensureAllPrograms(db);
 }
 
+/**
+ * Prints owner credentials to the boot log AND saves them next to the
+ * database file. A busy deploy log (Coolify/Docker included) scrolls fast
+ * and this only ever prints on the events that generate a new password, so
+ * the file is a safety net for whenever the log gets missed. Delete it once
+ * copied.
+ */
+function announceOwnerCredentials(email, password, note) {
+  console.log('[db] ==========================================================');
+  console.log(`[db] ${note}`);
+  console.log(`[db]   email:    ${email}`);
+  console.log(`[db]   password: ${password}`);
+  console.log('[db] This password is only ever printed here - copy it now.');
+  console.log('[db] ==========================================================');
+
+  try {
+    const credsPath = join(dirname(config.db.path), 'OWNER_CREDENTIALS.txt');
+    writeFileSync(credsPath, [
+      `laboratorium. — owner account (${note})`,
+      `email:    ${email}`,
+      `password: ${password}`,
+      '',
+      'This is the only place the password is recoverable from — it is',
+      'hashed everywhere else. Delete this file once you\'ve copied it;',
+      'to get a new one later, run: npm run owner:reset-password',
+      '(or set RESET_OWNER_PASSWORD=true and redeploy).',
+    ].join('\n'));
+    console.log(`[db] Also saved to ${credsPath} — delete it once copied.`);
+  } catch (err) {
+    console.error(`[db] Could not write OWNER_CREDENTIALS.txt: ${err.message}`);
+  }
+}
+
 function ensureOwner(db) {
   const byRole = db.prepare("SELECT id FROM users WHERE role = 'owner' LIMIT 1").get();
-  if (byRole) return;
+
+  if (byRole) {
+    // An owner already exists — the only thing left to do is honor an
+    // explicit request to reset it (RESET_OWNER_PASSWORD=true), since the
+    // password itself can never be recovered/re-printed otherwise. This is
+    // what makes "show me a fresh owner login+password in the deploy log"
+    // possible on a platform where the log is the only thing conveniently
+    // checked (e.g. Coolify) — set the flag, redeploy, read the log, unset it.
+    if (!config.resetOwnerPasswordOnBoot) return;
+    const owner = db.prepare("SELECT * FROM users WHERE id = ?").get(byRole.id);
+    const password = explicitEnv('OWNER_PASSWORD') || crypto.randomBytes(9).toString('base64url');
+    const hash = bcrypt.hashSync(password, config.bcryptRounds);
+    db.prepare(`UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`).run(hash, owner.id);
+    announceOwnerCredentials(owner.email, password, 'password reset (RESET_OWNER_PASSWORD=true) — unset it once done');
+    return;
+  }
 
   const explicitEmail = explicitEnv('OWNER_EMAIL').toLowerCase();
   const explicitPassword = explicitEnv('OWNER_PASSWORD');
@@ -130,32 +178,7 @@ function ensureOwner(db) {
   `).run(email, hash, handle);
 
   if (generated) {
-    console.log('[db] ==========================================================');
-    console.log('[db] Owner account auto-generated (set OWNER_EMAIL/OWNER_PASSWORD to pick your own):');
-    console.log(`[db]   email:    ${email}`);
-    console.log(`[db]   password: ${password}`);
-    console.log('[db] This password is only ever printed here - copy it now.');
-    console.log('[db] ==========================================================');
-
-    // Console output scrolls past fast in a busy boot log (Coolify/Docker
-    // included) and this only ever prints once — so it's also dropped next
-    // to the database file as a safety net in case the log gets missed.
-    // Delete this file once you've copied the password.
-    try {
-      const credsPath = join(dirname(config.db.path), 'OWNER_CREDENTIALS.txt');
-      writeFileSync(credsPath, [
-        'laboratorium. — owner account (auto-generated on first boot)',
-        `email:    ${email}`,
-        `password: ${password}`,
-        '',
-        'This is the only place the password is recoverable from — it is',
-        'hashed everywhere else. Delete this file once you\'ve copied it;',
-        'to get a new one later, run: npm run owner:reset-password',
-      ].join('\n'));
-      console.log(`[db] Also saved to ${credsPath} — delete it once copied.`);
-    } catch (err) {
-      console.error(`[db] Could not write OWNER_CREDENTIALS.txt: ${err.message}`);
-    }
+    announceOwnerCredentials(email, password, 'auto-generated on first boot (set OWNER_EMAIL/OWNER_PASSWORD to pick your own)');
   } else {
     console.log(`[db] Owner account created: ${email}`);
   }
