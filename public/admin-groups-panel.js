@@ -109,18 +109,20 @@ async function openGroupModal(groupId, title, showToast) {
       <div class="admin-inline-form" style="margin:0;padding:0;border:none">
         <select class="admin-inp" id="add-member-select">
           <option value="">Оберіть учня...</option>
-          ${students.map(s => `<option value="${s.id}">@${esc(s.handle)} · ${esc(s.name)}</option>`).join('')}
+          ${students.map(s => `<option value="${s.id}">@${esc(s.handle)} · ${esc(s.name)}${s.is_restricted ? ' (очікує групи)' : ''}</option>`).join('')}
         </select>
         <button type="button" class="btn btn--primary btn--sm" id="add-member-btn">Додати</button>
       </div>
     </div>`;
 
   body.querySelector('#add-member-btn')?.addEventListener('click', async () => {
-    const uid = parseInt(body.querySelector('#add-member-select').value, 10);
+    const select = body.querySelector('#add-member-select');
+    const uid = parseInt(select.value, 10);
     if (!uid) return;
+    const wasRestricted = students.find(s => s.id === uid)?.is_restricted;
     try {
       await api(`/admin/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify({ userIds: [uid] }) });
-      showToast('Учня додано');
+      showToast(wasRestricted ? 'Учня додано, доступ відкрито' : 'Учня додано');
       openGroupModal(groupId, title, showToast);
     } catch (err) { showToast(err.message, 'error'); }
   });

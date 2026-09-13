@@ -35,8 +35,8 @@
         <div id="form-error" class="form-error" hidden></div>
         <div id="form-info" class="form-note" hidden></div>
         <label>
-          <span>Email</span>
-          <input type="email" name="email" required placeholder="you@email.com" autocomplete="email">
+          <span data-i18n="Логін або email">Логін або email</span>
+          <input type="text" name="login" required placeholder="nickname або you@email.com" autocomplete="username">
         </label>
         <label>
           <span data-i18n="Пароль">Пароль</span>
@@ -97,7 +97,7 @@
         try {
           const data = await api('/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+            body: JSON.stringify({ login: fd.get('login'), password: fd.get('password') }),
           });
           setSession(data.token, data.user);
           window.location.replace(resolveLoginRedirect(params.get('next'), data.user.role));

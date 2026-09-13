@@ -21,18 +21,22 @@ export function findByHandle(handle) {
   return db.prepare('SELECT * FROM users WHERE handle = ?').get(handle);
 }
 
-export function register({ name, email, password, handle }) {
+/**
+ * Self-registration: the applicant chooses neither their own login nor
+ * password — both are generated here and emailed, so the account is only
+ * ever usable by whoever actually receives that email. Starts restricted
+ * (see is_restricted) — no lab VM, no unlocked tabs — until a teacher or
+ * owner places them in a study group (see group.service.js addGroupMembers).
+ */
+export async function register({ name, email, handle }) {
   if (!config.auth.allowPublicRegistration) {
     throw new ValidationError('Реєстрація закрита. Доступ надається після оплати.');
   }
-  if (!name?.trim() || !email?.trim() || !password) {
-    throw new ValidationError('Заповніть ім\'я, email і пароль');
+  if (!name?.trim() || !email?.trim()) {
+    throw new ValidationError('Заповніть ім\'я та email');
   }
   if (!isValidEmail(email)) {
     throw new ValidationError('Некоректний email');
-  }
-  if (password.length < 6) {
-    throw new ValidationError('Пароль мінімум 6 символів');
   }
   if (findByEmail(email)) {
     throw new ConflictError('Email вже зареєстровано');
@@ -46,7 +50,8 @@ export function register({ name, email, password, handle }) {
     throw new ConflictError('Handle вже зайнято');
   }
 
-  const password_hash = bcrypt.hashSync(password, config.bcryptRounds);
+  const plainPassword = generatePassword();
+  const password_hash = bcrypt.hashSync(plainPassword, config.bcryptRounds);
   const result = db.prepare(`
     INSERT INTO users (email, password_hash, name, handle, bounty_points, role, is_restricted)
     VALUES (?, ?, ?, ?, 0, 'student', 1)
@@ -55,16 +60,28 @@ export function register({ name, email, password, handle }) {
   const userId = result.lastInsertRowid;
   addBounty(userId, 100, 'Реєстрація в laboratorium.');
 
-  // Self-registered accounts start restricted (see is_restricted) — no lab
-  // VM until an admin approves their course application and lifts it.
+  const user = findById(userId);
+  const mailResult = await mailService.sendWelcomeCredentialsEmail(user, plainPassword);
 
-  return findById(userId);
+  // Never hand the plaintext password back here — unlike adminCreateUser(),
+  // the caller is an anonymous public request, so if the email didn't go
+  // out the only safe recovery path is an admin re-sending it from the
+  // users panel (send-reset / send-password), not exposing it in the response.
+  return {
+    user,
+    emailSent: mailResult.sent,
+    mailReason: mailResult.sent ? null : (mailResult.reason || 'no-smtp'),
+  };
 }
 
 /**
- * Called when an admin approves a self-registered account's application —
- * mirrors what adminCreateUser() already does for staff-provisioned
- * students (lab VM provisioning), deferred until now instead of at signup.
+ * Called when a teacher/owner adds a restricted (not-yet-placed) account to
+ * a study group — the only thing that lifts the self-registration
+ * restriction (a course application being approved is informational only;
+ * it does not by itself open access). Also usable as a manual admin
+ * override (see admin.service.js setUserRestricted). Mirrors what
+ * adminCreateUser() already does for staff-provisioned students (lab VM
+ * provisioning), deferred until now instead of at signup/creation.
  */
 export function liftRestriction(userId) {
   const user = findById(userId);
@@ -88,11 +105,17 @@ export async function adminCreateUser({ name, email, role = 'student', handle, p
 
   const password_hash = bcrypt.hashSync(plainPassword, config.bcryptRounds);
   const validRole = ['student', 'teacher', 'owner'].includes(role) ? role : 'student';
+  // Staff-created student accounts start restricted too, same as
+  // self-registration — a teacher/owner adding them to a study group is
+  // what lifts it (see addGroupMembers), so there's one consistent rule
+  // platform-wide instead of two different unlock paths depending on who
+  // created the account.
+  const isRestricted = validRole === 'student' ? 1 : 0;
 
   const result = db.prepare(`
-    INSERT INTO users (email, password_hash, name, handle, bounty_points, role)
-    VALUES (?, ?, ?, ?, 0, ?)
-  `).run(email.toLowerCase(), password_hash, name.trim(), userHandle, validRole);
+    INSERT INTO users (email, password_hash, name, handle, bounty_points, role, is_restricted)
+    VALUES (?, ?, ?, ?, 0, ?, ?)
+  `).run(email.toLowerCase(), password_hash, name.trim(), userHandle, validRole, isRestricted);
 
   const user = findById(result.lastInsertRowid);
   let emailSent = false;
@@ -103,9 +126,8 @@ export async function adminCreateUser({ name, email, role = 'student', handle, p
     mailReason = mailResult.sent ? null : (mailResult.reason || 'no-smtp');
   }
 
-  if (validRole === 'student') {
-    scheduleProvisionForStudent(user.id, userHandle);
-  }
+  // Lab VM provisioning is deferred to liftRestriction() (triggered by
+  // being added to a study group), not done here anymore.
 
   // Always hand the plaintext password back — if the email didn't actually
   // go out (no SMTP configured, or delivery failed), this is the only place
@@ -116,15 +138,19 @@ export async function adminCreateUser({ name, email, role = 'student', handle, p
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('laboratorium-timing-dummy', config.bcryptRounds);
 
-export function login({ email, password }) {
-  if (!email || !password) {
-    throw new ValidationError('Введіть email і пароль');
+/** Accepts either the account's email or its handle (nickname) as the login
+ * identifier — self-registered/staff-created accounts are handed a
+ * generated handle+password to sign in with, not their email. */
+export function login({ login, password }) {
+  if (!login || !password) {
+    throw new ValidationError('Введіть логін і пароль');
   }
 
-  const user = findByEmail(email);
+  const identifier = login.trim();
+  const user = identifier.includes('@') ? findByEmail(identifier) : findByHandle(identifier);
   const matches = bcrypt.compareSync(password, user?.password_hash || DUMMY_PASSWORD_HASH);
   if (!user || !matches) {
-    throw new UnauthorizedError('Невірний email або пароль');
+    throw new UnauthorizedError('Невірний логін або пароль');
   }
   if (user.is_frozen) {
     throw new UnauthorizedError('Акаунт заморожено. Зверніться до адміністрації.');

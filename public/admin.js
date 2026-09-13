@@ -543,7 +543,7 @@ function renderApplicationsPanel(apps) {
             : '<span class="status-pill">немає</span>'}</td>
           <td><span class="status-pill ${a.status}">${a.status}</span></td>
           <td>${a.status === 'pending' ? `
-            <button class="btn btn--ghost btn--sm app-approve" data-id="${a.id}" data-has-account="${a.user_name ? '1' : '0'}" title="${a.user_name ? (a.user_is_restricted ? 'Відкрити доступ' : 'Схвалити') : 'Схвалити і створити акаунт'}">${icon('check', 'ico ico--sm')}</button>
+            <button class="btn btn--ghost btn--sm app-approve" data-id="${a.id}" data-has-account="${a.user_name ? '1' : '0'}" title="${a.user_name ? 'Схвалити' : 'Схвалити і створити акаунт'}">${icon('check', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm app-reject" data-id="${a.id}">${icon('trash', 'ico ico--sm')}</button>
           ` : ''}</td>
         </tr>`).join('')}
@@ -622,11 +622,12 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
 async function updateApp(id, status, hasAccount = false) {
   let createAccount = false;
   if (status === 'approved') {
-    // A self-registered applicant already has an account — approving just
-    // lifts their restriction, it doesn't provision a new login/password.
+    // Approving is informational only — it no longer opens access by
+    // itself. Access opens only once a teacher/owner adds the student to a
+    // study group, so the confirm text here nudges toward that next step.
     const confirmMsg = hasAccount
-      ? 'Схвалити заявку і відкрити акаунту повний доступ?'
-      : 'Схвалити заявку і створити акаунт з паролем на email?';
+      ? 'Схвалити заявку? Щоб відкрити доступ, додайте учня до групи на вкладці «Групи».'
+      : 'Схвалити заявку і створити акаунт з паролем на email? Акаунт буде обмежений, доки учня не додадуть до групи.';
     if (!(await showConfirm(confirmMsg))) return;
     createAccount = true;
   } else if (status === 'rejected' && !(await showConfirm('Відхилити заявку?', { danger: true }))) {
@@ -644,8 +645,6 @@ async function updateApp(id, status, hasAccount = false) {
           { title: 'Пароль учня' },
         );
       }
-    } else if (res.liftedUser) {
-      showToast(`Заявку схвалено, доступ відкрито для @${res.liftedUser.handle}`);
     } else {
       showToast('Заявку оновлено');
     }

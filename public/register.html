@@ -29,10 +29,11 @@
       <div class="auth-header">
         <span class="section-tag">// auth.register</span>
         <h1 data-i18n="Створити акаунт">Створити акаунт</h1>
-        <p data-i18n="Зареєструйтесь і подайте заявку на курс — повний доступ до кабінету відкриється після підтвердження.">Зареєструйтесь і подайте заявку на курс — повний доступ до кабінету відкриється після підтвердження.</p>
+        <p data-i18n="Вкажіть ім'я та email — логін і пароль для входу ми надішлемо на пошту.">Вкажіть ім'я та email — логін і пароль для входу ми надішлемо на пошту.</p>
       </div>
       <form id="register-form" class="auth-form">
         <div id="form-error" class="form-error" hidden></div>
+        <div id="form-success" class="form-note" hidden></div>
         <label>
           <span data-i18n="Ім'я">Ім'я</span>
           <input type="text" name="name" required placeholder="Іван Петренко" autocomplete="name">
@@ -40,10 +41,6 @@
         <label>
           <span>Email</span>
           <input type="email" name="email" required placeholder="you@email.com" autocomplete="email">
-        </label>
-        <label>
-          <span data-i18n="Пароль">Пароль</span>
-          <input type="password" name="password" required minlength="6" placeholder="••••••••" autocomplete="new-password">
         </label>
         <button type="submit" class="btn btn--primary btn--full" data-i18n="Зареєструватися">Зареєструватися</button>
       </form>
@@ -54,7 +51,7 @@
   </div>
 
   <script type="module">
-    import { api, setSession, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
+    import { api, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
     import { initI18n, t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
     initTheme();
     initI18n();
@@ -84,9 +81,11 @@
       document.getElementById('register-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const errEl = document.getElementById('form-error');
+        const successEl = document.getElementById('form-success');
         const btn = e.target.querySelector('button');
         const fd = new FormData(e.target);
         errEl.hidden = true;
+        successEl.hidden = true;
         btn.disabled = true;
         btn.textContent = t('Реєстрація...');
         try {
@@ -95,11 +94,12 @@
             body: JSON.stringify({
               name: fd.get('name'),
               email: fd.get('email'),
-              password: fd.get('password'),
             }),
           });
-          setSession(data.token, data.user);
-          window.location.replace('/dashboard.html');
+          successEl.textContent = data.message;
+          successEl.hidden = false;
+          e.target.reset();
+          btn.textContent = t('Зареєстровано');
         } catch (err) {
           errEl.textContent = err.message;
           errEl.hidden = false;

@@ -105,7 +105,7 @@ export async function updateApplication(req, res) {
     req.body.createAccount,
     req.user,
   );
-  res.json({ application: app.application, account: app.account, liftedUser: app.liftedUser });
+  res.json({ application: app.application, account: app.account });
 }
 
 export async function restrictUser(req, res) {

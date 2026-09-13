@@ -118,11 +118,11 @@ export async function sendWelcomeCredentialsEmail(user, password) {
     html: `
       <p>Вітаємо, ${user.name}!</p>
       <p>Вам надано доступ до особистого кабінету <strong>laboratorium.</strong></p>
-      <p><strong>Email:</strong> ${user.email}<br>
+      <p><strong>Логін:</strong> @${user.handle}<br>
       <strong>Пароль:</strong> ${password}</p>
       <p><a href="${config.appUrl}/login.html">Увійти в кабінет</a></p>
-      <p>Рекомендуємо змінити пароль після першого входу.</p>
+      <p>Змінити пароль можна в будь-який момент через «Забули пароль?» на сторінці входу.</p>
     `,
-    text: `Доступ до laboratorium.\nEmail: ${user.email}\nПароль: ${password}\nВхід: ${config.appUrl}/login.html`,
+    text: `Доступ до laboratorium.\nЛогін: @${user.handle}\nПароль: ${password}\nВхід: ${config.appUrl}/login.html`,
   });
 }

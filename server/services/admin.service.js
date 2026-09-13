@@ -156,22 +156,19 @@ export async function updateApplicationStatus(id, status, createAccount = false,
   if (!app) throw new NotFoundError('Заявку не знайдено');
   db.prepare(`UPDATE applications SET status = ? WHERE id = ?`).run(status, id);
 
+  // Approving an application is informational only — it does not by itself
+  // open access. The only thing that lifts a restricted account is being
+  // placed in a study group (see group.service.js addGroupMembers), so a
+  // guest applicant with no account yet still only gets one created here
+  // (when the admin opts into createAccount) — the resulting account starts
+  // restricted just like a self-registration, awaiting group placement.
   let account = null;
-  let liftedUser = null;
   if (status === 'approved' && actor) {
-    // A self-registered applicant already has an account (linked via
-    // user_id); approving just lifts their restriction instead of creating
-    // a duplicate. Only a guest submission (no account yet) goes through
-    // adminCreateUser, and only when the admin opted into createAccount.
     const existing = app.user_id
       ? db.prepare('SELECT * FROM users WHERE id = ?').get(app.user_id)
       : db.prepare('SELECT * FROM users WHERE email = ?').get(app.email);
 
-    if (existing) {
-      if (existing.is_restricted) {
-        liftedUser = userService.liftRestriction(existing.id);
-      }
-    } else if (createAccount) {
+    if (!existing && createAccount) {
       account = await userService.adminCreateUser({
         name: app.name,
         email: app.email,
@@ -186,7 +183,6 @@ export async function updateApplicationStatus(id, status, createAccount = false,
     account: account
       ? { user: userService.toPublic(account.user), password: account.password, emailSent: account.emailSent, mailReason: account.mailReason }
       : null,
-    liftedUser: liftedUser ? userService.toPublic(liftedUser) : null,
   };
 }
 

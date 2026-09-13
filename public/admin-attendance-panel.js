@@ -72,7 +72,7 @@ function renderConferenceDetail(detail) {
       <thead><tr><th>Учень</th><th>Статус</th><th>Був у мережі</th><th>Не був на вкладці</th><th>Перемикань</th><th>Запис</th></tr></thead>
       <tbody>${students.map(s => `
         <tr>
-          <td>@${esc(s.handle)}</td>
+          <td>${esc(s.name)} <span style="color:var(--text-dim)">@${esc(s.handle)}</span></td>
           <td><span class="status-pill ${STATUS_PILL_CLASS[s.status] || ''}">${STATUS_LABELS[s.status] || s.status} · ${s.attendance_pct}%</span></td>
           <td>${fmtDur(s.present_seconds)}</td>
           <td>${s.away_seconds ? fmtDur(s.away_seconds) : '—'}</td>

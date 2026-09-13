@@ -8,9 +8,18 @@ export async function register(req, res) {
   if (!config.auth.allowPublicRegistration) {
     throw new ForbiddenError('Реєстрація закрита. Доступ надається після оплати.');
   }
-  const user = userService.register(req.body);
-  const token = signToken(user);
-  res.status(201).json({ token, user: userService.toPublic(user) });
+  // No token/session here: the account's login+password are generated and
+  // emailed, not chosen by the registrant, so there's nothing to log them
+  // in with yet — they sign in themselves once they have that email.
+  const { emailSent, mailReason } = await userService.register(req.body);
+  res.status(201).json({
+    ok: true,
+    emailSent,
+    mailReason,
+    message: emailSent
+      ? 'Реєстрацію прийнято! Перевірте пошту — ми надіслали логін і пароль для входу.'
+      : 'Акаунт створено, але лист не надійшов. Зверніться до адміністрації, щоб отримати доступ.',
+  });
 }
 
 export async function login(req, res) {

@@ -1,6 +1,7 @@
 import db from '../db/index.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { STUDENT_MEMBER_ROLES } from '../utils/roles.js';
+import * as userService from './user.service.js';
 
 function mapGroup(row) {
   if (!row) return null;
@@ -132,13 +133,19 @@ export function listAvailableStudents(actorId, actorRole, groupId = null) {
   }
 
   return db.prepare(`
-    SELECT u.id, u.name, u.handle, u.email, u.bounty_points
+    SELECT u.id, u.name, u.handle, u.email, u.bounty_points, u.is_restricted
     FROM users u
     WHERE u.role = 'student' ${excludeSql}
     ORDER BY u.name LIMIT 200
-  `).all(...params);
+  `).all(...params).map(s => ({ ...s, is_restricted: !!s.is_restricted }));
 }
 
+/**
+ * Being placed in a study group is what lifts a restricted (self-registered
+ * or staff-created but not-yet-placed) student's account — see
+ * userService.liftRestriction(). A course application being approved is
+ * informational only and does not by itself open access.
+ */
 export function addGroupMembers(groupId, actorId, actorRole, userIds) {
   const group = getGroupById(groupId);
   assertTeacherAccess(group, actorId, actorRole);
@@ -153,7 +160,9 @@ export function addGroupMembers(groupId, actorId, actorRole, userIds) {
   const tx = db.transaction((items) => {
     for (const uid of items) {
       const student = db.prepare("SELECT id FROM users WHERE id = ? AND role = 'student'").get(uid);
-      if (student) insert.run(groupId, uid, actorId);
+      if (!student) continue;
+      const changes = insert.run(groupId, uid, actorId).changes;
+      if (changes > 0) userService.liftRestriction(uid);
     }
   });
   tx(ids);

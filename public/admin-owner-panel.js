@@ -516,10 +516,11 @@ export function bindOwnerPanelEvents(showToast, reload) {
     const role = document.getElementById('new-user-role').value;
     try {
       const res = await api('/admin/users', { method: 'POST', body: JSON.stringify({ name, email, role, sendEmail: true }) });
+      const groupHint = role === 'student' ? ' Додайте учня до групи, щоб відкрити йому доступ.' : '';
       if (res.emailSent) {
-        showToast('Акаунт створено, пароль надіслано на email');
+        showToast(`Акаунт створено, пароль надіслано на email.${groupHint}`);
       } else {
-        await showCopyDialog(mailFailMessage(`Акаунт створено, але email НЕ надіслано. Скопіюйте пароль і передайте учню (${email}) вручну.`, res.mailReason), res.password, { title: 'Пароль учня' });
+        await showCopyDialog(mailFailMessage(`Акаунт створено, але email НЕ надіслано. Скопіюйте пароль і передайте учню (${email}) вручну.${groupHint}`, res.mailReason), res.password, { title: 'Пароль учня' });
       }
       reload();
     } catch (err) { showToast(err.message, 'error'); }
