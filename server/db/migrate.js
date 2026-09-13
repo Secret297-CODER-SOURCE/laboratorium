@@ -729,6 +729,12 @@ export function runMigrations(db) {
   if (!manualCols.includes('review_status')) {
     db.exec(`ALTER TABLE manuals ADD COLUMN review_status TEXT DEFAULT 'draft' NOT NULL`);
   }
+  // Group-scoping, mirroring quizzes.group_id — when set, a manual is only
+  // visible to that group's members instead of the broader direction match.
+  if (!manualCols.includes('group_id')) {
+    db.exec('ALTER TABLE manuals ADD COLUMN group_id INTEGER REFERENCES study_groups(id) ON DELETE SET NULL');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_manuals_group ON manuals(group_id)');
+  }
 
   // Directions: tag which ones are "programming" directions — gates the
   // code-editor/sandbox feature to relevant groups only.

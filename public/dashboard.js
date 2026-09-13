@@ -219,13 +219,14 @@ function renderDashboard(data) {
   if (canWriteArticles) {
     renderArticles(articles || []);
   }
+  renderMyManuals(data.myManuals || []);
   if (activeDashTab === 'ctf') loadCtfPanel();
   if (activeDashTab === 'tests') loadQuizzesPanel();
   if (activeDashTab === 'lab') loadLabPanel();
   if (activeDashTab === 'code') initCodeEditor();
 }
 
-const ALL_TABS = ['home', 'ctf', 'tests', 'lab', 'code', 'article'];
+const ALL_TABS = ['home', 'ctf', 'tests', 'lab', 'code', 'article', 'manuals'];
 
 function setupDashTabs(canWriteArticles) {
   const tabsEl = document.getElementById('dash-tabs');
@@ -262,6 +263,7 @@ function setupDashTabs(canWriteArticles) {
   document.getElementById('dash-panel-lab').hidden = activeDashTab !== 'lab';
   document.getElementById('dash-panel-code').hidden = activeDashTab !== 'code';
   document.getElementById('dash-panel-article').hidden = activeDashTab !== 'article';
+  document.getElementById('dash-panel-manuals').hidden = activeDashTab !== 'manuals';
 }
 
 if (!window.__dashTabsBound) {
@@ -340,6 +342,80 @@ function renderArticles(articles) {
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const MANUAL_STATUS_LABELS = {
+  published: 'Опубліковано',
+  submitted: 'На перевірці',
+  draft: 'Чернетка',
+};
+
+function manualStatusKey(m) {
+  if (m.is_published) return 'published';
+  return m.review_status === 'submitted' ? 'submitted' : 'draft';
+}
+
+function renderMyManuals(manuals) {
+  const el = document.getElementById('my-manuals-list');
+  if (!el) return;
+
+  if (!manuals.length) {
+    el.innerHTML = `<p class="empty-state">${t('Поки немає мануалів. Створіть перший!')}</p>`;
+    return;
+  }
+
+  el.innerHTML = manuals.map(m => {
+    const statusKey = manualStatusKey(m);
+    const scope = m.group_name || m.direction_name;
+    return `
+    <article class="article-item" data-id="${m.id}">
+      <div>
+        <h4>${escapeHtml(m.title)}</h4>
+        <div class="article-item-meta">
+          ${t(MANUAL_STATUS_LABELS[statusKey])}
+          ${scope ? ` · ${escapeHtml(scope)}` : ''}
+          · ${new Date(m.updated_at + 'Z').toLocaleDateString(dateLocale())}
+        </div>
+      </div>
+      <div class="article-item-actions">
+        <span class="article-status ${statusKey}">${t(MANUAL_STATUS_LABELS[statusKey])}</span>
+        <a class="btn btn--ghost btn--sm" href="/content-builder.html?type=manual&id=${m.id}">${t('Редагувати')}</a>
+        ${statusKey === 'draft' ? `<button type="button" class="btn btn--outline btn--sm manual-submit-btn" data-id="${m.id}">${t('Надіслати на перевірку')}</button>` : ''}
+      </div>
+    </article>
+  `;
+  }).join('');
+
+  el.querySelectorAll('.manual-submit-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await api(`/manuals/${btn.dataset.id}/submit`, { method: 'POST' });
+        await loadDashboard();
+        showToast(t('Мануал надіслано на перевірку'));
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  });
+}
+
+if (!window.__manualFormBound) {
+  window.__manualFormBound = true;
+  document.getElementById('manual-new-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('manual-new-title');
+    const title = input.value.trim();
+    if (!title) return;
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    try {
+      const res = await api('/manuals', { method: 'POST', body: JSON.stringify({ title }) });
+      window.location.href = `/content-builder.html?type=manual&id=${res.manual.id}`;
+    } catch (err) {
+      showToast(err.message, 'error');
+      btn.disabled = false;
+    }
+  });
 }
 
 function resetArticleForm() {

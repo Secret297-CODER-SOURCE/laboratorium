@@ -60,12 +60,12 @@ router.patch('/articles/:id', requireTab('dash.article'), asyncHandler(apiCtrl.u
 router.post('/articles/:id/submit', requireTab('dash.article'), asyncHandler(apiCtrl.submitArticle));
 
 router.get('/manuals', asyncHandler(apiCtrl.listManuals));
-router.get('/manuals/mine', asyncHandler(apiCtrl.listMyManuals));
-router.post('/manuals', asyncHandler(apiCtrl.createManual));
+router.get('/manuals/mine', requireTab('dash.manuals'), asyncHandler(apiCtrl.listMyManuals));
+router.post('/manuals', requireTab('dash.manuals'), asyncHandler(apiCtrl.createManual));
 router.get('/manuals/:id(\\d+)', asyncHandler(apiCtrl.getManualForActor));
-router.patch('/manuals/:id(\\d+)', asyncHandler(apiCtrl.updateManual));
-router.delete('/manuals/:id(\\d+)', asyncHandler(apiCtrl.deleteManual));
-router.post('/manuals/:id(\\d+)/submit', asyncHandler(apiCtrl.submitManualForReview));
+router.patch('/manuals/:id(\\d+)', requireTab('dash.manuals'), asyncHandler(apiCtrl.updateManual));
+router.delete('/manuals/:id(\\d+)', requireTab('dash.manuals'), asyncHandler(apiCtrl.deleteManual));
+router.post('/manuals/:id(\\d+)/submit', requireTab('dash.manuals'), asyncHandler(apiCtrl.submitManualForReview));
 router.get('/manuals/:slug', asyncHandler(apiCtrl.getManualBySlug));
 
 router.get('/content/:type/:id', asyncHandler(apiCtrl.getContentView));

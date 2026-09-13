@@ -1,6 +1,7 @@
 import db from '../db/index.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import * as notificationService from './notification.service.js';
+import * as groupService from './group.service.js';
 
 function isStaffRole(role) {
   return role === 'owner' || role === 'developer' || role === 'teacher';
@@ -21,6 +22,8 @@ function mapManual(row) {
     title: row.title,
     direction_id: row.direction_id,
     direction_name: row.direction_name || null,
+    group_id: row.group_id,
+    group_name: row.group_name || null,
     review_status: row.review_status || 'draft',
     sort_order: row.sort_order,
     created_by: row.created_by,
@@ -35,10 +38,11 @@ function mapManual(row) {
 
 const WITH_PAGE_STATUS = `
   SELECT m.*, cp.is_published, cp.updated_at as page_updated_at,
-    d.name as direction_name, u.name as author_name, u.handle as author_handle
+    d.name as direction_name, g.name as group_name, u.name as author_name, u.handle as author_handle
   FROM manuals m
   LEFT JOIN content_pages cp ON cp.target_type = 'manual' AND cp.target_id = m.id
   LEFT JOIN directions d ON d.id = m.direction_id
+  LEFT JOIN study_groups g ON g.id = m.group_id
   LEFT JOIN users u ON u.id = m.created_by
 `;
 
@@ -46,8 +50,45 @@ export function listAdmin() {
   return db.prepare(`${WITH_PAGE_STATUS} ORDER BY m.sort_order, m.id`).all().map(mapManual);
 }
 
-export function listPublished() {
-  return db.prepare(`${WITH_PAGE_STATUS} WHERE cp.is_published = 1 ORDER BY m.sort_order, m.id`).all().map(mapManual);
+function studentEffectiveDirectionIds(userId) {
+  return db.prepare(`
+    SELECT DISTINCT COALESCE(g.direction_id, p.direction_id) as direction_id
+    FROM study_group_members gm
+    JOIN study_groups g ON g.id = gm.group_id
+    LEFT JOIN programs p ON p.id = g.program_id
+    WHERE gm.user_id = ? AND COALESCE(g.direction_id, p.direction_id) IS NOT NULL
+  `).all(userId).map((r) => r.direction_id);
+}
+
+/**
+ * Visibility precedence (mirrors quizzes' group_id-then-direction fallback):
+ * a manual pinned to a specific group is visible only to that group's
+ * members; one with just a direction is visible to any group under that
+ * direction (today's behavior); one with neither stays globally visible.
+ * Staff always see every published manual, unfiltered.
+ */
+export function listPublished(userId, userRole) {
+  const base = `${WITH_PAGE_STATUS} WHERE cp.is_published = 1`;
+  if (!userId || isStaffRole(userRole)) {
+    return db.prepare(`${base} ORDER BY m.sort_order, m.id`).all().map(mapManual);
+  }
+
+  const groupIds = groupService.getStudentGroupIds(userId);
+  const directionIds = studentEffectiveDirectionIds(userId);
+
+  const clauses = ['(m.group_id IS NULL AND m.direction_id IS NULL)'];
+  const params = [];
+  if (groupIds.length) {
+    clauses.push(`m.group_id IN (${groupIds.map(() => '?').join(',')})`);
+    params.push(...groupIds);
+  }
+  if (directionIds.length) {
+    clauses.push(`(m.group_id IS NULL AND m.direction_id IN (${directionIds.map(() => '?').join(',')}))`);
+    params.push(...directionIds);
+  }
+
+  return db.prepare(`${base} AND (${clauses.join(' OR ')}) ORDER BY m.sort_order, m.id`)
+    .all(...params).map(mapManual);
 }
 
 /** Мануали користувача — власні чернетки/надіслані/опубліковані, для «Мої мануали». */
@@ -83,12 +124,13 @@ export function create(actorId, data) {
   }
 
   const directionId = data.direction_id ? parseInt(data.direction_id, 10) : null;
+  const groupId = data.group_id ? parseInt(data.group_id, 10) : null;
 
   const result = db.prepare(`
-    INSERT INTO manuals (slug, title, direction_id, sort_order, created_by)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO manuals (slug, title, direction_id, group_id, sort_order, created_by)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).run(
-    slug, title, directionId || null,
+    slug, title, directionId || null, groupId || null,
     parseInt(data.sort_order, 10) || 0, actorId || null,
   );
 
@@ -122,12 +164,15 @@ export function update(actorId, actorRole, id, data) {
   const directionId = data.direction_id !== undefined
     ? (data.direction_id ? parseInt(data.direction_id, 10) : null)
     : existing.direction_id;
+  const groupId = data.group_id !== undefined
+    ? (data.group_id ? parseInt(data.group_id, 10) : null)
+    : existing.group_id;
 
   db.prepare(`
-    UPDATE manuals SET slug = ?, title = ?, direction_id = ?, sort_order = ?, updated_at = datetime('now')
+    UPDATE manuals SET slug = ?, title = ?, direction_id = ?, group_id = ?, sort_order = ?, updated_at = datetime('now')
     WHERE id = ?
   `).run(
-    slug, title, directionId || null,
+    slug, title, directionId || null, groupId || null,
     data.sort_order !== undefined ? (parseInt(data.sort_order, 10) || 0) : existing.sort_order,
     id,
   );

@@ -3,6 +3,13 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.
 import { STUDENT_MEMBER_ROLES } from '../utils/roles.js';
 import * as userService from './user.service.js';
 
+/** Which groups a student belongs to — shared by anything that scopes
+ * content (quizzes, manuals, ...) to a student's own groups. */
+export function getStudentGroupIds(userId) {
+  return db.prepare('SELECT group_id FROM study_group_members WHERE user_id = ?')
+    .all(userId).map(r => r.group_id);
+}
+
 function mapGroup(row) {
   if (!row) return null;
   return { ...row, is_active: !!row.is_active, member_count: row.member_count ?? 0 };

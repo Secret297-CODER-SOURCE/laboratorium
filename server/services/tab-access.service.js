@@ -10,6 +10,7 @@ export const TAB_DEFINITIONS = [
   { key: 'dash.tests', label: 'Кабінет — Тести', group: 'Кабінет' },
   { key: 'dash.lab', label: 'Кабінет — Лабораторія', group: 'Кабінет' },
   { key: 'dash.article', label: 'Кабінет — Статті', group: 'Кабінет' },
+  { key: 'dash.manuals', label: 'Кабінет — Мануали', group: 'Кабінет' },
   { key: 'portal.cabinet', label: 'Портал — Кабінет', group: 'Портал' },
   { key: 'portal.ctf', label: 'Портал — CTF', group: 'Портал' },
   { key: 'portal.tests', label: 'Портал — Тести', group: 'Портал' },

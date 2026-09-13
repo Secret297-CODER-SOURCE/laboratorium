@@ -37,6 +37,7 @@
         <button type="button" class="dash-tab" data-tab="lab" data-i18n="Лабораторія">Лабораторія</button>
         <button type="button" class="dash-tab" data-tab="code" id="tab-code-btn" hidden data-i18n="Редактор коду">Редактор коду</button>
         <button type="button" class="dash-tab" data-tab="article" id="tab-article-btn" hidden data-i18n="Написати статтю">Написати статтю</button>
+        <button type="button" class="dash-tab" data-tab="manuals" data-i18n="Мої мануали">Мої мануали</button>
       </nav>
 
       <div id="dash-panel-home">
@@ -331,6 +332,26 @@
           </div>
           <div id="articles-list" class="articles-list">
             <p class="empty-state" data-i18n="Поки немає статей">Поки немає статей</p>
+          </div>
+        </section>
+      </div>
+
+      <div id="dash-panel-manuals" hidden>
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2 data-i18n="Новий мануал">Новий мануал</h2>
+          </div>
+          <form id="manual-new-form" class="enroll-form">
+            <input type="text" id="manual-new-title" data-i18n-placeholder="Назва мануала" placeholder="Назва мануала" required maxlength="200">
+            <button type="submit" class="btn btn--primary btn--sm" data-i18n="Створити">Створити</button>
+          </form>
+        </section>
+        <section class="dash-panel dash-panel--wide">
+          <div class="panel-header">
+            <h2 data-i18n="Мої мануали">Мої мануали</h2>
+          </div>
+          <div id="my-manuals-list">
+            <p class="empty-state" data-i18n="Поки немає мануалів">Поки немає мануалів</p>
           </div>
         </section>
       </div>

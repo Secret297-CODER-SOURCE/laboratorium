@@ -86,7 +86,7 @@ let quizzesAdminData = { quizzes: [] };
 let statsAdminData = null;
 let storageAdminData = { servers: [], assets: [] };
 let labsAdminData = [];
-let manualsAdminData = { manuals: [], directions: [] };
+let manualsAdminData = { manuals: [], directions: [], groups: [] };
 let ownerGroupsData = { groups: [], programs: [], directions: [], teachers: [] };
 let teacherDirections = [];
 let adminLoadSeq = 0;
@@ -258,7 +258,7 @@ async function load() {
   if (role === 'owner' && ownerTab === 'manuals') {
     try {
       manualsAdminData = await loadManualsAdminData();
-    } catch { manualsAdminData = { manuals: [], directions: [] }; }
+    } catch { manualsAdminData = { manuals: [], directions: [], groups: [] }; }
   }
 
   if (role === 'owner' && ownerTab === 'groups') {

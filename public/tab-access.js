@@ -17,6 +17,7 @@ const DASH_TAB_MAP = {
   tests: 'dash.tests',
   lab: 'dash.lab',
   article: 'dash.article',
+  manuals: 'dash.manuals',
 };
 
 export function setAllowedTabs(list) {
@@ -55,6 +56,6 @@ export function pageAllowed(pageKey) {
 }
 
 export function firstAllowedDashTab(fallback = 'home') {
-  const order = ['home', 'ctf', 'tests', 'lab', 'article'];
+  const order = ['home', 'ctf', 'tests', 'lab', 'article', 'manuals'];
   return order.find(t => dashTabAllowed(t)) || fallback;
 }

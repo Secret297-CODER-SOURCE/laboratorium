@@ -141,8 +141,15 @@ export function deleteUser(actorId, actorRole, userId) {
 }
 
 export function listApplications(status) {
+  // Matches the same fallback updateApplicationStatus() itself uses when
+  // approving: a guest submission (no user_id) can still correspond to an
+  // account that registered afterward with the same email — without this,
+  // the "Акаунт" column would wrongly show "немає" for someone staff can
+  // already place in a group.
   let sql = `SELECT a.*, u.name as user_name, u.handle as user_handle, u.is_restricted as user_is_restricted
-    FROM applications a LEFT JOIN users u ON u.id = a.user_id WHERE 1=1`;
+    FROM applications a
+    LEFT JOIN users u ON u.id = a.user_id OR (a.user_id IS NULL AND u.email = a.email)
+    WHERE 1=1`;
   const params = [];
   if (status) { sql += ' AND a.status = ?'; params.push(status); }
   sql += ' ORDER BY a.created_at DESC';
@@ -167,6 +174,13 @@ export async function updateApplicationStatus(id, status, createAccount = false,
     const existing = app.user_id
       ? db.prepare('SELECT * FROM users WHERE id = ?').get(app.user_id)
       : db.prepare('SELECT * FROM users WHERE email = ?').get(app.email);
+
+    // Found by email only (a guest submission whose applicant registered
+    // afterward) — link the application to that account now so it shows
+    // up correctly everywhere else that joins on user_id, not just here.
+    if (existing && !app.user_id) {
+      db.prepare('UPDATE applications SET user_id = ? WHERE id = ?').run(existing.id, id);
+    }
 
     if (!existing && createAccount) {
       account = await userService.adminCreateUser({

@@ -182,6 +182,7 @@ export async function getDashboard(req, res) {
   const canWriteArticles = articleService.studentCanWriteArticles(req.user.id);
   const studentMemberRoles = articleService.getStudentMemberRoles(req.user.id);
   const articles = canWriteArticles ? articleService.listForUser(req.user.id) : [];
+  const myManuals = manualService.listMine(req.user.id);
 
   res.json({
     user: userService.toPublic(user),
@@ -196,6 +197,7 @@ export async function getDashboard(req, res) {
     articles,
     canWriteArticles,
     studentMemberRoles,
+    myManuals,
     groupContent: contentService.listStudentGroupContent(req.user.id),
     stats: {
       programs_count: enrollments.length,
@@ -305,8 +307,8 @@ export async function submitArticle(req, res) {
   res.json({ article, message: 'Статтю надіслано викладачу' });
 }
 
-export async function listManuals(_req, res) {
-  res.json({ manuals: manualService.listPublished() });
+export async function listManuals(req, res) {
+  res.json({ manuals: manualService.listPublished(req.user?.id, req.user?.role) });
 }
 
 export async function listMyManuals(req, res) {

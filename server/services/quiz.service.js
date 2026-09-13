@@ -13,11 +13,6 @@ function parseOptions(json) {
   }
 }
 
-function studentGroupIds(userId) {
-  return db.prepare('SELECT group_id FROM study_group_members WHERE user_id = ?')
-    .all(userId).map(r => r.group_id);
-}
-
 function studentProgramIds(userId) {
   return db.prepare('SELECT program_id FROM enrollments WHERE user_id = ?')
     .all(userId).map(r => r.program_id);
@@ -82,7 +77,7 @@ function mapQuizRow(row, userId = null) {
 }
 
 export function listForStudent(userId) {
-  const groupIds = studentGroupIds(userId);
+  const groupIds = groupService.getStudentGroupIds(userId);
   const programIds = studentProgramIds(userId);
   if (!groupIds.length && !programIds.length) return [];
 

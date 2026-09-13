@@ -7,11 +7,12 @@ function esc(s) {
 }
 
 export async function loadManualsAdminData() {
-  const [{ manuals }, { directions }] = await Promise.all([
+  const [{ manuals }, { directions }, { groups }] = await Promise.all([
     api('/admin/manuals'),
     api('/admin/directions'),
+    api('/admin/groups?all=1'),
   ]);
-  return { manuals, directions };
+  return { manuals, directions, groups };
 }
 
 function statusPill(m) {
@@ -25,7 +26,12 @@ function directionOptions(directions, selectedId) {
     <option value="${d.id}" ${String(d.id) === String(selectedId || '') ? 'selected' : ''}>${esc(d.name)}${d.is_active ? '' : ' (неактивний)'}</option>`).join('');
 }
 
-export function renderManualsPanel({ manuals, directions } = {}) {
+function groupOptions(groups, selectedId) {
+  return '<option value="">— будь-яка з напрямку —</option>' + (groups || []).map(g => `
+    <option value="${g.id}" ${String(g.id) === String(selectedId || '') ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+}
+
+export function renderManualsPanel({ manuals, directions, groups } = {}) {
   return `<section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
       <h2>${icon('notes', 'ico ico--md')}Мануали</h2>
@@ -33,14 +39,16 @@ export function renderManualsPanel({ manuals, directions } = {}) {
     </div>
     <p class="empty-state" style="padding:0 0 12px;text-align:left">
       Мануали може створювати будь-хто (учні також) — чернетки з'являються тут для перевірки. Опублікувати може лише викладач/адмін.
+      Якщо обрати групу — мануал бачитимуть лише її учасники; без групи (лише напрямок) — усі групи цього напрямку.
     </p>
     <table class="admin-table">
-      <thead><tr><th>Назва</th><th>Slug</th><th>Напрямок</th><th>Автор</th><th>Порядок</th><th>Статус</th><th></th></tr></thead>
+      <thead><tr><th>Назва</th><th>Slug</th><th>Напрямок</th><th>Група</th><th>Автор</th><th>Порядок</th><th>Статус</th><th></th></tr></thead>
       <tbody>${(manuals || []).map(m => `
         <tr data-manual-id="${m.id}">
           <td><input class="admin-inp" data-field="title" value="${esc(m.title)}"></td>
           <td><input class="admin-inp admin-inp--sm" data-field="slug" value="${esc(m.slug)}"></td>
           <td><select class="admin-inp admin-inp--sm" data-field="direction_id">${directionOptions(directions, m.direction_id)}</select></td>
+          <td><select class="admin-inp admin-inp--sm" data-field="group_id">${groupOptions(groups, m.group_id)}</select></td>
           <td style="font-size:0.75rem;color:var(--text-muted)">${esc(m.author_name || m.author_handle || '—')}</td>
           <td><input class="admin-inp admin-inp--xs" type="number" data-field="sort_order" value="${m.sort_order}"></td>
           <td>${statusPill(m)}</td>
@@ -53,7 +61,7 @@ export function renderManualsPanel({ manuals, directions } = {}) {
               <button type="button" class="btn btn--ghost btn--sm manual-del" data-id="${m.id}" title="Видалити">${icon('trash', 'ico ico--sm')}</button>
             </div>
           </td>
-        </tr>`).join('') || '<tr><td colspan="7" class="empty-state">Мануалів ще немає</td></tr>'}
+        </tr>`).join('') || '<tr><td colspan="8" class="empty-state">Мануалів ще немає</td></tr>'}
       </tbody>
     </table>
   </section>`;
@@ -65,6 +73,7 @@ function rowData(row) {
     data[inp.dataset.field] = inp.type === 'checkbox' ? inp.checked : inp.value;
   });
   if ('direction_id' in data) data.direction_id = data.direction_id || null;
+  if ('group_id' in data) data.group_id = data.group_id || null;
   return data;
 }
 
