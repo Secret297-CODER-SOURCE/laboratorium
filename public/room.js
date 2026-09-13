@@ -45,6 +45,12 @@ let timerInterval = null;
 let isHost = false;
 
 const peers = new Map();
+// One audio + one video RTCRtpSender per peer, pre-negotiated up front (see
+// createPeer) so mic/cam/screen toggles are always a plain replaceTrack —
+// never a renegotiation added after the fact, which turned out to be the
+// actual cause of screen share not reaching peers whose connection was
+// first set up with no live tracks at all (mic+cam both off at join time).
+const peerSenders = new Map();
 
 const videoGrid = document.getElementById('video-grid');
 const localVideo = document.getElementById('local-video');
@@ -77,30 +83,21 @@ function updateLocalVideo() {
   }
 }
 
-async function renegotiatePeer(socketId, pc) {
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  socket.emit('signal:offer', { targetSocketId: socketId, offer });
+/** Pushes whatever localStream currently has onto one peer's pre-created senders. */
+async function applyLocalTracks(socketId) {
+  const senders = peerSenders.get(socketId);
+  if (!senders || !localStream) return;
+  await senders.audio.replaceTrack(localStream.getAudioTracks()[0] || null);
+  await senders.video.replaceTrack(localStream.getVideoTracks()[0] || null);
 }
 
-async function addTrackToAllPeers(track) {
-  for (const [socketId, pc] of peers) {
-    const sender = pc.getSenders().find(s => s.track?.kind === track.kind);
-    if (sender) {
-      await sender.replaceTrack(track);
-    } else {
-      pc.addTrack(track, localStream);
-      await renegotiatePeer(socketId, pc);
-    }
-  }
-}
-
-async function removeTrackFromAllPeers(kind) {
-  for (const [socketId, pc] of peers) {
-    const sender = pc.getSenders().find(s => s.track?.kind === kind);
-    if (!sender) continue;
-    await sender.replaceTrack(null);
-    await renegotiatePeer(socketId, pc);
+/** Swaps the given kind's outgoing track (mic/cam/screen) on every peer — no
+ * signaling round-trip needed since the sender already exists for every
+ * connection (see createPeer). Pass track=null to stop sending that kind. */
+async function setSenderTrack(kind, track) {
+  for (const senders of peerSenders.values()) {
+    const sender = senders[kind];
+    if (sender) await sender.replaceTrack(track);
   }
 }
 
@@ -112,11 +109,11 @@ async function setMicEnabled(on) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         track = stream.getAudioTracks()[0];
         localStream.addTrack(track);
-        await addTrackToAllPeers(track);
       } else {
         track.enabled = true;
       }
       micEnabled = true;
+      await setSenderTrack('audio', track);
     } catch {
       addSystemMessage('Мікрофон недоступний');
       return;
@@ -126,7 +123,7 @@ async function setMicEnabled(on) {
     if (track) {
       track.stop();
       localStream.removeTrack(track);
-      await removeTrackFromAllPeers('audio');
+      await setSenderTrack('audio', null);
     }
     micEnabled = false;
   }
@@ -142,11 +139,11 @@ async function setCamEnabled(on) {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         track = stream.getVideoTracks()[0];
         localStream.addTrack(track);
-        await addTrackToAllPeers(track);
       } else {
         track.enabled = true;
       }
       camEnabled = true;
+      if (!screenSharing) await setSenderTrack('video', track);
     } catch {
       addSystemMessage('Камера недоступна');
       return;
@@ -156,7 +153,7 @@ async function setCamEnabled(on) {
     if (track) {
       track.stop();
       localStream.removeTrack(track);
-      await removeTrackFromAllPeers('video');
+      if (!screenSharing) await setSenderTrack('video', null);
     }
     camEnabled = false;
   }
@@ -180,8 +177,15 @@ async function createPeer(socketId, isInitiator, userData) {
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   peers.set(socketId, pc);
 
-  if (localStream) {
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  // Always negotiate one audio + one video slot immediately, even with no
+  // track yet (mic/cam start off) — see applyLocalTracks/setSenderTrack.
+  peerSenders.set(socketId, {
+    audio: pc.addTransceiver('audio', { direction: 'sendrecv' }).sender,
+    video: pc.addTransceiver('video', { direction: 'sendrecv' }).sender,
+  });
+  await applyLocalTracks(socketId);
+  if (screenSharing && screenStream) {
+    await peerSenders.get(socketId).video.replaceTrack(screenStream.getVideoTracks()[0]);
   }
 
   const tile = document.createElement('div');
@@ -227,6 +231,7 @@ async function createPeer(socketId, isInitiator, userData) {
 function removePeer(socketId) {
   const pc = peers.get(socketId);
   if (pc) { pc.close(); peers.delete(socketId); }
+  peerSenders.delete(socketId);
   const tile = document.getElementById(`tile-${socketId}`);
   if (tile) tile.remove();
   updateGridClass();
@@ -396,7 +401,7 @@ document.getElementById('screen-btn').addEventListener('click', async () => {
     // ever see whatever track occupies the shared 'video' sender (the same
     // one the camera uses), so the screen has to be pushed onto it too.
     const screenTrack = screenStream.getVideoTracks()[0];
-    await addTrackToAllPeers(screenTrack);
+    await setSenderTrack('video', screenTrack);
     screenTrack.onended = () => {
       document.getElementById('screen-btn').click();
     };
@@ -415,12 +420,8 @@ async function stopScreenShare() {
 
   // The screen track was occupying the shared video sender — hand it back
   // to the camera (if still on) or clear it so peers stop seeing the screen.
-  if (camEnabled) {
-    const camTrack = localStream.getVideoTracks()[0];
-    if (camTrack) await addTrackToAllPeers(camTrack);
-  } else {
-    await removeTrackFromAllPeers('video');
-  }
+  const camTrack = camEnabled ? localStream.getVideoTracks()[0] : null;
+  await setSenderTrack('video', camTrack || null);
 }
 
 document.getElementById('rec-btn').addEventListener('click', async () => {
