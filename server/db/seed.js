@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import config from '../config/index.js';
 import { ROLES } from '../utils/roles.js';
 
@@ -134,6 +136,26 @@ function ensureOwner(db) {
     console.log(`[db]   password: ${password}`);
     console.log('[db] This password is only ever printed here - copy it now.');
     console.log('[db] ==========================================================');
+
+    // Console output scrolls past fast in a busy boot log (Coolify/Docker
+    // included) and this only ever prints once — so it's also dropped next
+    // to the database file as a safety net in case the log gets missed.
+    // Delete this file once you've copied the password.
+    try {
+      const credsPath = join(dirname(config.db.path), 'OWNER_CREDENTIALS.txt');
+      writeFileSync(credsPath, [
+        'laboratorium. — owner account (auto-generated on first boot)',
+        `email:    ${email}`,
+        `password: ${password}`,
+        '',
+        'This is the only place the password is recoverable from — it is',
+        'hashed everywhere else. Delete this file once you\'ve copied it;',
+        'to get a new one later, run: npm run owner:reset-password',
+      ].join('\n'));
+      console.log(`[db] Also saved to ${credsPath} — delete it once copied.`);
+    } catch (err) {
+      console.error(`[db] Could not write OWNER_CREDENTIALS.txt: ${err.message}`);
+    }
   } else {
     console.log(`[db] Owner account created: ${email}`);
   }
