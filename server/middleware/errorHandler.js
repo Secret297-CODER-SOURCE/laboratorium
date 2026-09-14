@@ -1,4 +1,5 @@
 import config from '../config/index.js';
+import * as errorLogService from '../services/error-log.service.js';
 
 export function errorHandler(err, req, res, _next) {
   const statusCode = err.statusCode || 500;
@@ -6,6 +7,15 @@ export function errorHandler(err, req, res, _next) {
 
   if (!err.isOperational) {
     console.error('[error]', err);
+    errorLogService.log({
+      source: 'server',
+      message: err.message,
+      stack: err.stack,
+      method: req.method,
+      path: req.originalUrl,
+      statusCode,
+      userId: req.user?.id,
+    });
   }
 
   res.status(statusCode).json({

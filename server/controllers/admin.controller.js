@@ -13,6 +13,7 @@ import * as labService from '../services/lab.service.js';
 import * as manualService from '../services/manual.service.js';
 import * as notificationService from '../services/notification.service.js';
 import * as mailService from '../services/mail.service.js';
+import * as errorLogService from '../services/error-log.service.js';
 import { addBounty } from '../services/bounty.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { isAdminRole } from '../utils/roles.js';
@@ -567,4 +568,16 @@ export async function createAnnouncement(req, res) {
   });
 
   res.status(201).json({ ok: true, sent: userIds.length, message: `Оголошення надіслано ${userIds.length} учням` });
+}
+
+export async function listErrors(req, res) {
+  res.json(errorLogService.list({
+    source: req.query.source || undefined,
+    limit: req.query.limit,
+    cursor: req.query.cursor ? parseInt(req.query.cursor, 10) : undefined,
+  }));
+}
+
+export async function clearErrors(_req, res) {
+  res.json(errorLogService.clear());
 }

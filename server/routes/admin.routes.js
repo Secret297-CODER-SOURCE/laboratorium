@@ -144,4 +144,7 @@ router.delete('/billing/payments/:paymentId', requireRole('owner', 'developer'),
 
 router.get('/content/:type/:id/status', asyncHandler(contentCtrl.getContentStatus));
 
+router.get('/errors', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listErrors));
+router.delete('/errors', requireRole('owner', 'developer'), asyncHandler(adminCtrl.clearErrors));
+
 export default router;

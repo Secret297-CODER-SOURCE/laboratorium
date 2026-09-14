@@ -25,6 +25,9 @@ import {
   renderAttendancePanel, bindAttendancePanelEvents, loadAttendanceData, loadConferenceAttendance,
 } from '/admin-attendance-panel.js';
 import {
+  renderErrorsPanel, bindErrorsPanelEvents, loadErrorsData,
+} from '/admin-errors-panel.js';
+import {
   renderCtfPanel, bindCtfPanelEvents, loadCtfAdminData,
 } from '/admin-ctf-panel.js';
 import {
@@ -97,6 +100,12 @@ function isScheduleTab(role) {
 
 function isAttendanceTab(role) {
   return (role === 'owner' && ownerTab === 'attendance') || (role === 'teacher' && teacherTab === 'attendance');
+}
+
+// Owner/developer only — matches the /admin/errors route gating, so there's
+// no teacher branch here unlike the other special-cased tabs.
+function isErrorsTab(role) {
+  return role === 'owner' && ownerTab === 'errors';
 }
 
 function showAdminLoading(message = 'Завантаження...') {
@@ -175,6 +184,35 @@ async function loadAttendanceView(role) {
   }
 }
 
+async function loadErrorsView(role) {
+  const seq = ++adminLoadSeq;
+  document.getElementById('admin-title').textContent = TITLES[role] || 'Панель керування';
+  renderNav(role);
+  showAdminLoading('Завантаження журналу помилок...');
+
+  try {
+    const source = new URLSearchParams(location.search).get('source') || '';
+    const data = await loadErrorsData(source);
+    if (seq !== adminLoadSeq) return;
+
+    const el = document.getElementById('admin-content');
+    el.innerHTML = renderOwnerTabs('errors') + renderErrorsPanel(data, source);
+    bindTabHandlers(role);
+    bindErrorsPanelEvents(showToast, (nextSource) => {
+      const url = new URL(location.href);
+      if (nextSource) url.searchParams.set('source', nextSource);
+      else url.searchParams.delete('source');
+      history.replaceState(null, '', url);
+      loadErrorsView(role);
+    });
+  } catch (err) {
+    if (seq !== adminLoadSeq) return;
+    const el = document.getElementById('admin-content');
+    el.innerHTML = `${renderOwnerTabs('errors')}<p class="empty-state">${err.message}</p>`;
+    bindTabHandlers(role);
+  }
+}
+
 async function load() {
   const role = getUser()?.role;
   if (role && isScheduleTab(role)) {
@@ -182,6 +220,9 @@ async function load() {
   }
   if (role && isAttendanceTab(role)) {
     return loadAttendanceView(role);
+  }
+  if (role && isErrorsTab(role)) {
+    return loadErrorsView(role);
   }
 
   const seq = ++adminLoadSeq;
@@ -455,6 +496,7 @@ function bindTabHandlers(role) {
       url.searchParams.set('tab', t);
       if (t !== 'schedule' && t !== 'attendance') url.searchParams.delete('groupId');
       if (t !== 'attendance') url.searchParams.delete('conferenceId');
+      if (t !== 'errors') url.searchParams.delete('source');
       history.replaceState(null, '', url);
       load();
     });

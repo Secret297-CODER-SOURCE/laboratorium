@@ -840,6 +840,21 @@ export function runMigrations(db) {
       FOREIGN KEY (recording_id) REFERENCES recordings(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS error_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL CHECK(source IN ('server', 'client')),
+      level TEXT NOT NULL DEFAULT 'error',
+      message TEXT NOT NULL,
+      stack TEXT,
+      method TEXT,
+      path TEXT,
+      status_code INTEGER,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      user_agent TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_error_logs_created ON error_logs(created_at DESC);
   `);
 }
 

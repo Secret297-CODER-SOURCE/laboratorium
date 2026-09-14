@@ -1,6 +1,7 @@
 import { initTheme as startThemes, getAccentColor } from '/theme-engine.js';
 import { isAdminUser, isRestrictedUser } from '/roles.js';
 import { t, getLocale } from '/i18n.js';
+import '/error-reporter.js';
 
 const TOKEN_KEY = 'lab_token';
 const USER_KEY = 'lab_user';

@@ -7,6 +7,7 @@ import { ensureCtfImageBuilt, isAgentEnabled } from './services/lab-agent.servic
 import { startBackupScheduler } from './services/backup-scheduler.service.js';
 import { setIo as setNotificationIo } from './services/notification.service.js';
 import { startBillingReminderScheduler } from './services/billing-reminder.service.js';
+import * as errorLogService from './services/error-log.service.js';
 
 const app = createApp();
 const server = createServer(app);
@@ -54,3 +55,21 @@ function shutdown(signal) {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Neither of these was handled at all before — an uncaught exception could
+// crash the process (or leave it in an undefined state) with nothing
+// recorded anywhere. Both are logged to error_logs (visible in the owner's
+// admin panel) same as any other unexpected server error; an uncaughtException
+// then triggers the same graceful shutdown used for SIGTERM/SIGINT, since
+// process state afterward can't be trusted to keep serving requests.
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+  errorLogService.log({ source: 'server', message: err.message, stack: err.stack });
+  shutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error('[unhandledRejection]', err);
+  errorLogService.log({ source: 'server', message: err.message, stack: err.stack });
+});

@@ -15,6 +15,7 @@
     "docker:prod:down": "docker compose -f docker-compose.prod.yml down",
     "deploy": "bash scripts/deploy.sh",
     "owner:reset-password": "node server/scripts/reset-owner-password.js",
+    "seed:courses": "node server/scripts/seed-course-content.js",
     "ctf:build": "docker build -t laboratorium/ctf-lab:latest challenges/ctf-lab",
     "ctf:deploy": "npm run ctf:build && docker image inspect laboratorium/ctf-lab:latest >/dev/null"
   },

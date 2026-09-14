@@ -15,6 +15,7 @@ import * as tabAccessService from '../services/tab-access.service.js';
 import * as paymentService from '../services/payment.service.js';
 import { addBounty, getBountyLog, getUserRank } from '../services/bounty.service.js';
 import * as notificationService from '../services/notification.service.js';
+import * as errorLogService from '../services/error-log.service.js';
 import { getTier, getNextTier } from '../utils/tier.js';
 import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../utils/errors.js';
 import QRCode from 'qrcode';
@@ -149,6 +150,18 @@ export async function submitApplication(req, res) {
     ok: true,
     message: 'Заявку прийнято. Ми зв\'яжемося з вами протягом 24 годин.',
   });
+}
+
+export async function reportClientError(req, res) {
+  errorLogService.log({
+    source: 'client',
+    message: req.body?.message,
+    stack: req.body?.stack,
+    path: req.body?.path,
+    userId: req.user?.id,
+    userAgent: req.headers['user-agent'],
+  });
+  res.status(204).end();
 }
 
 export async function listMyApplications(req, res) {
