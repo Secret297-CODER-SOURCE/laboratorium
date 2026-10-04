@@ -34,6 +34,24 @@ const GROUP_SELECT = `
   LEFT JOIN users u ON u.id = g.teacher_id
 `;
 
+/** Inverse of listGroupMembers() — which groups a given person is in, with
+ * their role in each. Used by the owner's per-person profile card. */
+export function getUserGroups(userId) {
+  return db.prepare(`
+    SELECT g.*, gm.member_role, p.name as program_name,
+      COALESCE(gd.name, pd.name) as direction_name,
+      u.name as teacher_name, u.handle as teacher_handle
+    FROM study_group_members gm
+    JOIN study_groups g ON g.id = gm.group_id
+    LEFT JOIN programs p ON p.id = g.program_id
+    LEFT JOIN directions gd ON gd.id = g.direction_id
+    LEFT JOIN directions pd ON pd.id = p.direction_id
+    LEFT JOIN users u ON u.id = g.teacher_id
+    WHERE gm.user_id = ?
+    ORDER BY g.name
+  `).all(userId).map((row) => ({ ...mapGroup(row), member_role: row.member_role || 'student' }));
+}
+
 export function listGroups(actorId, actorRole, { all = false } = {}) {
   let sql = `${GROUP_SELECT} WHERE g.is_active = 1`;
   const params = [];

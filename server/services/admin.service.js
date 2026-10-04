@@ -5,6 +5,9 @@ import { getStats } from '../db/index.js';
 import { sanitizeUser } from '../utils/tier.js';
 import * as userService from './user.service.js';
 import * as groupService from './group.service.js';
+import * as applicationService from './application.service.js';
+import * as paymentService from './payment.service.js';
+import * as userNoteService from './user-note.service.js';
 
 export function getPlatformStats() {
   const dbStats = getStats();
@@ -230,5 +233,35 @@ export function getDeveloperInfo() {
     nodeVersion: process.version,
     uptime: Math.floor(process.uptime()),
     memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+  };
+}
+
+/**
+ * One-stop profile card for the owner: everything already tracked about a
+ * person (applications, billing, groups) plus the notes log, aggregated
+ * from the existing per-feature services rather than duplicating their
+ * queries — this is purely a read-side join of data that already exists.
+ */
+export function getPersonProfile(userId) {
+  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!row) throw new NotFoundError('Користувача не знайдено');
+
+  const user = {
+    ...sanitizeUser(row),
+    is_frozen: !!row.is_frozen,
+    is_restricted: !!row.is_restricted,
+    billing_exempt: !!row.billing_exempt,
+  };
+
+  const billing = row.role === 'student'
+    ? { status: paymentService.getAccessStatus(userId), payments: paymentService.listUserPayments(userId) }
+    : null;
+
+  return {
+    user,
+    applications: applicationService.listForUser(userId),
+    billing,
+    groups: groupService.getUserGroups(userId),
+    notes: userNoteService.list(userId),
   };
 }

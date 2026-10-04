@@ -850,11 +850,22 @@ export function runMigrations(db) {
       method TEXT,
       path TEXT,
       status_code INTEGER,
-      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      user_id INTEGER,
       user_agent TEXT,
       created_at TEXT DEFAULT (datetime('now')) NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_error_logs_created ON error_logs(created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS user_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      author_id INTEGER,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_notes_user ON user_notes(user_id);
   `);
 }
 

@@ -147,4 +147,8 @@ router.get('/content/:type/:id/status', asyncHandler(contentCtrl.getContentStatu
 router.get('/errors', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listErrors));
 router.delete('/errors', requireRole('owner', 'developer'), asyncHandler(adminCtrl.clearErrors));
 
+router.get('/people/:userId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getPersonProfile));
+router.post('/people/:userId/notes', requireRole('owner', 'developer'), asyncHandler(adminCtrl.addPersonNote));
+router.delete('/people/:userId/notes/:noteId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.removePersonNote));
+
 export default router;

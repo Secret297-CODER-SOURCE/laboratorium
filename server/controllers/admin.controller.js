@@ -14,6 +14,7 @@ import * as manualService from '../services/manual.service.js';
 import * as notificationService from '../services/notification.service.js';
 import * as mailService from '../services/mail.service.js';
 import * as errorLogService from '../services/error-log.service.js';
+import * as userNoteService from '../services/user-note.service.js';
 import { addBounty } from '../services/bounty.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { isAdminRole } from '../utils/roles.js';
@@ -580,4 +581,17 @@ export async function listErrors(req, res) {
 
 export async function clearErrors(_req, res) {
   res.json(errorLogService.clear());
+}
+
+export async function getPersonProfile(req, res) {
+  res.json(adminService.getPersonProfile(parseInt(req.params.userId, 10)));
+}
+
+export async function addPersonNote(req, res) {
+  const note = userNoteService.add(parseInt(req.params.userId, 10), req.user.id, req.body.body);
+  res.status(201).json({ note });
+}
+
+export async function removePersonNote(req, res) {
+  res.json(userNoteService.remove(parseInt(req.params.noteId, 10)));
 }

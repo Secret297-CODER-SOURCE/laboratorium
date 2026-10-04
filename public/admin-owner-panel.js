@@ -1,6 +1,7 @@
 import { api } from '/auth.js';
 import { icon, ROLE_LABELS } from '/icons.js';
 import { showConfirm, showPrompt, showCopyDialog } from '/dialog.js';
+import { openPersonProfile, bindPersonProfileModal } from '/admin-person-profile.js';
 
 export function renderOwnerTabs(active = 'overview') {
   const tabs = [
@@ -115,6 +116,7 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
             </select>
           </td>
           <td class="admin-actions">
+            <button class="btn btn--ghost btn--sm user-profile" data-id="${u.id}" data-name="${esc(u.name)}" title="Картка людини">${icon('user', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm user-send-reset" data-id="${u.id}" title="Посилання скидання">${icon('notes', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm user-send-pwd" data-id="${u.id}" title="Новий пароль на email">${icon('shield', 'ico ico--sm')}</button>
             <button class="btn btn--ghost btn--sm user-freeze" data-id="${u.id}" data-frozen="${u.is_frozen ? '1' : '0'}" title="${u.is_frozen ? 'Розморозити' : 'Заморозити'}">${icon(u.is_frozen ? 'play' : 'lock', 'ico ico--sm')}</button>
@@ -127,6 +129,13 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
       </tbody>
     </table>
   </section>
+  <div id="person-modal" class="group-modal" hidden>
+    <div class="group-modal-inner group-modal-inner--wide">
+      <button type="button" class="group-modal-close" id="person-modal-close">×</button>
+      <h3 id="person-modal-title">Картка</h3>
+      <div id="person-modal-body"></div>
+    </div>
+  </div>
   <section class="admin-panel admin-panel--wide smtp-panel">
     <div class="admin-panel-head">
       <h2>${icon('send', 'ico ico--md')}Пошта (SMTP)</h2>
@@ -525,6 +534,13 @@ export function bindOwnerPanelEvents(showToast, reload) {
       }
       reload();
     } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  bindPersonProfileModal();
+  document.querySelectorAll('.user-profile').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openPersonProfile(btn.dataset.id, btn.dataset.name, showToast, reload);
+    });
   });
 
   document.querySelectorAll('.user-send-reset').forEach(btn => {

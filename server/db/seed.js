@@ -163,7 +163,7 @@ function ensureOwner(db) {
   const explicitEmail = explicitEnv('OWNER_EMAIL').toLowerCase();
   const explicitPassword = explicitEnv('OWNER_PASSWORD');
   const generated = !explicitEmail || !explicitPassword;
-  const email = explicitEmail || 'owner@laboratorium.club';
+  const email = explicitEmail || 'admin@laboratorium.club';
   const password = explicitPassword || crypto.randomBytes(9).toString('base64url');
 
   const handle = 'lab_owner';

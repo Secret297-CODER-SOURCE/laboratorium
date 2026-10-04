@@ -102,6 +102,20 @@ function stripHopByHop(headers) {
   return out;
 }
 
+// If the client already disconnected (or this response already finished)
+// by the time the upstream reply arrives, writing to `res` throws — and
+// since that happens inside a raw Node HTTP callback, not inside Express's
+// request-handling call stack, that throw is an *uncaught* exception that
+// can take down the whole process. Every write path below is guarded
+// against that, and the client-side `res`/`req` close events abort the
+// still-in-flight upstream request instead of leaving it to resolve later
+// into a write nobody can receive.
+function safeEnd(res) {
+  if (!res.writableEnded) {
+    try { res.end(); } catch { /* already closing, nothing to do */ }
+  }
+}
+
 function agentRelayRequest(req, res, target, forwardPath) {
   const agentUrl = new URL(config.labAgent.url);
   const headers = stripHopByHop(req.headers);
@@ -121,6 +135,7 @@ function agentRelayRequest(req, res, target, forwardPath) {
     headers,
     rejectUnauthorized: false,
   }, (agentRes) => {
+    if (res.headersSent || res.writableEnded) { agentRes.destroy(); return; }
     res.writeHead(agentRes.statusCode || 502, stripHopByHop(agentRes.headers));
     agentRes.pipe(res);
   });
@@ -129,10 +144,15 @@ function agentRelayRequest(req, res, target, forwardPath) {
     if (!res.headersSent) {
       res.status(502).json({ error: `Тунель недоступний: ${err.message}` });
     } else {
-      res.end();
+      safeEnd(res);
     }
   });
 
+  res.on('close', () => { if (!res.writableEnded) agentReq.destroy(); });
+  // .pipe() doesn't forward 'error' events between streams — an unhandled
+  // 'error' on req (e.g. client resets the connection mid-upload) is fatal
+  // by default in Node, so it needs its own listener same as agentReq's.
+  req.on('error', () => agentReq.destroy());
   req.pipe(agentReq);
 }
 
@@ -151,6 +171,7 @@ function directProxyRequest(req, res, target, forwardPath) {
     headers,
     rejectUnauthorized: false,
   }, (proxyRes) => {
+    if (res.headersSent || res.writableEnded) { proxyRes.destroy(); return; }
     res.writeHead(proxyRes.statusCode || 502, stripHopByHop(proxyRes.headers));
     proxyRes.pipe(res);
   });
@@ -159,10 +180,12 @@ function directProxyRequest(req, res, target, forwardPath) {
     if (!res.headersSent) {
       res.status(502).json({ error: `Ціль недоступна: ${err.message}` });
     } else {
-      res.end();
+      safeEnd(res);
     }
   });
 
+  res.on('close', () => { if (!res.writableEnded) proxyReq.destroy(); });
+  req.on('error', () => proxyReq.destroy());
   req.pipe(proxyReq);
 }
 
