@@ -52,11 +52,13 @@ export async function getDirections(_req, res) {
 
 export async function getSitemap(_req, res) {
   const base = config.siteUrl.replace(/\/+$/, '');
-  const programs = programService.getAll();
+  const programs = programService.getAll().filter((program) => {
+    if (!program.direction_id) return true;
+    return directionService.getById(program.direction_id)?.is_active;
+  });
 
   const urls = [
     { loc: `${base}/`, priority: '1.0' },
-    { loc: `${base}/login.html`, priority: '0.3' },
     ...programs.map(p => ({ loc: `${base}/course.html?id=${p.id}`, priority: '0.7' })),
   ];
 
@@ -75,6 +77,9 @@ export async function getPublicProgramPage(req, res) {
   if (!program || !program.is_active) throw new NotFoundError('Курс не знайдено');
 
   const direction = program.direction_id ? directionService.getById(program.direction_id) : null;
+  if (program.direction_id && !direction?.is_active) {
+    throw new NotFoundError('Курс не знайдено');
+  }
 
   let page = null;
   try {
