@@ -22,19 +22,19 @@ export const en = {
 
   // --- hero / about ---
   'hero-title': 'Advanced school of<br><span class="accent">IT &amp; cybersecurity</span>',
-  'Навчаємося на реальних завданнях: пентест, reverse engineering, розробка та захист інфраструктури. Кожен успіх — у bounty-системі.':
-    'We train on real tasks: pentesting, reverse engineering, building and defending infrastructure. Every win feeds into the bounty system.',
+  'Вивчай IT і кібербезпеку за навчальними програмами, виконуй практичні завдання та тренуйся в контрольованих лабораторіях.':
+    'Study IT and cybersecurity through structured programs, hands-on assignments and controlled lab exercises.',
   'Обрати програму': 'Choose a program',
   'Дізнатися більше': 'Learn more',
-  'напрямків': 'tracks',
-  'випускників': 'graduates',
-  '% працевлаштування': '% employment rate',
+  'Навчальні програми': 'Structured learning paths',
+  'Практика в лабораторіях': 'Hands-on lab practice',
+  'Завдання та зворотний зв’язок': 'Assignments and feedback',
   '01 / про школу': '01 / about',
-  'about-title': 'The lab where<br><span class="accent">ethical hackers</span> are made',
+  'about-title': 'A lab for building<br><span class="accent">responsible security skills</span>',
   'about-p1':
-    '<strong>laboratorium.</strong> is not a checkbox course. We build an environment where students work with real vulnerabilities, write exploits in a sandbox, and defend systems the way SOC and red teams do.',
-  'Ментори — практикуючі фахівці з індустрії. Кожен модуль завершується практичним завданням із нарахуванням bounty-очків і місцем у рейтингу.':
-    'Mentors are working industry professionals. Every module ends with a hands-on task that awards bounty points and a spot on the leaderboard.',
+    '<strong>laboratorium.</strong> is a learning platform with programs, group classes, assignments and practice in a lab environment. Learning scenarios help students reinforce knowledge in a controlled setting.',
+  'Навчання поєднує матеріали, завдання та практику в лабораторному середовищі. Роботи перевіряються викладачем, а прогрес можна відстежувати в особистому кабінеті.':
+    'Learning combines study materials, assignments and practice in a lab environment. Teachers review submitted work, and students can track progress in their dashboard.',
   'Кібербезпека': 'Cybersecurity',
   'Пентест, OSINT, malware analysis, SOC-операції та incident response.': 'Pentesting, OSINT, malware analysis, SOC operations and incident response.',
   'Програмування': 'Programming',
@@ -42,11 +42,11 @@ export const en = {
   'Практика 24/7': 'Practice 24/7',
   'Лабораторії, CTF-майданчики та доступ до стендів у будь-який час.': 'Labs, CTF ranges and stand access, any time.',
   'Спільнота': 'Community',
-  'Закритий Discord, мітапи, спільні CTF і менторство випускників.': 'Private Discord, meetups, joint CTFs and mentorship from alumni.',
+  'Групові чати, командні CTF і спілкування між учасниками.': 'Group chats, team CTFs and peer discussion.',
 
   // --- programs section ---
   '02 / програми': '02 / programs',
-  'programs-title': 'Choose your <span class="accent">attack vector</span>',
+  'programs-title': 'Choose your <span class="accent">learning path</span>',
   'Пошук курсу за назвою чи інструментом...': 'Search a course by name or tool...',
   'Завантаження програм...': 'Loading programs...',
   'Програми для цього напрямку ще не додані': 'No programs added for this track yet',
@@ -74,18 +74,19 @@ export const en = {
 
   // --- bounty section ---
   '03 / bounty system': '03 / bounty system',
-  'bounty-title': 'Learning as a <span class="accent">rewards game</span>',
-  'Кожне виконане завдання, зданий CTF і допомога одногрупникам приносять bounty-очки. Накопичуй рейтинг, відкривай рівні й отримуй реальні призи — від мерчу до оплати сертифікацій.':
-    'Every finished task, solved CTF and helping a classmate earns bounty points. Build up your rank, unlock tiers, and get real prizes — from merch to paid certifications.',
+  'bounty-title': 'Track your <span class="accent">learning progress</span>',
+  'Bounty-очки нараховуються за виконання завдань і проходження CTF. Вони допомагають бачити навчальний прогрес і формують рейтинг учасників.':
+    'Bounty points are awarded for completing assignments and CTF challenges. They help students track learning progress and contribute to the participant leaderboard.',
 
   // --- CTA / contact ---
-  'Наступний набір відкритий': 'Next intake is open',
-  'cta-spots': 'Only <strong id="spots-left">7</strong> spots left. Start — <strong>July 1, 2026</strong>',
-  'Забронювати місце': 'Reserve a spot',
+  'Оберіть напрямок для навчання': 'Choose a learning path',
+  'Перегляньте програми та залиште заявку — актуальні умови й дати старту уточнимо особисто.': 'Explore the programs and send an inquiry. We will confirm current terms and start dates with you.',
+  'Обговорити навчання': 'Ask about studying',
   '04 / контакти': '04 / contact',
   'contact-title': 'Get in touch<br>with the <span class="accent">lab</span>',
-  'Скануй для швидкого запису': 'Scan for a quick sign-up',
+  'Скануй, щоб відкрити сайт': 'Scan to open the website',
   "Ім'я": 'Name',
+  'Email': 'Email',
   'Напрямок': 'Track',
   'Повідомлення': 'Message',
   'Розкажи про свій досвід і цілі...': 'Tell us about your experience and goals...',

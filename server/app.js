@@ -21,6 +21,8 @@ import ctfDemoRoutes from './routes/ctf-demo.routes.js';
 import tunnelRoutes from './routes/tunnel.routes.js';
 import sitemapRoutes from './routes/sitemap.routes.js';
 import { trySslipHostTunnel } from './services/tunnel.service.js';
+import * as programService from './services/program.service.js';
+import * as directionService from './services/direction.service.js';
 import './db/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -59,6 +61,82 @@ function injectAssetVersion(html) {
 function sendHtmlPage(res, filePath, fallbackPath) {
   const resolved = existsSync(filePath) ? filePath : fallbackPath;
   let html = readFileSync(resolved, 'utf8');
+  html = injectAssetVersion(html);
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.type('html').send(html);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[char]);
+}
+
+function sendCoursePage(req, res) {
+  const id = /^\d+$/.test(String(req.query.id || '')) ? Number(req.query.id) : 0;
+  const program = id ? programService.getById(id) : null;
+  const direction = program?.direction_id ? directionService.getById(program.direction_id) : null;
+  if (!program?.is_active || (program.direction_id && !direction?.is_active)) {
+    return res.status(404).type('html').send(
+      '<!doctype html><html lang="uk"><meta charset="utf-8"><title>Курс не знайдено — laboratorium.</title><meta name="robots" content="noindex"><main><h1>Курс не знайдено</h1><p>Цю програму не знайдено або її більше не опубліковано.</p><a href="/">Переглянути програми</a></main></html>',
+    );
+  }
+
+  const sourceDescription = String(program.description || `Навчальна програма «${program.name}» у школі laboratorium.`)
+    .replace(/\s+/g, ' ')
+    .trim();
+  const description = sourceDescription.length > 160
+    ? `${sourceDescription.slice(0, 157).trimEnd()}…`
+    : sourceDescription;
+  const title = `${program.name} — laboratorium.`;
+  const canonical = `${config.siteUrl.replace(/\/+$/, '')}/course.html?id=${program.id}`;
+  const schema = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Course',
+    name: program.name,
+    description,
+    provider: {
+      '@type': 'EducationalOrganization',
+      name: 'laboratorium.',
+      url: `${config.siteUrl.replace(/\/+$/, '')}/`,
+    },
+  }).replace(/</g, '\\u003c');
+
+  let html = readFileSync(join(publicDir, 'course.html'), 'utf8');
+  html = html
+    .replaceAll('{{COURSE_TITLE}}', escapeHtml(title))
+    .replaceAll('{{COURSE_DESCRIPTION}}', escapeHtml(description))
+    .replaceAll('{{COURSE_CANONICAL}}', escapeHtml(canonical))
+    .replace('{{COURSE_SCHEMA}}', schema)
+    .replace(
+      '<div id="course-view"></div>',
+      `<div id="course-view">
+        <header class="course-hero">
+          <div class="container course-hero-inner">
+            <p class="course-eyebrow">${escapeHtml(direction?.name || 'Програма курсу')}</p>
+            <h1 class="course-title">${escapeHtml(program.name)}</h1>
+            <p class="course-lede">${escapeHtml(description)}</p>
+            <div class="course-stats">
+              <div class="course-stat">
+                <span class="course-stat-label">Рівень</span>
+                <span class="course-stat-value">${escapeHtml(program.level)}</span>
+              </div>
+              <div class="course-stat">
+                <span class="course-stat-label">Тривалість</span>
+                <span class="course-stat-value">${escapeHtml(program.duration)}</span>
+              </div>
+            </div>
+            <a href="/login.html" class="btn btn--primary">Дізнатися про запис</a>
+          </div>
+        </header>
+      </div>`,
+    );
+
   html = injectAssetVersion(html);
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.set('Pragma', 'no-cache');
@@ -111,6 +189,8 @@ export function createApp() {
   app.use(trySslipHostTunnel);
   app.use('/lab/t', tunnelRoutes);
   app.use('/lab/demo', ctfDemoRoutes);
+
+  app.get('/course.html', sendCoursePage);
 
   app.use('/uploads', express.static(config.uploads.dir, {
     etag: true,
