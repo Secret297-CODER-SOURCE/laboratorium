@@ -3,29 +3,43 @@ import { icon, ROLE_LABELS } from '/icons.js';
 import { showConfirm, showPrompt, showCopyDialog } from '/dialog.js';
 import { openPersonProfile, bindPersonProfileModal } from '/admin-person-profile.js';
 
-export function renderOwnerTabs(active = 'overview') {
-  const tabs = [
-    { id: 'overview', label: 'Огляд', icon: 'grid' },
-    { id: 'directions', label: 'Напрямки', icon: 'book' },
-    { id: 'programs', label: 'Програми', icon: 'notes' },
-    { id: 'manuals', label: 'Мануали', icon: 'list' },
-    { id: 'groups', label: 'Групи', icon: 'users' },
-    { id: 'ctf', label: 'CTF', icon: 'shield' },
-    { id: 'users', label: 'Користувачі', icon: 'users' },
-    { id: 'billing', label: 'Оплата', icon: 'chart' },
-    { id: 'access', label: 'Доступ', icon: 'shield' },
-    { id: 'applications', label: 'Заявки', icon: 'calendar' },
-    { id: 'proxmox', label: 'Proxmox', icon: 'server' },
-    { id: 'labs', label: 'Машини', icon: 'database' },
-    { id: 'storage', label: 'Сховище', icon: 'upload' },
-    { id: 'schedule', label: 'Розклад', icon: 'calendar' },
-    { id: 'attendance', label: 'Відвідуваність', icon: 'video' },
-    { id: 'errors', label: 'Помилки', icon: 'warning' },
+export function renderOwnerTabs(active = 'overview', badges = {}) {
+  const sections = [
+    { label: 'Керування', tabs: [
+      { id: 'overview', label: 'Огляд', icon: 'grid' },
+      { id: 'applications', label: 'Заявки', icon: 'calendar', badge: badges.applications },
+      { id: 'messages', label: 'Повідомлення', icon: 'chat', badge: badges.messages },
+      { id: 'stats', label: 'Статистика', icon: 'chart' },
+      { id: 'marketing', label: 'SEO та реклама', icon: 'chart' },
+    ] },
+    { label: 'Навчання', tabs: [
+      { id: 'directions', label: 'Напрямки', icon: 'book' },
+      { id: 'programs', label: 'Програми', icon: 'notes' },
+      { id: 'manuals', label: 'Мануали', icon: 'list' },
+      { id: 'groups', label: 'Групи', icon: 'users' },
+      { id: 'schedule', label: 'Розклад', icon: 'calendar' },
+      { id: 'attendance', label: 'Відвідуваність', icon: 'video' },
+      { id: 'ctf', label: 'CTF', icon: 'shield' },
+    ] },
+    { label: 'Налаштування', tabs: [
+      { id: 'users', label: 'Користувачі та пошта', icon: 'users' },
+      { id: 'access', label: 'Доступ', icon: 'shield' },
+      { id: 'billing', label: 'Оплата', icon: 'chart' },
+      { id: 'proxmox', label: 'Proxmox', icon: 'server' },
+      { id: 'labs', label: 'Машини', icon: 'database' },
+      { id: 'storage', label: 'Сховище', icon: 'upload' },
+      { id: 'errors', label: 'Журнал помилок', icon: 'warning' },
+    ] },
   ];
-  return `<nav class="admin-tabs">${tabs.map(t => `
-    <button type="button" class="admin-tab${active === t.id ? ' active' : ''}" data-tab="${t.id}">
-      ${icon(t.icon, 'ico ico--sm')}${t.label}
-    </button>`).join('')}</nav>`;
+  return `<nav class="admin-sidebar" aria-label="Меню адміністратора">${sections.map(section => `
+    <div class="admin-sidebar-section">
+      <h2>${section.label}</h2>
+      ${section.tabs.map(t => `
+        <button type="button" class="admin-tab${active === t.id ? ' active' : ''}" data-tab="${t.id}"${active === t.id ? ' aria-current="page"' : ''}>
+          ${icon(t.icon, 'ico ico--sm')}<span>${t.label}</span>
+          ${t.badge ? `<span class="admin-nav-badge" aria-label="${t.badge} нових">${t.badge > 99 ? '99+' : t.badge}</span>` : ''}
+        </button>`).join('')}
+    </div>`).join('')}</nav>`;
 }
 
 export function renderDirectionsPanel(directions) {
@@ -58,8 +72,14 @@ export function renderProgramsPanel(programs, directions) {
   return `<section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
       <h2>${icon('notes', 'ico ico--md')}Програми курсів</h2>
-      <button type="button" class="btn btn--outline btn--sm" id="add-program-btn">${icon('plus', 'ico ico--sm')}Додати</button>
+      <div class="program-transfer-actions">
+        <button type="button" class="btn btn--outline btn--sm" id="export-programs-btn">${icon('download', 'ico ico--sm')}Експорт JSON</button>
+        <button type="button" class="btn btn--outline btn--sm" id="import-programs-btn">${icon('upload', 'ico ico--sm')}Імпорт JSON</button>
+        <input type="file" id="import-programs-file" accept="application/json,.json" hidden>
+        <button type="button" class="btn btn--primary btn--sm" id="add-program-btn">${icon('plus', 'ico ico--sm')}Додати</button>
+      </div>
     </div>
+    <p class="program-transfer-hint">JSON містить програми разом із матеріалами курсів. Імпорт оновлює програми з таким самим slug, додає нові, зберігає програми, яких немає у файлі; якщо поле content пропущене, матеріали курсу не змінюються.</p>
     <table class="admin-table admin-table--programs">
       <thead><tr><th>Назва</th><th>Напрямок</th><th>Рівень</th><th>Тривалість</th><th>Bounty</th><th title="Рекомендована"><span class="admin-th-icon">${icon('star', 'ico ico--xs')}</span></th><th></th></tr></thead>
       <tbody>${(programs || []).map(p => `
@@ -490,6 +510,49 @@ export function bindOwnerPanelEvents(showToast, reload) {
       showToast('Програму додано');
       reload();
     } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('export-programs-btn')?.addEventListener('click', async () => {
+    try {
+      const data = await api('/admin/programs/export');
+      const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'laboratorium-training-programs.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast(`Експортовано програм: ${data.programs?.length || 0}`);
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  const importButton = document.getElementById('import-programs-btn');
+  const importFile = document.getElementById('import-programs-file');
+  importButton?.addEventListener('click', () => importFile?.click());
+  importFile?.addEventListener('change', async () => {
+    const file = importFile.files?.[0];
+    importFile.value = '';
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      showToast('JSON-файл має бути меншим за 1 МБ', 'error');
+      return;
+    }
+    try {
+      const payload = JSON.parse(await file.text());
+      if (!Array.isArray(payload.programs) || !payload.programs.length) {
+        throw new Error('У файлі не знайдено програм у полі programs');
+      }
+      const confirmed = await showConfirm(
+        `Імпортувати ${payload.programs.length} програм? Вони будуть створені або оновлені за slug. Програми поза файлом залишаться без змін.`,
+      );
+      if (!confirmed) return;
+      const result = await api('/admin/programs/import', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      showToast(`Імпортовано: ${result.created} додано, ${result.updated} оновлено`);
+      reload();
+    } catch (err) { showToast(err.message || 'Не вдалося прочитати JSON-файл', 'error'); }
   });
 
   document.querySelectorAll('.prog-save').forEach(btn => {

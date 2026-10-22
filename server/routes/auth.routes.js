@@ -17,6 +17,10 @@ const authLimiter = rateLimit({
 
 router.post('/register', authLimiter, asyncHandler(authCtrl.register));
 router.post('/login', authLimiter, asyncHandler(authCtrl.login));
+router.get('/google/status', asyncHandler(authCtrl.googleAuthStatus));
+router.get('/google/start', authLimiter, asyncHandler(authCtrl.startGoogleAuth));
+router.get('/google/callback', authLimiter, asyncHandler(authCtrl.completeGoogleCallback));
+router.post('/google/complete', authLimiter, asyncHandler(authCtrl.completeGoogleLogin));
 router.post('/forgot-password', authLimiter, asyncHandler(authCtrl.forgotPassword));
 router.post('/reset-password', authLimiter, asyncHandler(authCtrl.resetPassword));
 router.get('/status', (_req, res) => {

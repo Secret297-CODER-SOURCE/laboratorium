@@ -308,8 +308,9 @@
               </select>
             </label>
             <label>
-              <span data-i18n="Повідомлення">Повідомлення</span>
-              <textarea name="message" rows="4" data-i18n-placeholder="Розкажи про свій досвід і цілі..." placeholder="Розкажи про свій досвід і цілі..."></textarea>
+              <span data-i18n="Телефон для зворотного зв’язку">Телефон для зворотного зв’язку</span>
+              <input type="tel" name="phone" required inputmode="tel" autocomplete="tel" maxlength="32"
+                data-i18n-placeholder="+380 00 000 00 00" placeholder="+380 00 000 00 00">
             </label>
             <button type="submit" class="btn btn--primary btn--full" data-i18n="Надіслати заявку">Надіслати заявку</button>
             <p class="form-note" data-i18n="Натискаючи кнопку, ви погоджуєтесь з обробкою персональних даних.">Натискаючи кнопку, ви погоджуєтесь з обробкою персональних даних.</p>
@@ -342,9 +343,12 @@
 
     fetch('/api/site-info')
       .then(r => r.ok ? r.json() : null)
-      .then(info => initSiteQr({ siteUrl: info?.siteUrl || window.location.origin }))
+      .then(info => {
+        initSiteQr({ siteUrl: info?.siteUrl || window.location.origin });
+      })
       .catch(() => initSiteQr({ siteUrl: window.location.origin }));
     initProgramsSection();
   </script>
+  <script type="module" src="/analytics.js"></script>
 </body>
 </html>

@@ -1,10 +1,17 @@
+import { execFile } from 'node:child_process';
+import { promises as fs } from 'node:fs';
+import { dirname, join, resolve, sep } from 'node:path';
+import { promisify } from 'node:util';
 import db from '../db/index.js';
-import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
+import config from '../config/index.js';
+import { AppError, ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import * as sandbox from './sandbox.service.js';
 
+const execFileAsync = promisify(execFile);
 const STAFF_ROLES = new Set(['owner', 'developer', 'teacher']);
 const MAX_WORKSPACES_PER_USER = 20;
 const MIN_RUN_INTERVAL_MS = 3000;
+const GIT_ROOT = resolve(dirname(config.db.path), 'code-workspaces');
 
 const DEFAULT_FILES = {
   python: [{ path: 'main.py', content: 'print("Hello, laboratorium!")\n' }],
@@ -80,11 +87,129 @@ function getOwned(userId, workspaceId) {
   return ws;
 }
 
+function workspaceRepoPath(workspaceId) {
+  const root = resolve(GIT_ROOT, String(workspaceId));
+  if (!root.startsWith(`${GIT_ROOT}${sep}`)) throw new ValidationError('Невірний робочий простір');
+  return root;
+}
+
+function validateWorkspacePath(rawPath) {
+  const value = String(rawPath || '').trim();
+  const parts = value.split('/');
+  if (
+    !value
+    || value.length > 64
+    || value.includes('\\')
+    || /^[a-z]:/i.test(value)
+    || /[\0-\x1f\x7f]/.test(value)
+    || parts.some(part => !part || part === '.' || part === '..' || part.toLowerCase() === '.git')
+  ) {
+    throw new ValidationError('Некоректний шлях файлу. Використовуйте відносний шлях без .git, .. та зворотних слешів');
+  }
+  return value;
+}
+
+async function runGit(args, cwd) {
+  try {
+    return await execFileAsync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+      env: {
+        ...process.env,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_TERMINAL_PROMPT: '0',
+      },
+    });
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      throw new AppError('Локальний Git недоступний на сервері', 503, 'GIT_UNAVAILABLE');
+    }
+    const details = String(error.stderr || error.message || '').trim().slice(0, 1000);
+    throw new AppError(`Помилка локального Git${details ? `: ${details}` : ''}`, 500, 'GIT_OPERATION_FAILED');
+  }
+}
+
+async function clearWorkspaceFiles(directory, isRoot = true) {
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  for (const entry of entries) {
+    if (isRoot && entry.name === '.git') continue;
+    const entryPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await clearWorkspaceFiles(entryPath, false);
+      await fs.rmdir(entryPath);
+    } else {
+      await fs.unlink(entryPath);
+    }
+  }
+}
+
+async function syncWorkspaceFiles(workspaceId, files) {
+  const root = workspaceRepoPath(workspaceId);
+  await fs.mkdir(root, { recursive: true, mode: 0o700 });
+  await fs.chmod(root, 0o700);
+  await clearWorkspaceFiles(root);
+  for (const file of files) {
+    const path = validateWorkspacePath(file.path);
+    const destination = resolve(root, ...path.split('/'));
+    if (!destination.startsWith(`${root}${sep}`)) throw new ValidationError('Шлях файлу виходить за межі проєкту');
+    await fs.mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+    await fs.writeFile(destination, file.content, { encoding: 'utf8', mode: 0o600 });
+  }
+  return root;
+}
+
+async function ensureGitRepository(workspaceId, files) {
+  const root = await syncWorkspaceFiles(workspaceId, files);
+  try {
+    const stat = await fs.lstat(join(root, '.git'));
+    if (!stat.isDirectory()) throw new ValidationError('Некоректна локальна Git-база');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    await runGit(['init', '--quiet'], root);
+    await runGit(['checkout', '--quiet', '-b', 'main'], root);
+    await runGit(['config', 'user.name', 'Laboratorium learner'], root);
+    await runGit(['config', 'user.email', 'learner@localhost'], root);
+    await runGit(['config', 'commit.gpgsign', 'false'], root);
+    await runGit(['config', 'core.hooksPath', '/dev/null'], root);
+    await runGit(['add', '--all'], root);
+    await runGit(['commit', '--quiet', '-m', 'Початковий стан'], root);
+  }
+  return root;
+}
+
+async function readGitSnapshot(root) {
+  const [status, branch, commits, remotes] = await Promise.all([
+    runGit(['status', '--short', '--untracked-files=all'], root),
+    runGit(['branch', '--show-current'], root),
+    runGit(['log', '-5', '--format=%h%x09%s'], root),
+    runGit(['remote'], root),
+  ]);
+  const changes = status.stdout.split('\n').filter(Boolean);
+  const history = commits.stdout.trim()
+    ? commits.stdout.trim().split('\n').map((line) => {
+      const [hash, ...parts] = line.split('\t');
+      return { hash, message: parts.join('\t') };
+    })
+    : [];
+  return {
+    branch: branch.stdout.trim(),
+    clean: changes.length === 0,
+    changes,
+    history,
+    local_only: remotes.stdout.trim().length === 0,
+  };
+}
+
+function getWorkspaceFiles(workspaceId) {
+  return db.prepare('SELECT path, content FROM code_files WHERE workspace_id = ? ORDER BY path').all(workspaceId);
+}
+
 export function getWithFiles(userId, workspaceId) {
   const ws = getOwned(userId, workspaceId);
-  const files = db.prepare(`
-    SELECT path, content FROM code_files WHERE workspace_id = ? ORDER BY path
-  `).all(workspaceId);
+  const files = getWorkspaceFiles(workspaceId);
   const activeRun = db.prepare(`
     SELECT * FROM code_runs WHERE workspace_id = ? AND mode = 'web' AND status = 'running'
     ORDER BY id DESC LIMIT 1
@@ -128,13 +253,19 @@ export function saveFiles(userId, workspaceId, files) {
   if (!Array.isArray(files) || !files.length) throw new ValidationError('Немає файлів для збереження');
   if (files.length > 20) throw new ValidationError('Забагато файлів (максимум 20)');
 
+  const normalizedFiles = files.map((file) => ({
+    path: validateWorkspacePath(file?.path),
+    content: String(file?.content ?? '').slice(0, 200_000),
+  }));
+  if (new Set(normalizedFiles.map(file => file.path)).size !== normalizedFiles.length) {
+    throw new ValidationError('Шляхи файлів мають бути унікальними');
+  }
+
   const saveAll = db.transaction(() => {
     db.prepare('DELETE FROM code_files WHERE workspace_id = ?').run(workspaceId);
-    for (const f of files) {
-      const path = String(f.path || '').trim().slice(0, 64);
-      if (!path) continue;
-      const content = String(f.content ?? '').slice(0, 200_000);
-      db.prepare(`INSERT INTO code_files (workspace_id, path, content) VALUES (?, ?, ?)`).run(workspaceId, path, content);
+    for (const file of normalizedFiles) {
+      db.prepare(`INSERT INTO code_files (workspace_id, path, content) VALUES (?, ?, ?)`)
+        .run(workspaceId, file.path, file.content);
     }
     db.prepare(`UPDATE code_workspaces SET updated_at = datetime('now') WHERE id = ?`).run(workspaceId);
   });
@@ -143,15 +274,37 @@ export function saveFiles(userId, workspaceId, files) {
   return getWithFiles(userId, ws.id);
 }
 
-export function remove(userId, workspaceId) {
+export async function remove(userId, workspaceId) {
   const ws = getOwned(userId, workspaceId);
   const activeRun = db.prepare(`
     SELECT * FROM code_runs WHERE workspace_id = ? AND mode = 'web' AND status = 'running'
   `).get(workspaceId);
-  if (activeRun) sandbox.stopWebPreview(activeRun.container_name, activeRun.work_dir).catch(() => {});
+  if (activeRun) await sandbox.stopWebPreview(activeRun.container_name, activeRun.work_dir);
 
+  await fs.rm(workspaceRepoPath(ws.id), { recursive: true, force: true });
   db.prepare('DELETE FROM code_workspaces WHERE id = ?').run(ws.id);
   return { ok: true };
+}
+
+export async function getGitStatus(userId, workspaceId) {
+  const ws = getOwned(userId, workspaceId);
+  const files = getWorkspaceFiles(ws.id);
+  const root = await ensureGitRepository(ws.id, files);
+  return readGitSnapshot(root);
+}
+
+export async function createGitCommit(userId, workspaceId, rawMessage) {
+  const ws = getOwned(userId, workspaceId);
+  const message = String(rawMessage || '').trim();
+  if (!message || message.length > 120 || /[\0-\x1f\x7f]/.test(message)) {
+    throw new ValidationError('Вкажіть назву коміту до 120 символів без керівних символів');
+  }
+  const root = await ensureGitRepository(ws.id, getWorkspaceFiles(ws.id));
+  const before = await runGit(['status', '--porcelain', '--untracked-files=all'], root);
+  if (!before.stdout.trim()) return { committed: false, ...await readGitSnapshot(root) };
+  await runGit(['add', '--all'], root);
+  await runGit(['commit', '--quiet', '-m', message], root);
+  return { committed: true, ...await readGitSnapshot(root) };
 }
 
 const lastRunAt = new Map();
@@ -181,6 +334,22 @@ export async function run(userId, workspaceId) {
     WHERE id = ?
   `).run(result.status, result.stdout, result.stderr, result.exit_code, runRow.lastInsertRowid);
 
+  return mapRun(db.prepare('SELECT * FROM code_runs WHERE id = ?').get(runRow.lastInsertRowid));
+}
+
+export async function runTests(userId, workspaceId) {
+  const ws = getOwned(userId, workspaceId);
+  assertRunRateLimit(userId);
+  if (!['python', 'node'].includes(ws.language)) {
+    throw new ValidationError('Автоматичний запуск тестів наразі доступний для Python і Node.js');
+  }
+
+  const files = db.prepare('SELECT path, content FROM code_files WHERE workspace_id = ?').all(workspaceId);
+  const result = await sandbox.runTests(ws.language, files);
+  const runRow = db.prepare(`
+    INSERT INTO code_runs (workspace_id, mode, status, stdout, stderr, exit_code, finished_at)
+    VALUES (?, 'tests', ?, ?, ?, ?, datetime('now'))
+  `).run(workspaceId, result.status, result.stdout, result.stderr, result.exit_code);
   return mapRun(db.prepare('SELECT * FROM code_runs WHERE id = ?').get(runRow.lastInsertRowid));
 }
 

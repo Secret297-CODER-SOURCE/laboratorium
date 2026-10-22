@@ -1,10 +1,12 @@
 import * as adminService from '../services/admin.service.js';
 import * as directionService from '../services/direction.service.js';
 import * as programService from '../services/program.service.js';
+import * as programTransferService from '../services/program-transfer.service.js';
 import * as userService from '../services/user.service.js';
 import * as passwordService from '../services/password.service.js';
 import * as groupService from '../services/group.service.js';
 import * as taskService from '../services/task.service.js';
+import * as scheduleService from '../services/schedule.service.js';
 import * as articleService from '../services/article.service.js';
 import * as settingsService from '../services/settings.service.js';
 import * as tabAccessService from '../services/tab-access.service.js';
@@ -15,6 +17,9 @@ import * as notificationService from '../services/notification.service.js';
 import * as mailService from '../services/mail.service.js';
 import * as errorLogService from '../services/error-log.service.js';
 import * as userNoteService from '../services/user-note.service.js';
+import * as referralService from '../services/referral.service.js';
+import * as marketingService from '../services/marketing.service.js';
+import * as supportService from '../services/support.service.js';
 import { addBounty } from '../services/bounty.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { isAdminRole } from '../utils/roles.js';
@@ -41,6 +46,7 @@ export async function getOverview(req, res) {
       ...adminService.getOwnerDashboard(),
       directions: directionService.getAll(),
       programs: programService.getAllAdmin(),
+      messagesUnread: supportService.getOwnerInboxSummary().unread_count || 0,
     });
   }
 
@@ -175,6 +181,21 @@ export async function deleteProgram(req, res) {
   res.json(await programService.remove(parseInt(req.params.id, 10)));
 }
 
+export async function exportPrograms(_req, res) {
+  res.setHeader('Content-Disposition', 'attachment; filename="laboratorium-training-programs.json"');
+  res.json(programTransferService.exportPrograms());
+}
+
+export async function importPrograms(req, res) {
+  const results = programTransferService.importPrograms(req.body, req.user.id, req.user.role);
+  res.json({
+    imported: results.length,
+    created: results.filter((program) => program.action === 'created').length,
+    updated: results.filter((program) => program.action === 'updated').length,
+    programs: results,
+  });
+}
+
 export async function listGroups(req, res) {
   const all = req.query.all === '1' && ['owner', 'developer'].includes(req.user.role);
   res.json({
@@ -257,7 +278,10 @@ export async function listAvailableStudents(req, res) {
 }
 
 export async function listTasks(req, res) {
-  res.json(taskService.listForTeacher(req.user.id, req.user.role));
+  res.json({
+    ...taskService.listForTeacher(req.user.id, req.user.role),
+    pastLessons: scheduleService.listPastLessonsForTeacher(req.user.id, req.user.role),
+  });
 }
 
 export async function createTask(req, res) {
@@ -513,13 +537,14 @@ export async function getBillingOverview(req, res) {
 
 export async function recordBillingPayment(req, res) {
   const userId = parseInt(req.params.userId, 10);
-  const { year, month, note, amount } = req.body;
+  const { year, month, note, amount, creditApplied } = req.body;
   const payment = paymentService.recordPayment({
     userId,
     year,
     month,
     note,
     amount,
+    creditApplied,
     recordedBy: req.user.id,
   });
   notificationService.notifyUser(userId, {
@@ -541,6 +566,91 @@ export async function updateBillingUser(req, res) {
   const userId = parseInt(req.params.userId, 10);
   const user = paymentService.updateBillingSettings(userId, req.body);
   res.json({ user, message: 'Налаштування оплати оновлено' });
+}
+
+export async function getAccessLog(req, res) {
+  res.json(marketingService.listAccessLog(req.query));
+}
+
+export async function getAccessStats(req, res) {
+  res.json(marketingService.getAccessStats(req.query));
+}
+
+export async function getMarketingOverview(req, res) {
+  const now = new Date();
+  const year = parseInt(req.query.year, 10) || now.getFullYear();
+  const month = parseInt(req.query.month, 10) || (now.getMonth() + 1);
+  res.json({
+    ...marketingService.getOwnerOverview({ year, month }),
+    campaigns: marketingService.listCampaigns(),
+    referrals: referralService.listOwnerReferrals(),
+    referralSettings: referralService.getSettings(),
+    referralPrograms: referralService.listOwnerReferralPrograms(),
+  });
+}
+
+export async function createMarketingCampaign(req, res) {
+  res.status(201).json({ campaign: marketingService.createCampaign(req.body, req.user.id) });
+}
+
+export async function updateMarketingCampaign(req, res) {
+  res.json({
+    campaign: marketingService.setCampaignActive(parseInt(req.params.id, 10), req.body.active === true),
+  });
+}
+
+export async function updateReferralSettings(req, res) {
+  res.json({ settings: referralService.updateSettings(req.body) });
+}
+
+export async function createReferralProgram(req, res) {
+  const program = referralService.saveReferralProgram(req.body);
+  res.status(201).json({ program });
+}
+
+export async function updateReferralProgram(req, res) {
+  const program = referralService.saveReferralProgram(req.body, parseInt(req.params.id, 10));
+  res.json({ program });
+}
+
+export async function listSupportThreads(req, res) {
+  res.json({ threads: supportService.listOwnerThreads({ status: req.query.status || '' }) });
+}
+
+export async function getSupportInboxSummary(_req, res) {
+  res.json(supportService.getOwnerInboxSummary());
+}
+
+export async function getSupportThread(req, res) {
+  res.json(supportService.getOwnerThread(parseInt(req.params.id, 10)));
+}
+
+export async function replyToSupportThread(req, res) {
+  const result = await supportService.replyAsOwner(parseInt(req.params.id, 10), req.body.body);
+  res.json({
+    thread: result.thread,
+    messages: result.messages,
+    emailDelivery: result.emailDelivery,
+    message: result.emailDelivery.sent
+      ? 'Відповідь збережено та надіслано на email'
+      : `Відповідь збережено в чаті, але email не надіслано (${result.emailDelivery.reason || 'SMTP не налаштовано'})`,
+  });
+}
+
+export async function updateSupportThreadStatus(req, res) {
+  res.json({ thread: supportService.setThreadStatus(parseInt(req.params.id, 10), req.body.status) });
+}
+
+export async function listSupportTemplates(_req, res) {
+  res.json({ templates: supportService.listTemplates() });
+}
+
+export async function createSupportTemplate(req, res) {
+  res.status(201).json({ template: supportService.createTemplate(req.body) });
+}
+
+export async function deleteSupportTemplate(req, res) {
+  res.json(supportService.removeTemplate(parseInt(req.params.id, 10)));
 }
 
 /** Ручна розсилка оголошення учням: вчитель — лише своїй групі, owner/developer — будь-якій аудиторії. */

@@ -66,7 +66,6 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 0.9rem;
-  outline: none;
   font-family: inherit;
 }
 
@@ -335,8 +334,12 @@
 
 .enroll-form select {
   flex: 1;
-  padding: 8px 12px;
+  padding: 8px 2rem 8px 12px;
   background: var(--bg);
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  appearance: none;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
@@ -532,7 +535,6 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  outline: none;
 }
 
 .profile-form input:focus {
@@ -543,6 +545,24 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+.profile-form label.profile-visibility { flex-direction: row; align-items: center; gap: 10px; }
+.profile-form label.profile-visibility input { width: 18px; flex: 0 0 18px; margin: 0; }
+.profile-form label.profile-visibility input[type="checkbox"],
+.profile-form label.profile-award-toggle input[type="checkbox"] { padding: 0; accent-color: var(--accent); }
+.profile-form label.profile-visibility span { font: inherit; color: var(--text-muted); }
+.profile-award-visibility {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.profile-award-visibility legend { padding: 0 6px; color: var(--text); font-weight: 600; }
+.profile-award-visibility > p { margin: 0; color: var(--text-muted); font-size: 0.8rem; }
+.profile-award-visibility #profile-award-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 8px; }
+.profile-form label.profile-award-toggle { display: flex; flex-direction: row; align-items: flex-start; gap: 9px; color: var(--text-muted); font-size: 0.8rem; }
+.profile-form label.profile-award-toggle input { width: 18px; flex: 0 0 18px; margin: 2px 0 0; }
+.profile-form label.profile-award-toggle span { font: inherit; color: inherit; }
 
 .toast {
   position: fixed;
@@ -1464,3 +1484,153 @@
 }
 
 .quiz-opt-label:hover { background: var(--accent-subtle); }
+
+.support-student-panel { margin: 20px 0; }
+.support-student-panel .panel-header { align-items: flex-start; }
+.support-student-panel .panel-header p { margin-top: 5px; color: var(--text-muted); font-size: .86rem; }
+.support-new-form { display: grid; grid-template-columns: 1fr 2fr auto; align-items: end; gap: 12px; margin: 16px 0; }
+.support-new-form label { display: grid; grid-template-rows: auto 1fr; gap: 6px; font-size: .84rem; }
+.support-new-form label .admin-inp { height: 100%; min-height: 48px; box-sizing: border-box; }
+.support-new-form textarea.admin-inp { height: 48px; padding-top: 12px; }
+.support-new-form textarea { resize: vertical; }
+.support-new-form .btn { align-self: end; min-height: 44px; }
+.support-student-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); min-height: 380px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--bg-card) 84%, transparent); }
+.support-student-threads { display: flex; max-height: 520px; flex-direction: column; overflow-y: auto; border-right: 1px solid var(--border); }
+.support-user-thread { display: grid; gap: 5px; padding: 12px; color: var(--text); text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.support-user-thread:hover,
+.support-user-thread.is-active { background: var(--accent-subtle); }
+.support-user-thread span,
+.support-user-thread small { overflow: hidden; color: var(--text-muted); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+.support-user-conversation { display: flex; min-width: 0; flex-direction: column; }
+.support-user-thread-head { padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.support-user-thread-head span { display: block; margin-top: 4px; color: var(--text-muted); font-size: .78rem; }
+.support-student-panel .support-message-list { min-height: 240px; max-height: 420px; }
+.support-student-panel .support-reply-form { display: grid; gap: 10px; }
+.support-student-panel .support-reply-form textarea { resize: vertical; }
+@media (max-width: 760px) {
+  .support-new-form { grid-template-columns: 1fr; }
+  .support-new-form .btn { width: 100%; }
+  .support-student-layout { grid-template-columns: 1fr; }
+  .support-student-threads { max-height: 220px; border-right: 0; border-bottom: 1px solid var(--border); }
+}
+.student-achievements-panel { margin: 18px 0; }
+.student-achievements-panel .panel-header p { margin: 6px 0 0; color: var(--text-muted); font-size: 0.8rem; line-height: 1.55; }
+.student-achievement-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 10px; }
+.student-achievement-card { display: flex; min-width: 0; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.student-achievement-card.is-locked { opacity: 0.72; }
+.student-achievement-card.is-earned { border-color: color-mix(in srgb, var(--accent) 48%, var(--border)); background: color-mix(in srgb, var(--bg-card) 88%, var(--accent) 12%); }
+.student-achievement-icon { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border: 1px solid var(--border); border-radius: 11px; background: var(--accent-subtle); color: var(--accent); }
+.student-achievement-copy { flex: 1 1 auto; min-width: 0; }
+.student-achievement-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.student-achievement-heading h3 { margin: 0; font-size: 0.85rem; overflow-wrap: anywhere; }
+.student-achievement-state { flex: 0 0 auto; color: var(--accent); font-size: 0.67rem; font-weight: 600; }
+.student-achievement-copy p { margin: 5px 0 9px; color: var(--text-muted); font-size: 0.74rem; line-height: 1.45; }
+.student-achievement-progress { height: 5px; overflow: hidden; border-radius: 99px; background: var(--border); }
+.student-achievement-progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.2s ease; }
+.student-achievement-copy small { display: inline-block; margin-top: 5px; color: var(--text-dim); font-family: var(--mono); font-size: 0.68rem; }
+
+.achievement-nft-card {
+  --nft-accent: #c9f4e8;
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--nft-accent) 44%, var(--border));
+  border-radius: 15px;
+  background:
+    radial-gradient(ellipse at 50% 28%, color-mix(in srgb, var(--nft-accent) 18%, transparent), transparent 58%),
+    linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 88%, #111827), var(--bg));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 10px 26px rgba(0,0,0,.16);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.achievement-nft-card::after {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(color-mix(in srgb, var(--nft-accent) 18%, transparent) .7px, transparent .7px);
+  background-size: 7px 7px;
+  content: "";
+  opacity: .17;
+  mask-image: linear-gradient(120deg, #000, transparent 64%);
+}
+.achievement-nft-card:hover { transform: translateY(-3px); box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 16px 32px rgba(0,0,0,.24); }
+.achievement-nft-card[data-category="osint"] { --nft-accent: #a8f0ff; }
+.achievement-nft-card[data-category="web"] { --nft-accent: #b3f4ce; }
+.achievement-nft-card[data-category="network"] { --nft-accent: #c4b7ff; }
+.achievement-nft-card[data-category="crypto"] { --nft-accent: #ffe5a6; }
+.achievement-nft-card[data-category="forensics"] { --nft-accent: #ffb9c6; }
+.achievement-nft-card[data-category="reverse"] { --nft-accent: #b8d0ff; }
+.achievement-nft-top,
+.achievement-nft-copy,
+.achievement-nft-serial { position: relative; z-index: 1; }
+.achievement-nft-top { display: flex; justify-content: space-between; gap: 8px; color: var(--text-dim); font-family: var(--mono); font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; }
+.achievement-nft-top span:last-child { color: var(--nft-accent); }
+.achievement-nft-art { display: grid; min-height: 142px; place-items: center; margin: 5px 0 2px; }
+.award-pixel-art { display: block; width: 132px; max-width: 100%; image-rendering: pixelated; filter: drop-shadow(0 8px 12px color-mix(in srgb, var(--nft-accent) 20%, transparent)); }
+.achievement-nft-card.is-locked .award-pixel-art { filter: grayscale(.72) saturate(.5); opacity: .68; }
+.achievement-nft-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.achievement-nft-title-row h3 { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--text); font-size: .86rem; line-height: 1.3; }
+.achievement-nft-status { flex: 0 0 auto; padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--nft-accent) 42%, transparent); border-radius: 99px; color: var(--nft-accent); font-size: .6rem; white-space: nowrap; }
+.achievement-nft-copy p { min-height: 2.8em; margin: 8px 0 10px; color: var(--text-muted); font-size: .72rem; line-height: 1.45; }
+.achievement-nft-copy .student-achievement-progress { height: 5px; background: color-mix(in srgb, var(--nft-accent) 18%, var(--border)); }
+.achievement-nft-copy .student-achievement-progress span { background: var(--nft-accent); box-shadow: 0 0 9px color-mix(in srgb, var(--nft-accent) 55%, transparent); }
+.achievement-nft-copy small { display: inline-block; margin-top: 5px; color: var(--text-dim); font-family: var(--mono); font-size: .65rem; }
+.achievement-nft-serial { margin-top: auto; padding-top: 10px; color: color-mix(in srgb, var(--text-dim) 75%, transparent); font-family: var(--mono); font-size: .54rem; letter-spacing: .13em; text-align: right; }
+.achievement-nft-card[data-rarity="legendary"] { border-color: color-mix(in srgb, #ffd889 62%, var(--border)); }
+.achievement-nft-card[data-rarity="legendary"] .achievement-nft-top span:last-child { color: #ffd889; }
+.achievement-nft-card.is-compact { padding: 11px; }
+.achievement-nft-card.is-compact .achievement-nft-art { min-height: 126px; }
+.achievement-nft-card.is-compact .award-pixel-art { width: 116px; }
+.achievement-nft-card.is-compact .achievement-nft-copy p { min-height: 0; }
+.student-achievement-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+.student-profile-award-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr)); }
+@media (prefers-reduced-motion: reduce) {
+  .achievement-nft-card { transition: none; }
+  .achievement-nft-card:hover { transform: none; }
+}
+
+.learning-history-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.learning-history-columns > section { min-width: 0; }
+.learning-history-columns > section > h3 { margin: 0 0 12px; font-size: 0.95rem; }
+.learning-history-item { padding: 14px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.learning-history-item h3 { margin: 0; font-size: 0.88rem; }
+.learning-history-item p { margin: 5px 0 0; color: var(--text-muted); font-size: 0.75rem; }
+.learning-history-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.learning-history-note { margin-top: 10px; color: var(--text-muted); font-size: 0.82rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lab-tools-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.lab-tool-card { display: grid; align-content: start; gap: 10px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.lab-tool-card h3 { margin: 0; font-size: 0.95rem; }
+.lab-tool-card label { color: var(--text-muted); font-size: 0.78rem; }
+.lab-tool-card textarea { width: 100%; min-height: 74px; padding: 10px; resize: vertical; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font: 0.78rem var(--mono); }
+.lab-tool-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.lab-tool-output { min-height: 1.2em; color: var(--accent); font: 0.76rem/1.55 var(--mono); overflow-wrap: anywhere; white-space: pre-wrap; }
+.lab-tool-checklist { display: grid; gap: 5px; padding: 0; margin: 0; list-style: none; font-size: 0.74rem; line-height: 1.45; }
+.lab-tool-checklist li { display: flex; gap: 8px; color: var(--text-muted); }
+.lab-tool-checklist .is-ok > span { color: var(--accent); }
+.lab-tool-checklist .is-review > span { color: #f0b44d; }
+.lab-tool-output p { margin: 8px 0 0; color: var(--text-dim); font-size: 0.72rem; line-height: 1.45; }
+.status-pill.review { color: #c77dff; background: rgba(199, 125, 255, 0.1); }
+.status-pill.completed { color: var(--accent); background: var(--accent-subtle); }
+.homework-history { margin-top: 16px; }
+.homework-history-item { align-items: flex-start; }
+.homework-history-meta { margin-top: 4px; color: var(--text-muted); font-size: 0.75rem; }
+.homework-history-note { margin: 8px 0 0; color: var(--text-muted); font-size: 0.82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .learning-history-columns, .lab-tools-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+.dash-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: -8px 0 22px; }
+.dash-jump-btn { display: inline-flex; align-items: center; min-height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: color-mix(in srgb, var(--bg-card) 88%, transparent); color: var(--text-muted); font-size: .78rem; font-weight: 500; text-decoration: none; transition: border-color .2s, color .2s, background .2s; }
+.dash-jump-btn.is-active, .dash-jump-btn:hover, .dash-jump-btn:focus-visible { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); outline: none; }
+.dash-jump-btn[hidden] { display: none; }
+.dash-panel[id] { scroll-margin-top: 90px; }
+@media (max-width: 640px) {
+  .dash-jump { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .dash-jump-btn { flex: 0 0 auto; }
+}
+.dash-section-closed { display: none !important; }
+.dash-grid > .dash-panel { grid-column: 1 / -1; }

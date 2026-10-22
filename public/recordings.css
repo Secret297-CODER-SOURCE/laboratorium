@@ -120,7 +120,6 @@
   border-radius: var(--radius);
   resize: vertical;
   min-height: 60px;
-  outline: none;
   font-size: 0.85rem;
 }
 

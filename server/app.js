@@ -23,6 +23,8 @@ import sitemapRoutes from './routes/sitemap.routes.js';
 import { trySslipHostTunnel } from './services/tunnel.service.js';
 import * as programService from './services/program.service.js';
 import * as directionService from './services/direction.service.js';
+import * as contentService from './services/content.service.js';
+import * as marketingService from './services/marketing.service.js';
 import './db/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +64,10 @@ function sendHtmlPage(res, filePath, fallbackPath) {
   const resolved = existsSync(filePath) ? filePath : fallbackPath;
   let html = readFileSync(resolved, 'utf8');
   html = injectAssetVersion(html);
+  if (html.includes('/analytics.js') === false
+    && ['/index.html', '/login.html', '/register.html'].includes(`/${resolved.split('/').pop()}`)) {
+    html = html.replace('</body>', '  <script type="module" src="/analytics.js"></script>\n</body>');
+  }
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.set('Pragma', 'no-cache');
   res.type('html').send(html);
@@ -75,6 +81,70 @@ function escapeHtml(value) {
     '"': '&quot;',
     "'": '&#39;',
   })[char]);
+}
+
+function renderCourseBlock(block) {
+  const data = block.data || {};
+  const escapeText = (value) => escapeHtml(value).replace(/\n/g, '<br>');
+
+  switch (block.block_type) {
+    case 'heading': {
+      const level = Math.min(3, Math.max(1, parseInt(data.level, 10) || 2));
+      return `<h${level} class="cb-heading cb-heading--${level}">${escapeHtml(data.text)}</h${level}>`;
+    }
+    case 'text':
+      return `<div class="cb-text">${escapeText(data.text)}</div>`;
+    case 'list': {
+      const tag = data.style === 'number' ? 'ol' : 'ul';
+      const items = Array.isArray(data.items) ? data.items : [];
+      return `<${tag} class="cb-list">${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</${tag}>`;
+    }
+    case 'callout': {
+      const variant = ['info', 'warning', 'success'].includes(data.variant) ? data.variant : 'info';
+      return `<aside class="cb-callout cb-callout--${variant}">${data.title ? `<strong class="cb-callout-title">${escapeHtml(data.title)}</strong>` : ''}<p>${escapeText(data.text)}</p></aside>`;
+    }
+    case 'link': {
+      let url;
+      try {
+        url = new URL(String(data.url || ''));
+      } catch {
+        return '';
+      }
+      if (!['https:', 'http:'].includes(url.protocol)) return '';
+      return `<p class="cb-link-wrap"><a href="${escapeHtml(url.href)}" class="btn btn--outline" target="_blank" rel="noopener noreferrer">${escapeHtml(data.label || url.hostname)}</a></p>`;
+    }
+    case 'cards': {
+      const items = Array.isArray(data.items) ? data.items : [];
+      return `<div class="cb-cards">${items.map(item => `<article class="cb-card"><h3>${escapeHtml(item.title)}</h3>${item.text ? `<p>${escapeText(item.text)}</p>` : ''}</article>`).join('')}</div>`;
+    }
+    case 'steps': {
+      const items = Array.isArray(data.items) ? data.items : [];
+      return `<ol class="cb-steps">${items.map(item => `<li class="cb-step"><strong>${escapeHtml(item.title)}</strong><p>${escapeText(item.text)}</p></li>`).join('')}</ol>`;
+    }
+    case 'quote':
+      return `<blockquote class="cb-quote"><p>${escapeText(data.text)}</p>${data.author ? `<cite>— ${escapeHtml(data.author)}</cite>` : ''}</blockquote>`;
+    case 'divider':
+      return '<hr class="cb-divider">';
+    default:
+      return '';
+  }
+}
+
+function renderCourseContent(page) {
+  if (!page?.sections?.length) return '';
+  const sections = page.sections.map(section => `
+    <section class="cb-section">
+      <header class="cb-section-head"><h2>${escapeHtml(section.title)}</h2></header>
+      <div class="cb-section-body">
+        ${(section.blocks || []).map((block) => {
+          const markup = renderCourseBlock(block);
+          return markup
+            ? `<div class="cb-block cb-block--${escapeHtml(block.block_type)}">${markup}</div>`
+            : '';
+        }).join('')}
+      </div>
+    </section>`).join('');
+  return `<div class="container course-content"><div class="cb-body">${sections}</div></div>`;
 }
 
 function sendCoursePage(req, res) {
@@ -106,6 +176,8 @@ function sendCoursePage(req, res) {
       url: `${config.siteUrl.replace(/\/+$/, '')}/`,
     },
   }).replace(/</g, '\\u003c');
+  const page = contentService.getPublishedProgramPage(program.id);
+  const applicationUrl = `/?direction=${encodeURIComponent(direction?.slug || '')}#contact`;
 
   let html = readFileSync(join(publicDir, 'course.html'), 'utf8');
   html = html
@@ -131,9 +203,10 @@ function sendCoursePage(req, res) {
                 <span class="course-stat-value">${escapeHtml(program.duration)}</span>
               </div>
             </div>
-            <a href="/login.html" class="btn btn--primary">Дізнатися про запис</a>
+            <a href="${escapeHtml(applicationUrl)}" class="btn btn--primary">Подати заявку на напрям</a>
           </div>
         </header>
+        ${renderCourseContent(page)}
       </div>`,
     );
 
@@ -189,6 +262,13 @@ export function createApp() {
   app.use(trySslipHostTunnel);
   app.use('/lab/t', tunnelRoutes);
   app.use('/lab/demo', ctfDemoRoutes);
+
+  app.use((req, _res, next) => {
+    if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html'))) {
+      marketingService.recordBotRequest(req.originalUrl, req.headers['user-agent']);
+    }
+    next();
+  });
 
   app.get('/course.html', sendCoursePage);
 

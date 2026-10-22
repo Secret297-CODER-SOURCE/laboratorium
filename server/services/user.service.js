@@ -7,6 +7,7 @@ import { sanitizeUser } from '../utils/tier.js';
 import { addBounty } from './bounty.service.js';
 import { generatePassword } from './password.service.js';
 import * as mailService from './mail.service.js';
+import * as referralService from './referral.service.js';
 import { scheduleProvisionForStudent } from './lab.service.js';
 
 export function findByEmail(email) {
@@ -28,7 +29,7 @@ export function findByHandle(handle) {
  * (see is_restricted) — no lab VM, no unlocked tabs — until a teacher or
  * owner places them in a study group (see group.service.js addGroupMembers).
  */
-export async function register({ name, email, handle }) {
+export async function register({ name, email, handle, referral_code }) {
   if (!config.auth.allowPublicRegistration) {
     throw new ValidationError('Реєстрація закрита. Доступ надається після оплати.');
   }
@@ -59,6 +60,7 @@ export async function register({ name, email, handle }) {
 
   const userId = result.lastInsertRowid;
   addBounty(userId, 100, 'Реєстрація в laboratorium.');
+  referralService.assignReferrerToUser(userId, referral_code);
 
   const user = findById(userId);
   const mailResult = await mailService.sendWelcomeCredentialsEmail(user, plainPassword);
@@ -159,7 +161,49 @@ export function login({ login, password }) {
   return user;
 }
 
-export function updateProfile(userId, { name, handle }) {
+export function loginWithGoogle({ sub, email, emailVerified, name, referralCode = '' }) {
+  if (typeof sub !== 'string' || !sub || !isValidEmail(email) || emailVerified !== true) {
+    throw new ValidationError('Google не підтвердив адресу email');
+  }
+
+  let user = db.prepare('SELECT * FROM users WHERE google_sub = ?').get(sub);
+  if (user) {
+    if (user.is_frozen) throw new UnauthorizedError('Акаунт заморожено. Зверніться до адміністрації.');
+    return user;
+  }
+
+  const normalizedEmail = email.toLowerCase();
+  user = findByEmail(normalizedEmail);
+  if (user) {
+    if (user.google_sub) {
+      throw new ConflictError('До цього акаунта прив’язаний інший Google-профіль');
+    }
+    db.prepare(`UPDATE users SET google_sub = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(sub, user.id);
+    user = findById(user.id);
+    if (user.is_frozen) throw new UnauthorizedError('Акаунт заморожено. Зверніться до адміністрації.');
+    return user;
+  }
+
+  if (!config.auth.allowPublicRegistration) {
+    throw new ForbiddenError('Реєстрація закрита. Доступ надається після оплати.');
+  }
+
+  const displayName = String(name || '').trim().slice(0, 120) || normalizedEmail.split('@')[0];
+  const handle = generateHandle(displayName);
+  const passwordHash = bcrypt.hashSync(generatePassword(), config.bcryptRounds);
+  const result = db.prepare(`
+    INSERT INTO users (email, password_hash, name, handle, bounty_points, role, is_restricted, google_sub)
+    VALUES (?, ?, ?, ?, 0, 'student', 1, ?)
+  `).run(normalizedEmail, passwordHash, displayName, handle, sub);
+  addBounty(result.lastInsertRowid, 100, 'Реєстрація через Google');
+  referralService.assignReferrerToUser(result.lastInsertRowid, referralCode);
+  return findById(result.lastInsertRowid);
+}
+
+export function updateProfile(userId, {
+  name, handle, profile_bio, profile_public, profile_hidden_awards, profile_share_solutions,
+}) {
   const user = findById(userId);
   if (!user) throw new NotFoundError('Користувача не знайдено');
 
@@ -177,6 +221,40 @@ export function updateProfile(userId, { name, handle }) {
     }
     db.prepare('UPDATE users SET handle = ?, updated_at = datetime(\'now\') WHERE id = ?')
       .run(handle.trim(), userId);
+  }
+
+  if (profile_bio !== undefined) {
+    if (typeof profile_bio !== 'string' || profile_bio.length > 280) {
+      throw new ValidationError('Опис профілю: до 280 символів');
+    }
+    db.prepare('UPDATE users SET profile_bio = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .run(profile_bio.trim(), userId);
+  }
+
+  if (profile_public !== undefined) {
+    if (typeof profile_public !== 'boolean') {
+      throw new ValidationError('Налаштування видимості профілю некоректне');
+    }
+    db.prepare('UPDATE users SET profile_public = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .run(profile_public ? 1 : 0, userId);
+  }
+
+  if (profile_hidden_awards !== undefined) {
+    if (!Array.isArray(profile_hidden_awards)
+      || profile_hidden_awards.length > 100
+      || profile_hidden_awards.some((id) => typeof id !== 'string' || !/^[a-z0-9-]{1,80}$/i.test(id))) {
+      throw new ValidationError('Список прихованих нагород некоректний');
+    }
+    db.prepare('UPDATE users SET profile_hidden_awards = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .run(JSON.stringify([...new Set(profile_hidden_awards)]), userId);
+  }
+
+  if (profile_share_solutions !== undefined) {
+    if (typeof profile_share_solutions !== 'boolean') {
+      throw new ValidationError('Налаштування показу рішень некоректне');
+    }
+    db.prepare('UPDATE users SET profile_share_solutions = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .run(profile_share_solutions ? 1 : 0, userId);
   }
 
   return findById(userId);

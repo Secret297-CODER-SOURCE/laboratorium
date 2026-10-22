@@ -22,7 +22,7 @@ const root = document.getElementById('course-view');
 function levelMeterHtml(level) {
   const segs = levelSegments(level);
   return `<span class="course-level" title="${t('Рівень: {level}', { level })}">
-    ${[1, 2, 3].map(n => `<span class="course-level-seg${n <= segs ? ' is-on' : ''}"></span>`).join('')}
+    ${[1, 2, 3, 4].map(n => `<span class="course-level-seg${n <= segs ? ' is-on' : ''}"></span>`).join('')}
   </span>`;
 }
 
@@ -52,8 +52,7 @@ async function load() {
   document.title = `${p.name} — laboratorium.`;
 
   const accent = dirAccent(dir);
-  const ctaHref = isLoggedIn() ? '/dashboard.html' : '/login.html';
-  const ctaLabel = isLoggedIn() ? t('Записатися на курс') : t('Увійти та записатися');
+  const ctaHref = `/?direction=${encodeURIComponent(dir?.slug || '')}#contact`;
   const tags = p.tags || [];
 
   root.innerHTML = `
@@ -71,24 +70,26 @@ async function load() {
         <div class="course-stats">
           <div class="course-stat">
             <span class="course-stat-label">${t('Рівень')}</span>
-            <span class="course-stat-value">${levelMeterHtml(p.level)}${p.level}</span>
+            <span class="course-stat-value">${levelMeterHtml(p.level)}${t(p.level)}</span>
           </div>
           <div class="course-stat">
             <span class="course-stat-label">${t('Тривалість')}</span>
             <span class="course-stat-value ico-inline">${icon('calendar', 'ico ico--sm')}${p.duration}</span>
           </div>
-          <div class="course-stat">
-            <span class="course-stat-label">Bounty</span>
-            <span class="course-stat-value ico-inline">${icon('chart', 'ico ico--sm')}+${p.bounty_reward}</span>
-          </div>
+          ${p.bounty_reward > 0 ? `
+            <div class="course-stat">
+              <span class="course-stat-label">Bounty</span>
+              <span class="course-stat-value ico-inline">${icon('chart', 'ico ico--sm')}+${p.bounty_reward}</span>
+            </div>` : ''}
         </div>
         ${tags.length ? `
           <div class="course-arsenal">
-            <span class="dossier-arsenal-label">${t('Арсенал')}</span>
+            <span class="dossier-arsenal-label">${t('Модулі навчання')}</span>
             <ul>${tags.map(tag => `<li>${tag}</li>`).join('')}</ul>
           </div>` : ''}
         <div class="course-actions">
-          <a href="${ctaHref}" class="btn btn--primary">${ctaLabel}</a>
+          <a href="${ctaHref}" class="btn btn--primary">${t('Подати заявку на напрям')}</a>
+          <a href="/#programs" class="btn btn--outline">${t('Усі програми')}</a>
         </div>
       </div>
     </header>

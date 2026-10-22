@@ -8,6 +8,7 @@ import * as learningCtrl from '../controllers/learning.controller.js';
 import * as storageCtrl from '../controllers/storage.controller.js';
 import * as statsCtrl from '../controllers/stats.controller.js';
 import * as attendanceCtrl from '../controllers/attendance.controller.js';
+import * as calendarCtrl from '../controllers/calendar.controller.js';
 import { uploadCtfAttachment } from '../middleware/upload.js';
 
 const router = Router();
@@ -28,12 +29,23 @@ router.post('/users/:id/send-password', requireRole('owner', 'developer'), async
 router.get('/applications', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listApplications));
 router.patch('/applications/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateApplication));
 
+router.get('/messages', requireRole('owner'), asyncHandler(adminCtrl.listSupportThreads));
+router.get('/messages/summary', requireRole('owner'), asyncHandler(adminCtrl.getSupportInboxSummary));
+router.get('/messages/templates', requireRole('owner'), asyncHandler(adminCtrl.listSupportTemplates));
+router.post('/messages/templates', requireRole('owner'), asyncHandler(adminCtrl.createSupportTemplate));
+router.delete('/messages/templates/:id', requireRole('owner'), asyncHandler(adminCtrl.deleteSupportTemplate));
+router.get('/messages/:id', requireRole('owner'), asyncHandler(adminCtrl.getSupportThread));
+router.post('/messages/:id/replies', requireRole('owner'), asyncHandler(adminCtrl.replyToSupportThread));
+router.patch('/messages/:id/status', requireRole('owner'), asyncHandler(adminCtrl.updateSupportThreadStatus));
+
 router.get('/directions', asyncHandler(adminCtrl.listDirections));
 router.post('/directions', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createDirection));
 router.patch('/directions/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateDirection));
 router.delete('/directions/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteDirection));
 
 router.get('/programs', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listPrograms));
+router.get('/programs/export', requireRole('owner', 'developer'), asyncHandler(adminCtrl.exportPrograms));
+router.post('/programs/import', requireRole('owner', 'developer'), asyncHandler(adminCtrl.importPrograms));
 router.post('/programs', requireRole('owner', 'developer'), asyncHandler(adminCtrl.createProgram));
 router.patch('/programs/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateProgram));
 router.delete('/programs/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteProgram));
@@ -70,6 +82,10 @@ router.delete('/schedule/lessons/:id', asyncHandler(scheduleCtrl.deleteLesson));
 router.get('/schedule/absences', asyncHandler(scheduleCtrl.listAbsences));
 router.post('/schedule/absences/:id/acknowledge', asyncHandler(scheduleCtrl.acknowledgeAbsence));
 router.get('/schedule/stats', asyncHandler(scheduleCtrl.getStats));
+router.get('/calendar/events', requireRole('owner', 'developer'), asyncHandler(calendarCtrl.listAdminEvents));
+router.post('/calendar/events', requireRole('owner', 'developer'), asyncHandler(calendarCtrl.createEvent));
+router.delete('/calendar/events/:id(\\d+)', requireRole('owner', 'developer'), asyncHandler(calendarCtrl.deleteEvent));
+router.post('/calendar/ctftime/sync', requireRole('owner', 'developer'), asyncHandler(calendarCtrl.syncCtfEvents));
 
 router.get('/quizzes', asyncHandler(learningCtrl.listQuizzes));
 router.post('/quizzes', asyncHandler(learningCtrl.createQuiz));
@@ -141,6 +157,14 @@ router.get('/billing', requireRole('owner', 'developer'), asyncHandler(adminCtrl
 router.post('/billing/users/:userId/payments', requireRole('owner', 'developer'), asyncHandler(adminCtrl.recordBillingPayment));
 router.patch('/billing/users/:userId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateBillingUser));
 router.delete('/billing/payments/:paymentId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.deleteBillingPayment));
+router.get('/marketing', requireRole('owner'), asyncHandler(adminCtrl.getMarketingOverview));
+router.get('/marketing/access-log', requireRole('owner'), asyncHandler(adminCtrl.getAccessLog));
+router.get('/marketing/access-stats', requireRole('owner'), asyncHandler(adminCtrl.getAccessStats));
+router.post('/marketing/campaigns', requireRole('owner'), asyncHandler(adminCtrl.createMarketingCampaign));
+router.patch('/marketing/campaigns/:id', requireRole('owner'), asyncHandler(adminCtrl.updateMarketingCampaign));
+router.patch('/marketing/referrals', requireRole('owner'), asyncHandler(adminCtrl.updateReferralSettings));
+router.post('/marketing/referral-programs', requireRole('owner'), asyncHandler(adminCtrl.createReferralProgram));
+router.patch('/marketing/referral-programs/:id', requireRole('owner'), asyncHandler(adminCtrl.updateReferralProgram));
 
 router.get('/content/:type/:id/status', asyncHandler(contentCtrl.getContentStatus));
 

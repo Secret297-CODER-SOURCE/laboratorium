@@ -91,7 +91,7 @@ function renderBillingRow(student, year, month) {
   const statusClass = STATUS_CLASS[status] || '';
 
   const paidCell = student.payment
-    ? `<span class="billing-paid-at">${formatDate(student.payment.paid_at)}</span>${student.payment.note ? `<span class="billing-note">${esc(student.payment.note)}</span>` : ''}`
+    ? `<span class="billing-paid-at">${formatDate(student.payment.paid_at)}</span>${student.payment.amount != null ? `<span class="billing-note">Отримано: ${Number(student.payment.amount).toLocaleString('uk-UA')}</span>` : ''}${student.payment.credit_applied > 0 ? `<span class="billing-note">Кредит: ${Number(student.payment.credit_applied).toLocaleString('uk-UA')}</span>` : ''}${student.payment.note ? `<span class="billing-note">${esc(student.payment.note)}</span>` : ''}`
     : '<span class="billing-unpaid">Не оплачено</span>';
 
   const due = student.dueDate ? formatDate(student.dueDate).split(',')[0] : '—';
@@ -101,6 +101,7 @@ function renderBillingRow(student, year, month) {
     <td>
       <strong>@${esc(student.handle)}</strong>
       <div class="billing-user-sub">${esc(student.name)}</div>
+      ${student.availableCredit > 0 ? `<div class="billing-user-sub">Доступний кредит: ${Number(student.availableCredit).toLocaleString('uk-UA')}</div>` : ''}
     </td>
     <td>
       <input class="admin-inp admin-inp--xs billing-day-inp" type="number" min="1" max="28" value="${student.billing_day || 1}" data-user-id="${student.id}">
@@ -144,11 +145,21 @@ export function bindBillingPanelEvents(showToast, reload) {
       const userId = parseInt(btn.dataset.userId, 10);
       const year = parseInt(document.getElementById('billing-year')?.value, 10);
       const month = parseInt(document.getElementById('billing-month')?.value, 10);
-      const note = (await showPrompt('Примітка (необов\'язково):')) ?? '';
+      const amount = await showPrompt('Фактично отримана сума (залиште порожнім, якщо не вказуєте):');
+      if (amount === null) return;
+      const creditApplied = await showPrompt('Скільки реферального кредиту / знижки на навчання застосувати? Введіть 0, якщо не застосовувати:');
+      if (creditApplied === null) return;
+      const note = await showPrompt('Примітка (необов\'язково):');
+      if (note === null) return;
       try {
         await api(`/admin/billing/users/${userId}/payments`, {
           method: 'POST',
-          body: JSON.stringify({ year, month, note: note.trim() || null }),
+          body: JSON.stringify({
+            year, month,
+            amount: amount.trim() ? Number(amount) : null,
+            creditApplied: creditApplied.trim() ? Number(creditApplied) : 0,
+            note: note.trim() || null,
+          }),
         });
         showToast('Оплату зафіксовано');
         reload();

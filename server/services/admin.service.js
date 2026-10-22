@@ -4,6 +4,7 @@ import db from '../db/index.js';
 import { getStats } from '../db/index.js';
 import { sanitizeUser } from '../utils/tier.js';
 import * as userService from './user.service.js';
+import * as referralService from './referral.service.js';
 import * as groupService from './group.service.js';
 import * as applicationService from './application.service.js';
 import * as paymentService from './payment.service.js';
@@ -184,6 +185,7 @@ export async function updateApplicationStatus(id, status, createAccount = false,
     if (existing && !app.user_id) {
       db.prepare('UPDATE applications SET user_id = ? WHERE id = ?').run(existing.id, id);
     }
+    if (status === 'approved') referralService.awardForApprovedApplication(id);
 
     if (!existing && createAccount) {
       account = await userService.adminCreateUser({

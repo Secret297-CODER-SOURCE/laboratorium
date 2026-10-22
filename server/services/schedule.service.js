@@ -1,4 +1,5 @@
 import db from '../db/index.js';
+import { randomUUID } from 'node:crypto';
 import * as groupService from './group.service.js';
 import { ForbiddenError, NotFoundError, ValidationError, ConflictError } from '../utils/errors.js';
 
@@ -7,6 +8,7 @@ function mapLesson(row) {
   return {
     ...row,
     is_cancelled: !!row.is_cancelled,
+    is_exception: !!row.is_exception,
     absence_count: row.absence_count ?? 0,
     member_count: row.member_count ?? 0,
     has_absence: !!row.has_absence,
@@ -100,6 +102,42 @@ export function listStudentLessons(userId, { from, to } = {}) {
   `).all(userId, userId, fromDt, toDt).map(mapLesson);
 }
 
+export function listStudentLessonHistory(userId) {
+  return db.prepare(`
+    SELECT l.*, g.name as group_name, g.color as group_color,
+      u.name as teacher_name, u.handle as teacher_handle,
+      la.id as absence_id, la.reason as absence_reason, la.status as absence_status,
+      la.created_at as absence_created_at
+    FROM lessons l
+    JOIN study_groups g ON g.id = l.group_id
+    JOIN study_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+    JOIN users u ON u.id = l.teacher_id
+    LEFT JOIN lesson_absences la ON la.lesson_id = l.id AND la.user_id = ?
+    WHERE l.is_cancelled = 0
+      AND datetime(l.lesson_at) < datetime('now')
+    ORDER BY l.lesson_at DESC
+  `).all(userId, userId).map(mapLesson);
+}
+
+export function listPastLessonsForTeacher(actorId, actorRole) {
+  let sql = `
+    SELECT l.*, g.name as group_name, g.color as group_color,
+      u.name as teacher_name, u.handle as teacher_handle,
+      (SELECT COUNT(*) FROM study_group_members gm WHERE gm.group_id = l.group_id) as member_count
+    FROM lessons l
+    JOIN study_groups g ON g.id = l.group_id
+    JOIN users u ON u.id = l.teacher_id
+    WHERE l.is_cancelled = 0 AND datetime(l.lesson_at) < datetime('now')
+  `;
+  const params = [];
+  if (actorRole === 'teacher') {
+    sql += ' AND g.teacher_id = ?';
+    params.push(actorId);
+  }
+  sql += ' ORDER BY l.lesson_at DESC';
+  return db.prepare(sql).all(...params).map(mapLesson);
+}
+
 export function createLesson(actorId, actorRole, data) {
   const groupId = parseInt(data.group_id, 10);
   assertGroupManage(groupId, actorId, actorRole);
@@ -107,39 +145,71 @@ export function createLesson(actorId, actorRole, data) {
   const title = data.title?.trim();
   const lessonAt = data.lesson_at?.trim();
   if (!title) throw new ValidationError('Вкажіть назву заняття');
-  if (!lessonAt) throw new ValidationError('Вкажіть дату і час');
+  const start = Date.parse(lessonAt || '');
+  if (!Number.isFinite(start)) throw new ValidationError('Вкажіть коректну дату і час');
+  const duration = parseInt(data.duration_minutes, 10) || 90;
+  if (duration < 15 || duration > 480) throw new ValidationError('Тривалість має бути від 15 до 480 хвилин');
 
   const group = groupService.getGroupById(groupId);
-  const result = db.prepare(`
+  const recurrenceUntil = data.recurrence_until ? Date.parse(`${data.recurrence_until}T23:59:59.999Z`) : null;
+  if (data.repeat_weekly && !Number.isFinite(recurrenceUntil)) {
+    throw new ValidationError('Вкажіть дату завершення циклічного розкладу');
+  }
+  if (data.repeat_weekly && (recurrenceUntil < start || recurrenceUntil > start + 731 * 86400000)) {
+    throw new ValidationError('Дата завершення має бути в межах двох років від першого заняття');
+  }
+  const seriesId = data.repeat_weekly ? randomUUID() : null;
+  const insert = db.prepare(`
     INSERT INTO lessons (group_id, teacher_id, title, lesson_at, duration_minutes, topic, location)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    groupId,
-    group.teacher_id,
-    title,
-    lessonAt,
-    parseInt(data.duration_minutes, 10) || 90,
-    data.topic?.trim() || null,
-    data.location?.trim() || null,
-  );
+  `);
 
-  return getLessonById(result.lastInsertRowid);
+  const insertLesson = db.prepare(`
+    INSERT INTO lessons
+      (group_id, teacher_id, title, lesson_at, duration_minutes, topic, location, series_id, original_lesson_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const createAll = db.transaction(() => {
+    if (!seriesId) {
+      const result = insert.run(groupId, group.teacher_id, title, new Date(start).toISOString(), duration,
+        data.topic?.trim() || null, data.location?.trim() || null);
+      return [result.lastInsertRowid];
+    }
+    const ids = [];
+    for (let at = start; at <= recurrenceUntil; at += 7 * 86400000) {
+      const iso = new Date(at).toISOString();
+      const result = insertLesson.run(groupId, group.teacher_id, title, iso, duration,
+        data.topic?.trim() || null, data.location?.trim() || null, seriesId, iso);
+      ids.push(result.lastInsertRowid);
+    }
+    return ids;
+  });
+  const lessonIds = createAll();
+  return getLessonById(lessonIds[0]);
 }
 
 export function updateLesson(lessonId, actorId, actorRole, data) {
   const lesson = getLessonById(lessonId);
   if (!lesson) throw new NotFoundError('Заняття не знайдено');
   assertGroupManage(lesson.group_id, actorId, actorRole);
+  const title = data.title?.trim() || lesson.title;
+  const lessonAt = data.lesson_at?.trim() || lesson.lesson_at;
+  if (!Number.isFinite(Date.parse(lessonAt))) throw new ValidationError('Вкажіть коректну дату і час');
+  const duration = data.duration_minutes !== undefined
+    ? (parseInt(data.duration_minutes, 10) || 90)
+    : lesson.duration_minutes;
+  if (duration < 15 || duration > 480) throw new ValidationError('Тривалість має бути від 15 до 480 хвилин');
 
   db.prepare(`
     UPDATE lessons SET
       title = ?, lesson_at = ?, duration_minutes = ?, topic = ?, location = ?,
-      is_cancelled = ?, updated_at = datetime('now')
+      is_cancelled = ?, is_exception = CASE WHEN series_id IS NOT NULL THEN 1 ELSE is_exception END,
+      updated_at = datetime('now')
     WHERE id = ?
   `).run(
-    data.title?.trim() || lesson.title,
-    data.lesson_at?.trim() || lesson.lesson_at,
-    data.duration_minutes !== undefined ? (parseInt(data.duration_minutes, 10) || 90) : lesson.duration_minutes,
+    title,
+    lessonAt,
+    duration,
     data.topic !== undefined ? (data.topic?.trim() || null) : lesson.topic,
     data.location !== undefined ? (data.location?.trim() || null) : lesson.location,
     data.is_cancelled === true ? 1 : (data.is_cancelled === false ? 0 : (lesson.is_cancelled ? 1 : 0)),

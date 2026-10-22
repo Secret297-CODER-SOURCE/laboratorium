@@ -16,7 +16,7 @@ import {
 } from '/admin-billing-panel.js';
 import {
   renderTeacherTabs, renderGroupsPanel, bindGroupsPanelEvents,
-  renderTasksPanel, bindTasksPanelEvents,
+  renderTasksPanel, renderHomeworkReviewPanel, bindTasksPanelEvents,
 } from '/admin-groups-panel.js';
 import {
   renderSchedulePanel, bindSchedulePanelEvents, loadScheduleData,
@@ -46,6 +46,10 @@ import {
   renderManualsPanel, bindManualsPanelEvents, loadManualsAdminData,
 } from '/admin-manuals-panel.js';
 import { initNumberInputs } from '/number-inputs.js';
+import { renderMarketingPanel, loadMarketingData, bindMarketingPanelEvents } from '/admin-marketing-panel.js';
+import {
+  loadMessagesPanel, renderMessagesPanel, bindMessagesPanelEvents,
+} from '/admin-messages-panel.js';
 
 if (!(await requireAuthAsync())) throw new Error('auth');
 initTheme();
@@ -80,7 +84,8 @@ const TITLES = {
   teacher: 'Панель викладача',
 };
 
-let ownerTab = new URLSearchParams(location.search).get('tab') || 'overview';
+const initialOwnerTab = new URLSearchParams(location.search).get('tab') || 'overview';
+let ownerTab = initialOwnerTab === 'contact' ? 'messages' : initialOwnerTab;
 let teacherTab = new URLSearchParams(location.search).get('tab') || 'overview';
 let teacherTasksData = { tasks: [], reviewQueue: [] };
 let scheduleData = { lessons: [], absences: [], stats: {} };
@@ -93,6 +98,16 @@ let manualsAdminData = { manuals: [], directions: [], groups: [] };
 let ownerGroupsData = { groups: [], programs: [], directions: [], teachers: [] };
 let teacherDirections = [];
 let adminLoadSeq = 0;
+let adminNavBadges = { applications: 0, tasks: 0, homework: 0 };
+
+function renderAdminShell(role, content) {
+  if (role !== 'owner' && role !== 'teacher') return content;
+  const active = role === 'owner' ? ownerTab : teacherTab;
+  const nav = role === 'owner'
+    ? renderOwnerTabs(active, adminNavBadges)
+    : renderTeacherTabs(active, adminNavBadges);
+  return `<div class="admin-layout">${nav}<div class="admin-workspace">${content}</div></div>`;
+}
 
 function isScheduleTab(role) {
   return (role === 'owner' && ownerTab === 'schedule') || (role === 'teacher' && teacherTab === 'schedule');
@@ -111,12 +126,7 @@ function isErrorsTab(role) {
 function showAdminLoading(message = 'Завантаження...') {
   const el = document.getElementById('admin-content');
   if (!el) return;
-  const tabs = getUser()?.role === 'owner'
-    ? renderOwnerTabs(ownerTab)
-    : getUser()?.role === 'teacher'
-      ? renderTeacherTabs(teacherTab)
-      : '';
-  el.innerHTML = `${tabs}<p class="empty-state sched-loading">${message}</p>`;
+  el.innerHTML = renderAdminShell(getUser()?.role, `<p class="empty-state sched-loading">${message}</p>`);
 }
 
 async function loadScheduleView(role) {
@@ -131,19 +141,18 @@ async function loadScheduleView(role) {
     if (seq !== adminLoadSeq) return;
     const schedGroups = groupsRes.groups || [];
     window.__scheduleGroups = schedGroups;
-    scheduleData = await loadScheduleData(schedGroups, gf);
+    scheduleData = await loadScheduleData(schedGroups, gf, role === 'owner' || role === 'developer');
     if (seq !== adminLoadSeq) return;
 
     const el = document.getElementById('admin-content');
-    const tabs = role === 'owner' ? renderOwnerTabs('schedule') : renderTeacherTabs('schedule');
-    el.innerHTML = tabs + renderSchedulePanel(schedGroups, scheduleData, gf);
+    const view = new URLSearchParams(location.search).get('view') === 'events' ? 'events' : 'schedule';
+    el.innerHTML = renderAdminShell(role, renderSchedulePanel(schedGroups, scheduleData, gf, role === 'owner' || role === 'developer', view));
     bindTabHandlers(role);
     bindSchedulePanelEvents(showToast, () => loadScheduleView(role));
   } catch (err) {
     if (seq !== adminLoadSeq) return;
     const el = document.getElementById('admin-content');
-    const tabs = role === 'owner' ? renderOwnerTabs('schedule') : renderTeacherTabs('schedule');
-    el.innerHTML = `${tabs}<p class="empty-state">${err.message}</p>`;
+    el.innerHTML = renderAdminShell(role, `<p class="empty-state">${err.message}</p>`);
     bindTabHandlers(role);
   }
 }
@@ -171,15 +180,13 @@ async function loadAttendanceView(role) {
     }
 
     const el = document.getElementById('admin-content');
-    const tabs = role === 'owner' ? renderOwnerTabs('attendance') : renderTeacherTabs('attendance');
-    el.innerHTML = tabs + renderAttendancePanel(attendGroups, data, gf, detail, confId);
+    el.innerHTML = renderAdminShell(role, renderAttendancePanel(attendGroups, data, gf, detail, confId));
     bindTabHandlers(role);
     bindAttendancePanelEvents(() => loadAttendanceView(role));
   } catch (err) {
     if (seq !== adminLoadSeq) return;
     const el = document.getElementById('admin-content');
-    const tabs = role === 'owner' ? renderOwnerTabs('attendance') : renderTeacherTabs('attendance');
-    el.innerHTML = `${tabs}<p class="empty-state">${err.message}</p>`;
+    el.innerHTML = renderAdminShell(role, `<p class="empty-state">${err.message}</p>`);
     bindTabHandlers(role);
   }
 }
@@ -196,7 +203,7 @@ async function loadErrorsView(role) {
     if (seq !== adminLoadSeq) return;
 
     const el = document.getElementById('admin-content');
-    el.innerHTML = renderOwnerTabs('errors') + renderErrorsPanel(data, source);
+    el.innerHTML = renderAdminShell(role, renderErrorsPanel(data, source));
     bindTabHandlers(role);
     bindErrorsPanelEvents(showToast, (nextSource) => {
       const url = new URL(location.href);
@@ -208,13 +215,27 @@ async function loadErrorsView(role) {
   } catch (err) {
     if (seq !== adminLoadSeq) return;
     const el = document.getElementById('admin-content');
-    el.innerHTML = `${renderOwnerTabs('errors')}<p class="empty-state">${err.message}</p>`;
+    el.innerHTML = renderAdminShell(role, `<p class="empty-state">${err.message}</p>`);
     bindTabHandlers(role);
   }
 }
 
 async function load() {
   const role = getUser()?.role;
+  const overviewData = await api('/admin/overview');
+  if (role === 'owner') {
+    adminNavBadges.applications = overviewData.applications?.filter((app) => app.status === 'pending').length || 0;
+    adminNavBadges.messages = overviewData.messagesUnread || 0;
+  }
+  if (role === 'teacher') {
+    try {
+      teacherTasksData = await api('/admin/tasks');
+      adminNavBadges.homework = teacherTasksData.reviewQueue?.length || 0;
+    } catch {
+      teacherTasksData = { tasks: [], reviewQueue: [] };
+      adminNavBadges.homework = 0;
+    }
+  }
   if (role && isScheduleTab(role)) {
     return loadScheduleView(role);
   }
@@ -227,7 +248,7 @@ async function load() {
 
   const seq = ++adminLoadSeq;
   const { stats, applications, users, conferences, students, recordings, groups,
-    nodeVersion, uptime, memoryMB, recentUsers, db, directions, programs } = await api('/admin/overview');
+    nodeVersion, uptime, memoryMB, recentUsers, db, directions, programs } = overviewData;
   if (seq !== adminLoadSeq) return;
 
   window.__ownerDirections = directions;
@@ -249,11 +270,6 @@ async function load() {
       try {
         ({ directions: teacherDirections } = await api('/admin/directions'));
       } catch { teacherDirections = []; }
-    }
-    if (teacherTab === 'tasks') {
-      try {
-        teacherTasksData = await api('/admin/tasks');
-      } catch { teacherTasksData = { tasks: [], reviewQueue: [] }; }
     }
     if (teacherTab === 'schedule') {
       try {
@@ -323,13 +339,20 @@ async function load() {
     try {
       const { groups: allGroups } = await api('/admin/groups?all=1');
       const gf = new URLSearchParams(location.search).get('groupId') || '';
-      scheduleData = await loadScheduleData(allGroups || groups, gf);
+      scheduleData = await loadScheduleData(allGroups || groups, gf, true);
       window.__scheduleGroups = allGroups || groups;
     } catch { scheduleData = { lessons: [], absences: [], stats: {} }; }
   }
 
+  if (role === 'owner' && ownerTab === 'stats') {
+    try {
+      statsAdminData = await loadStatsAdminData();
+    } catch {
+      statsAdminData = { summary: {}, leaderboard: [], tasks: [], quizzes: [] };
+    }
+  }
+
   if (role === 'teacher') {
-    html = renderTeacherTabs(teacherTab);
     if (teacherTab === 'overview') {
       html += `
       <div class="admin-stats">
@@ -366,9 +389,11 @@ async function load() {
       html += renderGroupsPanel(groups, panelPrograms, teacherDirections);
     } else if (teacherTab === 'tasks') {
       html += renderTasksPanel(groups, teacherTasksData);
+    } else if (teacherTab === 'homework') {
+      html += renderHomeworkReviewPanel(teacherTasksData);
     } else if (teacherTab === 'schedule') {
       const gf = new URLSearchParams(location.search).get('groupId') || '';
-      html += renderSchedulePanel(groups, scheduleData, gf);
+      html += renderSchedulePanel(groups, scheduleData, gf, false);
     } else if (teacherTab === 'quizzes') {
       html += renderQuizzesPanel(groups, quizzesAdminData.quizzes);
     } else if (teacherTab === 'stats') {
@@ -399,7 +424,6 @@ async function load() {
       </div>`;
   } else if (role === 'owner') {
     const pending = applications?.filter(a => a.status === 'pending').length || 0;
-    html = renderOwnerTabs(ownerTab);
     if (ownerTab === 'overview') {
       html += `
       <div class="admin-stats">
@@ -458,6 +482,20 @@ async function load() {
       }
     } else if (ownerTab === 'applications') {
       html += renderApplicationsPanel(applications);
+    } else if (ownerTab === 'stats') {
+      html += renderStatsPanel(statsAdminData);
+    } else if (ownerTab === 'marketing') {
+      try {
+        html += renderMarketingPanel(await loadMarketingData());
+      } catch (err) {
+        html += `<p class="empty-state">${err.message}</p>`;
+      }
+    } else if (ownerTab === 'messages') {
+      try {
+        html += renderMessagesPanel(await loadMessagesPanel());
+      } catch (err) {
+        html += `<p class="empty-state">${err.message}</p>`;
+      }
     } else if (ownerTab === 'proxmox') {
       try {
         const [{ settings }, { settings: labPublic }, labsRes] = await Promise.all([
@@ -477,11 +515,12 @@ async function load() {
     } else if (ownerTab === 'schedule') {
       const schedGroups = window.__scheduleGroups || groups || [];
       const gf = new URLSearchParams(location.search).get('groupId') || '';
-      html += renderSchedulePanel(schedGroups, scheduleData, gf);
+      const view = new URLSearchParams(location.search).get('view') === 'events' ? 'events' : 'schedule';
+      html += renderSchedulePanel(schedGroups, scheduleData, gf, true, view);
     }
   }
 
-  el.innerHTML = html;
+  el.innerHTML = renderAdminShell(role, html);
   bindTabHandlers(role);
   bindEvents(role, panelPrograms, groups);
 }
@@ -495,6 +534,7 @@ function bindTabHandlers(role) {
       const url = new URL(location.href);
       url.searchParams.set('tab', t);
       if (t !== 'schedule' && t !== 'attendance') url.searchParams.delete('groupId');
+      if (t !== 'schedule') url.searchParams.delete('view');
       if (t !== 'attendance') url.searchParams.delete('conferenceId');
       if (t !== 'errors') url.searchParams.delete('source');
       history.replaceState(null, '', url);
@@ -574,11 +614,14 @@ function renderApplicationsPanel(apps) {
   return `<section class="admin-panel admin-panel--wide">
     <h2>${icon('notes', 'ico ico--md')}Заявки</h2>
     <table class="admin-table">
-      <thead><tr><th>Ім'я</th><th>Email</th><th>Програма</th><th>Акаунт</th><th>Статус</th><th></th></tr></thead>
+      <thead><tr><th>Ім'я</th><th>Email</th><th>Телефон</th><th>Програма</th><th>Акаунт</th><th>Статус</th><th></th></tr></thead>
       <tbody>${apps.map(a => `
         <tr>
           <td>${a.name}</td>
           <td>${a.email}</td>
+          <td>${a.callback_phone
+            ? `<a href="tel:${String(a.callback_phone).replace(/[^\d+]/g, '')}">${String(a.callback_phone).replace(/[&<>"']/g, '')}</a>`
+            : '—'}</td>
           <td>${a.program}</td>
           <td>${a.user_name
             ? (a.user_is_restricted ? `<span class="status-pill pending">очікує (@${a.user_handle})</span>` : `<span class="status-pill approved">активний (@${a.user_handle})</span>`)
@@ -616,10 +659,13 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
   if (role === 'teacher' && teacherTab === 'tasks') {
     bindTasksPanelEvents(showToast, load);
   }
+  if (role === 'teacher' && teacherTab === 'homework') {
+    bindTasksPanelEvents(showToast, load);
+  }
   if (role === 'teacher' && teacherTab === 'quizzes') {
     bindQuizzesPanelEvents(showToast, load);
   }
-  if (role === 'teacher' && teacherTab === 'stats') {
+  if ((role === 'teacher' && teacherTab === 'stats') || (role === 'owner' && ownerTab === 'stats')) {
     bindStatsPanelEvents(showToast);
   }
   if (role === 'teacher' && teacherTab === 'ctf') {
@@ -636,6 +682,12 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
   }
   if (role === 'owner' && ownerTab === 'manuals') {
     bindManualsPanelEvents(showToast, load);
+  }
+  if (role === 'owner' && ownerTab === 'marketing') {
+    bindMarketingPanelEvents(showToast, load);
+  }
+  if (role === 'owner' && ownerTab === 'messages') {
+    bindMessagesPanelEvents(showToast, load);
   }
 
   document.querySelectorAll('.role-select').forEach(sel => {

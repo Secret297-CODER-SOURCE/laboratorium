@@ -14,6 +14,7 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/conferences.css">
+  <link rel="stylesheet" href="/unified-calendar.css">
   <link rel="stylesheet" href="/icons.css">
 </head>
 <body data-theme="flow">
@@ -40,14 +41,7 @@
       </div>
 
       <div id="tab-calendar">
-        <div class="calendar-wrap">
-          <div class="calendar-nav">
-            <button class="btn btn--ghost btn--sm ico-inline" id="cal-prev" data-nav-icon="chevron-left">Назад</button>
-            <h2 id="cal-title"></h2>
-            <button class="btn btn--ghost btn--sm ico-inline" id="cal-next" data-nav-icon="chevron-right">Вперед</button>
-          </div>
-          <div class="calendar-grid" id="calendar-grid"></div>
-        </div>
+        <section class="student-calendar" id="unified-calendar" aria-label="Календар занять і конференцій" aria-live="polite"></section>
       </div>
 
       <div id="tab-upcoming" hidden>

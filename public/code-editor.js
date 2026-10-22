@@ -141,13 +141,34 @@ function renderMain(root) {
       <div class="code-editor-actions">
         <button type="button" class="btn btn--ghost btn--sm" id="code-add-file-btn" title="Новий файл">${icon('plus', 'ico ico--sm')}</button>
         <button type="button" class="btn btn--outline btn--sm" id="code-save-btn">${icon('check', 'ico ico--sm')}Зберегти</button>
+        <button type="button" class="btn btn--outline btn--sm" id="code-git-btn" aria-expanded="false" aria-controls="code-git-panel">${icon('clock', 'ico ico--sm')}Git</button>
+        ${['python', 'node'].includes(ws.language)
+    ? `<button type="button" class="btn btn--outline btn--sm" id="code-test-btn">${icon('check', 'ico ico--sm')}Тести</button>`
+    : ''}
         ${isWeb
     ? `<button type="button" class="btn btn--primary btn--sm" id="code-run-web-btn">${icon('play', 'ico ico--sm')}Запустити прев'ю</button>`
     : `<button type="button" class="btn btn--primary btn--sm" id="code-run-btn">${icon('play', 'ico ico--sm')}Запустити</button>`}
         <button type="button" class="btn btn--ghost btn--sm" id="code-delete-ws-btn" title="Видалити проєкт">${icon('trash', 'ico ico--sm')}</button>
       </div>
     </div>
+    <section class="code-git-panel" id="code-git-panel" aria-label="Локальна Git-історія" hidden>
+      <div class="code-git-heading">
+        <div>
+          <h3>Локальна Git-історія</h3>
+          <p>Коміти зберігаються лише в цьому навчальному проєкті; віддалений репозиторій не підключений.</p>
+        </div>
+        <span class="code-git-branch" id="code-git-branch">main</span>
+      </div>
+      <p class="code-git-status" id="code-git-status" role="status" aria-live="polite">Завантаження історії…</p>
+      <form class="code-git-commit-form" id="code-git-commit-form">
+        <label for="code-git-message">Повідомлення коміту</label>
+        <input id="code-git-message" name="message" type="text" maxlength="120" placeholder="Що змінилося?" required>
+        <button type="submit" class="btn btn--primary btn--sm" id="code-git-commit-btn">Створити коміт</button>
+      </form>
+      <ol class="code-git-history" id="code-git-history"></ol>
+    </section>
     <div class="code-editor-cm" id="code-cm-host"></div>
+    <p class="code-editor-diagnostic" id="code-editor-diagnostic" role="status" aria-live="polite" hidden></p>
     ${isWeb ? `
       <div class="code-web-preview" id="code-web-preview">
         ${ws.activeWebRun?.target_url ? webPreviewMarkup(ws.activeWebRun.target_url) : '<p class="empty-state">Натисніть «Запустити прев\'ю», щоб побачити результат</p>'}
@@ -162,6 +183,9 @@ function renderMain(root) {
 
   main.querySelector('#code-add-file-btn').addEventListener('click', addFile);
   main.querySelector('#code-save-btn').addEventListener('click', saveFiles);
+  main.querySelector('#code-git-btn').addEventListener('click', toggleGitPanel);
+  main.querySelector('#code-git-commit-form').addEventListener('submit', createGitCommit);
+  main.querySelector('#code-test-btn')?.addEventListener('click', runTests);
   main.querySelector('#code-delete-ws-btn').addEventListener('click', deleteWorkspace);
   if (isWeb) {
     main.querySelector('#code-run-web-btn').addEventListener('click', runWeb);
@@ -242,6 +266,7 @@ function mountEditor(main) {
     mode: modeForFile(ws.language, file?.path || ''),
     theme: 'material-darker',
     lineNumbers: true,
+    gutters: ['CodeMirror-linenumbers', 'lab-diagnostics'],
     matchBrackets: true,
     autoCloseBrackets: true,
     indentUnit: 2,
@@ -249,6 +274,35 @@ function mountEditor(main) {
     viewportMargin: Infinity,
   });
   state.cm.on('change', () => { state.dirty = true; });
+}
+
+function showCompilerDiagnostics(output) {
+  const notice = document.getElementById('code-editor-diagnostic');
+  if (!state.cm || !notice) return;
+  state.cm.clearGutter('lab-diagnostics');
+  const diagnostics = String(output || '').split('\n').flatMap(line => {
+    const cpp = line.match(/(?:^|\/)([^/\s:]+):(\d+):\d+:\s+(?:fatal\s+)?error:\s*(.+)$/);
+    const python = line.match(/File ".*\/([^/"]+)", line (\d+)/);
+    const node = line.match(/(?:^|\/)([^/\s:]+\.js):(\d+)(?::\d+)?/);
+    const match = cpp || python || node;
+    return match ? [{ file: match[1], line: Number(match[2]), message: cpp?.[3] || 'Перевірте рядок: інтерпретатор повідомив про помилку' }] : [];
+  }).filter((item, index, all) => all.findIndex(other => other.file === item.file && other.line === item.line) === index);
+
+  const currentFile = state.files.find(file => file.path === state.activeFilePath)?.path;
+  diagnostics.filter(item => !item.file || currentFile?.endsWith(item.file))
+    .forEach(item => {
+      const marker = document.createElement('span');
+      marker.className = 'code-diagnostic-marker';
+      marker.textContent = '●';
+      marker.title = `${item.file}:${item.line} ${item.message}`;
+      marker.setAttribute('aria-label', marker.title);
+      state.cm.setGutterMarker(item.line - 1, 'lab-diagnostics', marker);
+    });
+
+  notice.hidden = diagnostics.length === 0;
+  notice.textContent = diagnostics.length
+    ? `${diagnostics.length} ${diagnostics.length === 1 ? 'помилка' : 'помилки'}: рядки підсвічені в редакторі`
+    : '';
 }
 
 async function saveFiles() {
@@ -259,20 +313,86 @@ async function saveFiles() {
       body: JSON.stringify({ files: state.files }),
     });
     state.dirty = false;
+    showCompilerDiagnostics('');
     showToastLocal('Збережено');
+    if (!document.getElementById('code-git-panel')?.hidden) await loadGitStatus();
+    return true;
   } catch (err) {
     showToastLocal(err.message, 'error');
+    return false;
+  }
+}
+
+function renderGitStatus(status) {
+  const branch = document.getElementById('code-git-branch');
+  const summary = document.getElementById('code-git-status');
+  const history = document.getElementById('code-git-history');
+  if (!branch || !summary || !history) return;
+
+  branch.textContent = status.branch || 'main';
+  summary.textContent = status.clean
+    ? 'Робоча копія чиста — незбережених змін для коміту немає.'
+    : `Змінено файлів: ${status.changes.length}`;
+  history.innerHTML = status.history.length
+    ? status.history.map(commit => `
+      <li>
+        <code>${esc(commit.hash)}</code>
+        <span>${esc(commit.message)}</span>
+      </li>`).join('')
+    : '<li class="empty-state">Історія поки порожня</li>';
+}
+
+async function loadGitStatus() {
+  const summary = document.getElementById('code-git-status');
+  if (!summary || !state.activeId) return;
+  summary.textContent = 'Оновлення локальної історії…';
+  try {
+    const { status } = await api(`/code/workspaces/${state.activeId}/git`);
+    renderGitStatus(status);
+  } catch (err) {
+    summary.textContent = err.message;
+  }
+}
+
+async function toggleGitPanel() {
+  const panel = document.getElementById('code-git-panel');
+  const button = document.getElementById('code-git-btn');
+  panel.hidden = !panel.hidden;
+  button.setAttribute('aria-expanded', String(!panel.hidden));
+  if (!panel.hidden) await loadGitStatus();
+}
+
+async function createGitCommit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!await saveFiles()) return;
+  const button = document.getElementById('code-git-commit-btn');
+  const message = document.getElementById('code-git-message').value.trim();
+  button.disabled = true;
+  try {
+    const result = await api(`/code/workspaces/${state.activeId}/git/commit`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+    renderGitStatus(result);
+    if (result.committed) form.reset();
+    showToastLocal(result.committed ? 'Локальний коміт створено' : 'Немає змін для коміту');
+  } catch (err) {
+    showToastLocal(err.message, 'error');
+  } finally {
+    button.disabled = false;
   }
 }
 
 async function runExec() {
-  await saveFiles();
+  if (!await saveFiles()) return;
   const output = document.getElementById('code-output');
   const btn = document.getElementById('code-run-btn');
   btn.disabled = true;
   output.innerHTML = '<p class="empty-state">Виконується…</p>';
   try {
     const { run } = await api(`/code/workspaces/${state.activeId}/run`, { method: 'POST' });
+    showCompilerDiagnostics(run.stderr);
     const statusLabel = { done: 'Готово', error: 'Помилка', timeout: 'Перевищено час' }[run.status] || run.status;
     output.innerHTML = `
       <div class="code-output-status status-pill ${run.status === 'done' ? 'running' : 'error'}">${statusLabel}</div>
@@ -287,8 +407,30 @@ async function runExec() {
   }
 }
 
+async function runTests() {
+  if (!await saveFiles()) return;
+  const btn = document.getElementById('code-test-btn');
+  const output = document.getElementById('code-output');
+  btn.disabled = true;
+  output.innerHTML = '<p class="empty-state">Запуск тестів…</p>';
+  try {
+    const { run } = await api(`/code/workspaces/${state.activeId}/test`, { method: 'POST' });
+    showCompilerDiagnostics(run.stderr);
+    const passed = run.status === 'done' && run.exit_code === 0;
+    output.innerHTML = `
+      <div class="code-output-status status-pill ${passed ? 'running' : 'error'}">${passed ? 'Тести пройшли' : 'Є помилки'}</div>
+      ${run.stdout ? `<pre class="code-output-stream">${esc(run.stdout)}</pre>` : ''}
+      ${run.stderr ? `<pre class="code-output-stream code-output-stderr">${esc(run.stderr)}</pre>` : ''}
+    `;
+  } catch (err) {
+    output.innerHTML = `<p class="empty-state">${esc(err.message)}</p>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function runWeb() {
-  await saveFiles();
+  if (!await saveFiles()) return;
   const preview = document.getElementById('code-web-preview');
   const btn = document.getElementById('code-run-web-btn');
   btn.disabled = true;

@@ -93,9 +93,38 @@ export function listForStudent(userId) {
   `).all(userId, userId).map(mapAssignment);
 }
 
+export function listSubmissionHistoryForStudent(userId) {
+  return db.prepare(`
+    ${assignmentSelect}
+    WHERE ta.user_id = ?
+      AND ta.status IN ('review', 'completed')
+    ORDER BY COALESCE(ta.completed_at, ta.submitted_at) DESC, ta.id DESC
+  `).all(userId).map(mapAssignment);
+}
+
+export function listCompletedForProfile(userId) {
+  return db.prepare(`
+    ${assignmentSelect}
+    WHERE ta.user_id = ?
+      AND ta.status = 'completed'
+    ORDER BY ta.completed_at DESC, ta.id DESC
+  `).all(userId).map(mapAssignment);
+}
+
 export function listForTeacher(actorId, actorRole) {
   const groups = groupService.listGroups(actorId, actorRole);
-  if (!groups.length) return { tasks: [], reviewQueue: [] };
+  const historicalGroups = actorRole === 'teacher'
+    ? db.prepare('SELECT id FROM study_groups WHERE teacher_id = ?').all(actorId)
+    : db.prepare('SELECT id FROM study_groups').all();
+  const historicalGroupIds = historicalGroups.map((group) => group.id);
+  const historicalPlaceholders = historicalGroupIds.map(() => '?').join(',');
+  const submissionHistory = historicalGroupIds.length ? db.prepare(`
+    ${assignmentSelect}
+    WHERE t.group_id IN (${historicalPlaceholders})
+      AND ta.status IN ('review', 'completed')
+    ORDER BY COALESCE(ta.completed_at, ta.submitted_at) DESC, ta.id DESC
+  `).all(...historicalGroupIds).map(mapAssignment) : [];
+  if (!groups.length) return { tasks: [], reviewQueue: [], submissionHistory };
 
   const groupIds = groups.map(g => g.id);
   const placeholders = groupIds.map(() => '?').join(',');
@@ -119,7 +148,7 @@ export function listForTeacher(actorId, actorRole) {
     ORDER BY ta.submitted_at ASC
   `).all(...groupIds).map(mapAssignment);
 
-  return { tasks, reviewQueue };
+  return { tasks, reviewQueue, submissionHistory };
 }
 
 export function createTask(actorId, actorRole, data) {

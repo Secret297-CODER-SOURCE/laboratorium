@@ -7,6 +7,7 @@ import { uploadTaskSubmission } from '../middleware/upload.js';
 import * as apiCtrl from '../controllers/api.controller.js';
 import * as notificationCtrl from '../controllers/notification.controller.js';
 import * as contentCtrl from '../controllers/content.controller.js';
+import * as calendarCtrl from '../controllers/calendar.controller.js';
 
 const router = Router();
 
@@ -26,6 +27,11 @@ router.get('/notifications/push/public-key', asyncHandler(notificationCtrl.getPu
 router.post('/notifications/push/subscribe', asyncHandler(notificationCtrl.subscribePush));
 router.post('/notifications/push/unsubscribe', asyncHandler(notificationCtrl.unsubscribePush));
 
+router.get('/support/threads', asyncHandler(apiCtrl.listMySupportThreads));
+router.post('/support/threads', asyncHandler(apiCtrl.createSupportThread));
+router.get('/support/threads/:id(\\d+)', asyncHandler(apiCtrl.getMySupportThread));
+router.post('/support/threads/:id(\\d+)/replies', asyncHandler(apiCtrl.replyToSupportThread));
+
 router.use(requirePlatformAccess);
 
 // Restricted (self-registered, not-yet-approved) accounts still need their
@@ -35,6 +41,8 @@ router.use(requirePlatformAccess);
 router.get('/dashboard', asyncHandler(apiCtrl.getDashboard));
 router.get('/tab-access', asyncHandler(apiCtrl.getTabAccess));
 router.get('/applications/mine', asyncHandler(apiCtrl.listMyApplications));
+router.get('/referrals/me', asyncHandler(apiCtrl.getMyReferralSummary));
+router.get('/students/:handle/profile', asyncHandler(apiCtrl.getStudentPublicProfile));
 
 router.use(requireUnrestricted);
 
@@ -66,6 +74,9 @@ router.get('/manuals/:id(\\d+)', asyncHandler(apiCtrl.getManualForActor));
 router.patch('/manuals/:id(\\d+)', requireTab('dash.manuals'), asyncHandler(apiCtrl.updateManual));
 router.delete('/manuals/:id(\\d+)', requireTab('dash.manuals'), asyncHandler(apiCtrl.deleteManual));
 router.post('/manuals/:id(\\d+)/submit', requireTab('dash.manuals'), asyncHandler(apiCtrl.submitManualForReview));
+router.get('/manuals/:id(\\d+)/comments', asyncHandler(apiCtrl.listManualComments));
+router.post('/manuals/:id(\\d+)/comments', asyncHandler(apiCtrl.createManualComment));
+router.delete('/manual-comments/:commentId(\\d+)', asyncHandler(apiCtrl.deleteManualComment));
 router.get('/manuals/:slug', asyncHandler(apiCtrl.getManualBySlug));
 
 router.get('/content/:type/:id', asyncHandler(apiCtrl.getContentView));
@@ -73,6 +84,7 @@ router.get('/content/:type/:id/editor', asyncHandler(contentCtrl.getContentEdito
 router.put('/content/:type/:id', asyncHandler(contentCtrl.saveContent));
 
 router.get('/schedule', asyncHandler(apiCtrl.getStudentSchedule));
+router.get('/calendar/events', asyncHandler(calendarCtrl.listStudentEvents));
 router.post('/schedule/lessons/:lessonId/absence', asyncHandler(apiCtrl.reportAbsence));
 
 router.get('/quizzes', requireTab('dash.tests'), asyncHandler(apiCtrl.listQuizzes));

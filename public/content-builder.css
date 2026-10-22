@@ -173,7 +173,6 @@
 }
 
 .builder-inp:focus {
-  outline: none;
   border-color: var(--accent);
 }
 

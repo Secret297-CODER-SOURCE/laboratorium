@@ -350,13 +350,20 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  outline: none;
 }
 
 #create-modal .modal-form input:not([type="checkbox"]):focus,
 #create-modal .modal-form select:focus,
 #create-modal .modal-form textarea:focus {
   border-color: var(--accent);
+}
+
+#create-modal .modal-form select {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
 }
 
 #create-modal .modal-actions {

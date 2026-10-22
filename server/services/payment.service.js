@@ -1,6 +1,7 @@
 import db from '../db/index.js';
 import config from '../config/index.js';
 import { ConflictError, NotFoundError, ValidationError } from '../utils/errors.js';
+import * as referralService from './referral.service.js';
 
 const BYPASS_ROLES = new Set(['owner', 'developer', 'teacher']);
 
@@ -162,6 +163,7 @@ export function listBillingOverview({ year, month }) {
         ...s,
         billing_exempt: !!s.billing_exempt,
         payment,
+        availableCredit: referralService.getAvailableCredit(s.id),
         accessStatus: status.status,
         dueDate: status.dueDate,
         graceUntil: status.graceUntil,
@@ -170,7 +172,7 @@ export function listBillingOverview({ year, month }) {
   };
 }
 
-export function recordPayment({ userId, year, month, note, amount, recordedBy }) {
+export function recordPayment({ userId, year, month, note, amount, creditApplied = 0, recordedBy }) {
   const y = parseInt(year, 10);
   const m = parseInt(month, 10);
   if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
@@ -180,15 +182,25 @@ export function recordPayment({ userId, year, month, note, amount, recordedBy })
   const user = getUserBillingRow(userId);
   if (!user) throw new NotFoundError('Користувача не знайдено');
   if (user.role !== 'student') throw new ValidationError('Оплата фіксується лише для учнів');
+  const cashAmount = amount === '' || amount === undefined || amount === null ? null : Number(amount);
+  const creditAmount = Number(creditApplied || 0);
+  if ((cashAmount !== null && (!Number.isFinite(cashAmount) || cashAmount < 0))
+    || !Number.isFinite(creditAmount) || creditAmount < 0) {
+    throw new ValidationError('Сума оплати та застосований кредит мають бути невід’ємними числами');
+  }
 
   if (hasPayment(userId, y, m)) {
     throw new ConflictError('Оплата за цей місяць вже зафіксована');
   }
 
-  const result = db.prepare(`
-    INSERT INTO payment_records (user_id, period_year, period_month, paid_at, amount, note, recorded_by)
-    VALUES (?, ?, ?, datetime('now'), ?, ?, ?)
-  `).run(userId, y, m, amount ?? null, note?.trim() || null, recordedBy || null);
+  const result = db.transaction(() => {
+    const inserted = db.prepare(`
+      INSERT INTO payment_records (user_id, period_year, period_month, paid_at, amount, note, recorded_by)
+      VALUES (?, ?, ?, datetime('now'), ?, ?, ?)
+    `).run(userId, y, m, cashAmount, note?.trim() || null, recordedBy || null);
+    if (creditAmount > 0) referralService.consumeCredits(userId, creditAmount, inserted.lastInsertRowid);
+    return inserted;
+  })();
 
   return db.prepare('SELECT * FROM payment_records WHERE id = ?').get(result.lastInsertRowid);
 }
@@ -196,7 +208,14 @@ export function recordPayment({ userId, year, month, note, amount, recordedBy })
 export function removePayment(paymentId) {
   const row = db.prepare('SELECT * FROM payment_records WHERE id = ?').get(paymentId);
   if (!row) throw new NotFoundError('Запис оплати не знайдено');
-  db.prepare('DELETE FROM payment_records WHERE id = ?').run(paymentId);
+  db.transaction(() => {
+    const allocations = db.prepare(`
+      SELECT credit_id, amount FROM payment_credit_allocations WHERE payment_id = ?
+    `).all(paymentId);
+    const restore = db.prepare('UPDATE referral_credits SET remaining = MIN(amount, remaining + ?) WHERE id = ?');
+    for (const allocation of allocations) restore.run(allocation.amount, allocation.credit_id);
+    db.prepare('DELETE FROM payment_records WHERE id = ?').run(paymentId);
+  })();
   return { ok: true };
 }
 

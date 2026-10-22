@@ -574,6 +574,243 @@ export function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_payment_records_user ON payment_records(user_id);
   `);
 
+  const paymentCols = db.prepare('PRAGMA table_info(payment_records)').all().map(c => c.name);
+  if (!paymentCols.includes('credit_applied')) {
+    db.exec('ALTER TABLE payment_records ADD COLUMN credit_applied REAL DEFAULT 0 NOT NULL');
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS campaign_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      label TEXT NOT NULL,
+      source TEXT NOT NULL,
+      medium TEXT NOT NULL,
+      campaign TEXT NOT NULL,
+      content TEXT,
+      destination TEXT DEFAULT '/' NOT NULL,
+      is_active INTEGER DEFAULT 1 NOT NULL,
+      created_by INTEGER,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS analytics_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type TEXT NOT NULL CHECK(event_type IN ('page_view','application_submitted','registration','bot_crawl')),
+      visitor_id TEXT,
+      session_id TEXT,
+      user_id INTEGER,
+      path TEXT NOT NULL,
+      referrer_origin TEXT,
+      source TEXT,
+      medium TEXT,
+      campaign TEXT,
+      content TEXT,
+      term TEXT,
+      campaign_code TEXT,
+      bot_name TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
+    CREATE INDEX IF NOT EXISTS idx_analytics_campaign ON analytics_events(campaign_code, created_at);
+    CREATE INDEX IF NOT EXISTS idx_analytics_visitor ON analytics_events(visitor_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS analytics_daily_aggregates (
+      day TEXT NOT NULL,
+      event_type TEXT NOT NULL CHECK(event_type IN ('page_view','click','application_submitted','registration','login','page_duration','bot_crawl')),
+      path TEXT NOT NULL DEFAULT '',
+      source TEXT NOT NULL DEFAULT '',
+      medium TEXT NOT NULL DEFAULT '',
+      campaign TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      campaign_code TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      bot_name TEXT NOT NULL DEFAULT '',
+      count INTEGER NOT NULL DEFAULT 0 CHECK(count >= 0),
+      PRIMARY KEY (day, event_type, path, source, medium, campaign, content, campaign_code, detail, bot_name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_analytics_daily_day_type ON analytics_daily_aggregates(day, event_type);
+    CREATE INDEX IF NOT EXISTS idx_analytics_daily_campaign ON analytics_daily_aggregates(campaign_code, event_type);
+
+    CREATE TABLE IF NOT EXISTS access_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      event_type TEXT NOT NULL,
+      ip TEXT NOT NULL DEFAULT '',
+      device TEXT NOT NULL DEFAULT 'other',
+      os TEXT NOT NULL DEFAULT '',
+      browser TEXT NOT NULL DEFAULT '',
+      path TEXT NOT NULL DEFAULT '',
+      source TEXT NOT NULL DEFAULT '',
+      medium TEXT NOT NULL DEFAULT '',
+      campaign TEXT NOT NULL DEFAULT '',
+      referrer_host TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_access_log_created ON access_log(created_at);
+    CREATE INDEX IF NOT EXISTS idx_access_log_ip ON access_log(ip);
+
+    INSERT INTO analytics_daily_aggregates (
+      day, event_type, path, source, medium, campaign, content, campaign_code, detail, bot_name, count
+    )
+    SELECT day, event_type, path, source, medium, campaign, content, campaign_code, '', bot_name, COUNT(*)
+    FROM (
+      SELECT COALESCE(date(created_at), date('now')) AS day, event_type,
+        CASE WHEN path IN ('/', '/index.html', '/course.html', '/login.html', '/register.html')
+          THEN path ELSE '/other' END AS path,
+        CASE WHEN COALESCE(source, '') NOT GLOB '*[^A-Za-z0-9._:-]*'
+          THEN substr(COALESCE(source, ''), 1, 100) ELSE '' END AS source,
+        CASE WHEN COALESCE(medium, '') NOT GLOB '*[^A-Za-z0-9._:-]*'
+          THEN substr(COALESCE(medium, ''), 1, 100) ELSE '' END AS medium,
+        CASE WHEN COALESCE(campaign, '') NOT GLOB '*[^A-Za-z0-9._:-]*'
+          THEN substr(COALESCE(campaign, ''), 1, 120) ELSE '' END AS campaign,
+        CASE WHEN COALESCE(content, '') NOT GLOB '*[^A-Za-z0-9._:-]*'
+          THEN substr(COALESCE(content, ''), 1, 120) ELSE '' END AS content,
+        CASE WHEN COALESCE(campaign_code, '') NOT GLOB '*[^A-Za-z0-9._:-]*'
+          THEN substr(COALESCE(campaign_code, ''), 1, 32) ELSE '' END AS campaign_code,
+        CASE WHEN COALESCE(bot_name, '') NOT GLOB '*[^A-Za-z0-9._:-]*'
+          THEN substr(COALESCE(bot_name, ''), 1, 100) ELSE '' END AS bot_name
+      FROM analytics_events
+    )
+    GROUP BY day, event_type, path, source, medium, campaign, content, campaign_code, bot_name
+    ON CONFLICT(day, event_type, path, source, medium, campaign, content, campaign_code, detail, bot_name)
+    DO UPDATE SET count = count + excluded.count;
+    DELETE FROM analytics_events;
+
+    CREATE TABLE IF NOT EXISTS referral_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      code TEXT NOT NULL UNIQUE,
+      is_active INTEGER DEFAULT 1 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS referral_settings (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      enabled INTEGER DEFAULT 0 NOT NULL,
+      reward_points INTEGER DEFAULT 0 NOT NULL,
+      credit_amount REAL DEFAULT 0 NOT NULL,
+      max_rewards_per_user INTEGER DEFAULT 0 NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+    INSERT OR IGNORE INTO referral_settings (id) VALUES (1);
+
+    CREATE TABLE IF NOT EXISTS referral_programs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '' NOT NULL,
+      reward_points INTEGER DEFAULT 0 NOT NULL,
+      credit_amount REAL DEFAULT 0 NOT NULL,
+      max_rewards_per_user INTEGER DEFAULT 0 NOT NULL,
+      is_active INTEGER DEFAULT 1 NOT NULL,
+      apply_to_all INTEGER DEFAULT 0 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS referral_program_assignments (
+      program_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      PRIMARY KEY(program_id, user_id),
+      FOREIGN KEY (program_id) REFERENCES referral_programs(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_referral_program_assignments_user
+      ON referral_program_assignments(user_id, program_id);
+
+    CREATE TABLE IF NOT EXISTS referral_program_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      program_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      code TEXT NOT NULL UNIQUE,
+      is_active INTEGER DEFAULT 1 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      UNIQUE(program_id, user_id),
+      FOREIGN KEY (program_id) REFERENCES referral_programs(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS referral_rewards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      application_id INTEGER NOT NULL UNIQUE,
+      referrer_id INTEGER NOT NULL,
+      referred_user_id INTEGER,
+      points_awarded INTEGER DEFAULT 0 NOT NULL,
+      credit_awarded REAL DEFAULT 0 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+      FOREIGN KEY (referrer_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (referred_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS referral_credits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      reward_id INTEGER NOT NULL,
+      amount REAL NOT NULL CHECK(amount > 0),
+      remaining REAL NOT NULL CHECK(remaining >= 0),
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (reward_id) REFERENCES referral_rewards(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_referral_credits_user ON referral_credits(user_id, remaining);
+
+    CREATE TABLE IF NOT EXISTS payment_credit_allocations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      payment_id INTEGER NOT NULL,
+      credit_id INTEGER NOT NULL,
+      amount REAL NOT NULL CHECK(amount > 0),
+      FOREIGN KEY (payment_id) REFERENCES payment_records(id) ON DELETE CASCADE,
+      FOREIGN KEY (credit_id) REFERENCES referral_credits(id) ON DELETE CASCADE,
+      UNIQUE(payment_id, credit_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_payment_credit_allocations_payment ON payment_credit_allocations(payment_id);
+
+    CREATE TABLE IF NOT EXISTS support_threads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      subject TEXT NOT NULL,
+      status TEXT DEFAULT 'open' NOT NULL CHECK(status IN ('open','waiting','closed')),
+      unread_owner INTEGER DEFAULT 1 NOT NULL,
+      unread_user INTEGER DEFAULT 0 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_support_threads_status ON support_threads(status, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_support_threads_user ON support_threads(user_id, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS support_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      thread_id INTEGER NOT NULL,
+      sender_role TEXT NOT NULL CHECK(sender_role IN ('user','owner')),
+      body TEXT NOT NULL,
+      email_sent INTEGER DEFAULT 0 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (thread_id) REFERENCES support_threads(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_support_messages_thread ON support_messages(thread_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS support_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+
+    INSERT INTO support_templates (title, body)
+    SELECT 'Отримали ваше звернення', 'Дякуємо за повідомлення! Ми отримали ваше звернення та скоро відповімо.'
+    WHERE NOT EXISTS (SELECT 1 FROM support_templates);
+    INSERT INTO support_templates (title, body)
+    SELECT 'Потрібні додаткові дані', 'Щоб краще допомогти, будь ласка, надішліть додаткову інформацію у відповідь на це повідомлення.'
+    WHERE NOT EXISTS (SELECT 1 FROM support_templates WHERE title = 'Потрібні додаткові дані');
+  `);
+
   bootstrapCurrentMonthPayments(db);
 
   const chCols2 = db.prepare('PRAGMA table_info(challenges)').all().map(c => c.name);
@@ -756,6 +993,58 @@ export function runMigrations(db) {
   if (!userColsRestrict.includes('is_restricted')) {
     db.exec('ALTER TABLE users ADD COLUMN is_restricted INTEGER DEFAULT 0 NOT NULL');
   }
+  const userColsProfile = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userColsProfile.includes('profile_public')) {
+    db.exec('ALTER TABLE users ADD COLUMN profile_public INTEGER DEFAULT 1 NOT NULL');
+  }
+  if (!userColsProfile.includes('profile_bio')) {
+    db.exec("ALTER TABLE users ADD COLUMN profile_bio TEXT DEFAULT '' NOT NULL");
+  }
+  if (!userColsProfile.includes('profile_hidden_awards')) {
+    db.exec("ALTER TABLE users ADD COLUMN profile_hidden_awards TEXT DEFAULT '[]' NOT NULL");
+  }
+  if (!userColsProfile.includes('profile_share_solutions')) {
+    db.exec('ALTER TABLE users ADD COLUMN profile_share_solutions INTEGER DEFAULT 0 NOT NULL');
+  }
+  if (!userColsProfile.includes('google_sub')) {
+    db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT');
+  }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub)');
+  if (!userColsProfile.includes('referred_by_user_id')) {
+    db.exec('ALTER TABLE users ADD COLUMN referred_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
+  }
+  if (!userColsProfile.includes('referred_by_program_id')) {
+    db.exec('ALTER TABLE users ADD COLUMN referred_by_program_id INTEGER REFERENCES referral_programs(id) ON DELETE SET NULL');
+  }
+
+  const applicationCols = db.prepare('PRAGMA table_info(applications)').all().map(c => c.name);
+  for (const [column, sql] of [
+    ['referral_program_id', 'ALTER TABLE applications ADD COLUMN referral_program_id INTEGER REFERENCES referral_programs(id) ON DELETE SET NULL'],
+    ['callback_phone', 'ALTER TABLE applications ADD COLUMN callback_phone TEXT'],
+    ['referral_code', 'ALTER TABLE applications ADD COLUMN referral_code TEXT'],
+    ['referrer_id', 'ALTER TABLE applications ADD COLUMN referrer_id INTEGER REFERENCES users(id) ON DELETE SET NULL'],
+    ['analytics_visitor_id', 'ALTER TABLE applications ADD COLUMN analytics_visitor_id TEXT'],
+    ['analytics_source', 'ALTER TABLE applications ADD COLUMN analytics_source TEXT'],
+    ['analytics_medium', 'ALTER TABLE applications ADD COLUMN analytics_medium TEXT'],
+    ['analytics_campaign', 'ALTER TABLE applications ADD COLUMN analytics_campaign TEXT'],
+    ['analytics_campaign_code', 'ALTER TABLE applications ADD COLUMN analytics_campaign_code TEXT'],
+  ]) {
+    if (!applicationCols.includes(column)) db.exec(sql);
+  }
+
+  const referralRewardCols = db.prepare('PRAGMA table_info(referral_rewards)').all().map(c => c.name);
+  if (!referralRewardCols.includes('program_id')) {
+    db.exec('ALTER TABLE referral_rewards ADD COLUMN program_id INTEGER REFERENCES referral_programs(id) ON DELETE SET NULL');
+  }
+
+  db.exec(`
+    UPDATE applications SET
+      analytics_visitor_id = NULL,
+      analytics_source = NULL,
+      analytics_medium = NULL,
+      analytics_campaign = NULL,
+      analytics_campaign_code = NULL;
+  `);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS code_workspaces (
@@ -867,6 +1156,52 @@ export function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_user_notes_user ON user_notes(user_id);
   `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS calendar_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual', 'ctftime')),
+      external_id TEXT,
+      audience_type TEXT NOT NULL DEFAULT 'all' CHECK(audience_type IN ('all', 'group', 'student')),
+      audience_id INTEGER,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '' NOT NULL,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT,
+      url TEXT,
+      source_url TEXT,
+      created_by INTEGER,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_events_source_external
+      ON calendar_events(source, external_id) WHERE external_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_calendar_events_starts_at ON calendar_events(starts_at);
+    CREATE INDEX IF NOT EXISTS idx_calendar_events_audience ON calendar_events(audience_type, audience_id);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS manual_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      manual_id INTEGER NOT NULL,
+      user_id INTEGER,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (manual_id) REFERENCES manuals(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_manual_comments_manual_created
+      ON manual_comments(manual_id, created_at, id);
+  `);
+
+  const lessonCols = db.prepare('PRAGMA table_info(lessons)').all().map((column) => column.name);
+  if (!lessonCols.includes('series_id')) db.exec('ALTER TABLE lessons ADD COLUMN series_id TEXT');
+  if (!lessonCols.includes('original_lesson_at')) db.exec('ALTER TABLE lessons ADD COLUMN original_lesson_at TEXT');
+  if (!lessonCols.includes('is_exception')) {
+    db.exec('ALTER TABLE lessons ADD COLUMN is_exception INTEGER DEFAULT 0 NOT NULL');
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_lessons_series ON lessons(series_id, lesson_at)');
 }
 
 function bootstrapCurrentMonthPayments(db) {

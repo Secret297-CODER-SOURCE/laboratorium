@@ -2,7 +2,8 @@ import { api, getToken, getUser, requireUnrestrictedAsync, initTheme } from '/au
 import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, pageAllowed } from '/tab-access.js';
-import { showPrompt, showAlert } from '/dialog.js';
+import { showAlert } from '/dialog.js';
+import { NFT_STICKERS, STICKER_THEMES, renderNftSticker } from '/chat-stickers.js';
 
 if (!(await requireUnrestrictedAsync())) throw new Error('auth');
 initTheme();
@@ -21,7 +22,23 @@ initNavIcons();
   document.getElementById('gc-groups').innerHTML = '<p class="empty-state">Помилка завантаження</p>';
 });
 
-const STICKERS = ['target', 'zap', 'code', 'rocket', 'check', 'heart', 'shield', 'book', 'award', 'notes', 'lightbulb', 'chart'];
+const GIF_HISTORY_KEY = 'lab-gif-history';
+const GIF_HISTORY_LIMIT = 5;
+
+function readGifHistory() {
+  try {
+    const list = JSON.parse(localStorage.getItem(GIF_HISTORY_KEY) || '[]');
+    return Array.isArray(list) ? list.filter((url) => typeof url === 'string').slice(0, GIF_HISTORY_LIMIT) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberGif(url) {
+  if (!url) return;
+  const next = [url, ...readGifHistory().filter((item) => item !== url)].slice(0, GIF_HISTORY_LIMIT);
+  try { localStorage.setItem(GIF_HISTORY_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+}
 
 const socket = io({ auth: { token: getToken() } });
 const USER = getUser();
@@ -98,8 +115,16 @@ function renderMessage(m) {
   let content = '';
   if (m.msg_type === 'sticker') {
     const stickerName = m.body?.startsWith('icon:') ? m.body.slice(5) : null;
-    content = stickerName
+    const emoji = m.body?.startsWith('emoji:') ? m.body.slice(6) : null;
+    const nftId = m.body?.startsWith('nft:') ? m.body.slice(4) : null;
+    content = nftId
+      ? renderNftSticker(nftId)
+      : stickerName
       ? `<div class="gc-msg-sticker">${icon(stickerName, 'ico ico--xl')}</div>`
+      : m.attachment_url
+        ? `<div class="gc-msg-sticker-image"><img src="${esc(m.attachment_url)}" alt="Стікер" loading="lazy"></div>`
+        : emoji
+          ? `<div class="gc-msg-emoji-sticker">${esc(emoji)}</div>`
       : `<div class="gc-msg-sticker gc-msg-sticker--legacy">${esc(m.body)}</div>`;
   } else if (m.msg_type === 'gif' || m.msg_type === 'image') {
     content = `${m.body ? `<div class="gc-msg-body">${esc(m.body)}</div>` : ''}
@@ -122,23 +147,112 @@ function renderMessage(m) {
 }
 
 function bindCompose() {
-  document.getElementById('toggle-stickers')?.addEventListener('click', () => {
-    document.getElementById('sticker-panel').classList.toggle('open');
+  const stickerPanel = document.getElementById('sticker-panel');
+  const gifPopover = document.getElementById('gif-popover');
+  const stickerButton = document.getElementById('toggle-stickers');
+  const gifButton = document.getElementById('send-gif-btn');
+
+  function closePanels() {
+    stickerPanel?.classList.remove('open');
+    stickerButton?.setAttribute('aria-expanded', 'false');
+    if (gifPopover) gifPopover.hidden = true;
+    gifButton?.setAttribute('aria-expanded', 'false');
+  }
+
+  stickerButton?.addEventListener('click', () => {
+    const willOpen = !stickerPanel.classList.contains('open');
+    closePanels();
+    stickerPanel.classList.toggle('open', willOpen);
+    stickerButton.setAttribute('aria-expanded', String(willOpen));
   });
 
-  document.querySelectorAll('.gc-sticker-btn').forEach(btn => {
-    btn.addEventListener('click', () => sendPayload({ msg_type: 'sticker', body: btn.dataset.sticker }));
+  document.querySelectorAll('.gc-sticker-category').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.gc-sticker-category').forEach((tab) => {
+        const active = tab === button;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+      document.querySelectorAll('.gc-sticker-group').forEach((group) => {
+        group.hidden = group.dataset.category !== button.dataset.category;
+      });
+    });
   });
 
-  document.getElementById('send-gif-btn')?.addEventListener('click', async () => {
-    const url = await showPrompt('Вставте посилання на GIF (https://...)');
-    if (!url?.trim()) return;
-    await sendPayload({ msg_type: 'gif', attachment_url: url.trim() });
+  document.querySelectorAll('.gc-sticker-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      sendPayload({ msg_type: 'sticker', body: btn.dataset.sticker });
+      closePanels();
+    });
   });
 
-  document.getElementById('media-file')?.addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
+  function renderGifHistory() {
+    const list = document.getElementById('gif-history');
+    if (!list) return;
+    const history = readGifHistory();
+    list.innerHTML = history.length
+      ? history.map((url) => `<button type="button" class="gc-gif-thumb" data-gif-url="${esc(url)}" aria-label="Надіслати GIF ще раз"><img src="${esc(url)}" alt="" loading="lazy"></button>`).join('')
+      : '<p class="gc-gif-empty">Тут з’являться ваші останні GIF</p>';
+    list.querySelectorAll('[data-gif-url]').forEach((thumb) => {
+      thumb.addEventListener('click', async () => {
+        closePanels();
+        await sendPayload({ msg_type: 'gif', attachment_url: thumb.dataset.gifUrl });
+      });
+    });
+  }
+
+  gifButton?.addEventListener('click', () => {
+    const willOpen = gifPopover.hidden;
+    closePanels();
+    if (!willOpen) return;
+    renderGifHistory();
+    gifPopover.hidden = false;
+    gifButton.setAttribute('aria-expanded', 'true');
+    document.getElementById('gif-input')?.focus();
+  });
+
+  async function sendGifFromInput() {
+    const field = document.getElementById('gif-input');
+    const url = field?.value.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) { await showAlert('Вставте GIF із буфера або посилання, що починається з https://'); return; }
+    field.value = '';
+    closePanels();
+    rememberGif(url);
+    await sendPayload({ msg_type: 'gif', attachment_url: url });
+  }
+
+  document.getElementById('gif-send')?.addEventListener('click', sendGifFromInput);
+  document.getElementById('gif-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sendGifFromInput(); }
+  });
+  document.getElementById('gif-input')?.addEventListener('paste', async (event) => {
+    const file = [...(event.clipboardData?.items || [])]
+      .find((item) => item.kind === 'file' && /^(image|video)\//.test(item.type))?.getAsFile();
     if (!file) return;
+    event.preventDefault();
+    closePanels();
+    await uploadChatFile(file);
+  });
+  document.getElementById('gif-file')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    closePanels();
+    if (file) await uploadChatFile(file);
+    e.target.value = '';
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.gc-compose')) closePanels();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closePanels();
+  });
+
+  async function uploadChatFile(file, { asSticker = false } = {}) {
+    if (!file || (!file.type.startsWith('image/') && !file.type.startsWith('video/'))) {
+      throw new Error('Можна надіслати лише зображення або відео');
+    }
+    if (file.size > 50 * 1024 * 1024) throw new Error('Максимальний розмір файлу — 50 МБ');
     try {
       const fd = new FormData();
       fd.append('file', file);
@@ -149,11 +263,29 @@ function bindCompose() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Помилка завантаження');
-      await sendPayload({ msg_type: data.msg_type, attachment_url: data.url });
+      if (file.type === 'image/gif' || data.msg_type === 'gif') rememberGif(data.url);
+      await sendPayload({
+        msg_type: asSticker && data.msg_type === 'image' ? 'sticker' : data.msg_type,
+        attachment_url: data.url,
+      });
     } catch (err) {
       await showAlert(err.message);
     }
+  }
+
+  document.getElementById('media-file')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (file) await uploadChatFile(file);
     e.target.value = '';
+  });
+
+  document.getElementById('gc-input')?.addEventListener('paste', async (event) => {
+    const file = [...(event.clipboardData?.items || [])]
+      .find((item) => item.kind === 'file' && /^(image|video)\//.test(item.type))
+      ?.getAsFile();
+    if (!file) return;
+    event.preventDefault();
+    await uploadChatFile(file, { asSticker: file.type.startsWith('image/') && file.type !== 'image/gif' });
   });
 
   const sendText = () => {
@@ -174,18 +306,35 @@ function renderCompose() {
   return `
     <div class="gc-compose">
       <div class="gc-compose-tools">
-        <button type="button" class="gc-tool-btn" id="toggle-stickers">Стікери</button>
-        <button type="button" class="gc-tool-btn" id="send-gif-btn">GIF</button>
+        <button type="button" class="gc-tool-btn" id="toggle-stickers" aria-expanded="false">Стікери</button>
+        <div class="gc-gif-wrap">
+          <button type="button" class="gc-tool-btn" id="send-gif-btn" aria-expanded="false" aria-haspopup="dialog">GIF</button>
+          <div class="gc-gif-popover" id="gif-popover" role="dialog" aria-label="GIF" hidden>
+            <div class="gc-gif-head"><strong>GIF</strong><span>5 останніх</span></div>
+            <div class="gc-gif-history" id="gif-history"></div>
+            <div class="gc-gif-add">
+              <input type="text" id="gif-input" class="gc-gif-input" autocomplete="off" placeholder="Ctrl/Cmd+V — вставити GIF або посилання">
+              <button type="button" class="btn btn--primary btn--sm" id="gif-send">Надіслати</button>
+            </div>
+            <label class="gc-gif-upload">Вибрати файл<input type="file" id="gif-file" accept="image/gif,image/*,video/*" hidden></label>
+          </div>
+        </div>
         <label class="gc-tool-btn" style="cursor:pointer">
           Фото/відео
           <input type="file" id="media-file" accept="image/*,video/*" hidden>
         </label>
       </div>
       <div class="gc-sticker-panel" id="sticker-panel">
-        ${STICKERS.map(s => `<button type="button" class="gc-sticker-btn" data-sticker="icon:${s}" title="${s}">${icon(s, 'ico ico--md')}</button>`).join('')}
+        <div class="gc-sticker-categories" role="tablist" aria-label="Категорії стікерів">
+          ${STICKER_THEMES.map((theme, index) => `<button type="button" class="gc-sticker-category${index === 0 ? ' active' : ''}" data-category="${theme.id}" role="tab" aria-selected="${index === 0}">${theme.label}</button>`).join('')}
+        </div>
+        ${STICKER_THEMES.map((theme, index) => `
+          <div class="gc-sticker-group" data-category="${theme.id}"${index ? ' hidden' : ''}>
+            ${NFT_STICKERS.filter((sticker) => sticker.theme === theme.id).map((sticker) => `<button type="button" class="gc-sticker-btn" data-sticker="nft:${sticker.id}" aria-label="${sticker.title}">${renderNftSticker(sticker.id, { mini: true })}</button>`).join('')}
+          </div>`).join('')}
       </div>
       <div class="gc-compose-row">
-        <input type="text" id="gc-input" placeholder="Повідомлення..." maxlength="2000">
+        <input type="text" id="gc-input" placeholder="Повідомлення... (можна вставити зображення)" maxlength="2000">
         <button type="button" class="btn btn--primary btn--sm" id="gc-send">${icon('send', 'ico ico--sm')}</button>
       </div>
     </div>`;

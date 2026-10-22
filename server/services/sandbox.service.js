@@ -70,15 +70,14 @@ function scheduleHardKill(containerName, ms) {
 }
 
 /** One-shot code execution (Python/Node/C++/Bash) — no network, hard resource caps, ephemeral container. */
-export async function runExec(language, files) {
+async function runInSandbox(language, files, command) {
   if (!isSandboxEnabled()) throw new ValidationError('Пісочницю коду не налаштовано на цьому сервері');
   const lang = LANGUAGES[language];
-  if (!lang) throw new ValidationError('Непідтримувана мова');
+  if (!lang || !command) throw new ValidationError('Непідтримувана мова або команда');
   if (!Array.isArray(files) || !files.length) throw new ValidationError('Немає файлів для запуску');
 
   const dir = await mkdtemp(join(tmpdir(), 'lab-sandbox-'));
   const containerName = assertSafeContainerName(`sbx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-  const entry = files.find((f) => f.path === lang.filename)?.path || files[0].path;
 
   const killer = scheduleHardKill(containerName, RUN_TIMEOUT_MS);
   try {
@@ -99,7 +98,7 @@ export async function runExec(language, files) {
       '-v', `${dir}:/workspace:ro`,
       '-w', '/workspace',
       lang.image,
-      ...lang.cmd(safeFileName(entry)),
+      ...command,
     ];
 
     try {
@@ -124,6 +123,32 @@ export async function runExec(language, files) {
     await execFileAsync('docker', ['rm', '-f', containerName]).catch(() => {});
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+export async function runExec(language, files) {
+  const lang = LANGUAGES[language];
+  if (!lang) throw new ValidationError('Непідтримувана мова');
+  const entry = files?.find((f) => f.path === lang.filename)?.path || files?.[0]?.path;
+  if (!entry) throw new ValidationError('Немає файлів для запуску');
+  return runInSandbox(language, files, lang.cmd(safeFileName(entry)));
+}
+
+export async function runTests(language, files) {
+  if (!['python', 'node'].includes(language)) {
+    throw new ValidationError('Автоматичний запуск тестів наразі доступний для Python і Node.js');
+  }
+  const testFiles = (files || []).filter((file) => language === 'python'
+    ? /(^|\/)test[^/]*\.py$/i.test(file.path)
+    : /(^|\/)([^/]+\.)?(test|spec)\.js$/i.test(file.path));
+  if (!testFiles.length) {
+    throw new ValidationError(language === 'python'
+      ? 'Додайте тестові файли test_*.py'
+      : 'Додайте тестові файли *.test.js або *.spec.js');
+  }
+  const args = language === 'python'
+    ? ['python3', '-m', 'unittest', 'discover', '-s', '/workspace', '-p', 'test*.py']
+    : ['node', '--test', ...testFiles.map((file) => safeFileName(file.path))];
+  return runInSandbox(language, files, args);
 }
 
 /**

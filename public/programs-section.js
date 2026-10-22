@@ -1,4 +1,4 @@
-import { api, isLoggedIn } from '/auth.js';
+import { api } from '/auth.js';
 import { icon } from '/icons.js';
 import { t } from '/i18n.js';
 
@@ -46,28 +46,31 @@ export function dirIcon(dir) {
 
 export function levelSegments(level) {
   const l = String(level || '').toLowerCase();
-  if (l.includes('advanced')) return 3;
-  if (l.includes('intermediate')) return 2;
+  if (l.includes('advanced') || l.includes('просун')) return 4;
+  if (l.includes('special') || l.includes('спеціал')) return 3;
+  if (l.includes('intermediate') || l.includes('серед')) return 2;
   return 1;
 }
 
 function renderLevelMeter(level) {
   const segs = levelSegments(level);
-  return `<span class="dossier-level" title="${t('Рівень: {level}', { level })}">
-    ${[1, 2, 3].map(n => `<span class="dossier-level-seg${n <= segs ? ' is-on' : ''}"></span>`).join('')}
+  return `<span class="dossier-level" title="${t('Рівень: {level}', { level: t(level) })}">
+    ${[1, 2, 3, 4].map(n => `<span class="dossier-level-seg${n <= segs ? ' is-on' : ''}"></span>`).join('')}
   </span>`;
 }
 
 function renderProgramRow(p, dir) {
   const accent = dirAccent(dir);
   const tags = p.tags || [];
-  const ctaHref = isLoggedIn() ? '/dashboard.html' : '/login.html';
-  const ctaLabel = isLoggedIn() ? t('Записатися') : t('Увійти та записатися');
+  const ctaHref = `/?direction=${encodeURIComponent(dir.slug)}#contact`;
   const bodyId = `dossier-body-${p.id}`;
 
   return `<li class="dossier-row${p.is_featured ? ' dossier-row--featured' : ''}" style="--prog-accent:${accent}">
     <button type="button" class="dossier-row-head" data-id="${p.id}" aria-expanded="false" aria-controls="${bodyId}">
-      ${renderLevelMeter(p.level)}
+      <span class="dossier-level-group">
+        ${renderLevelMeter(p.level)}
+        <span class="dossier-level-label">${t(p.level)}</span>
+      </span>
       <span class="dossier-id">TGT://${p.slug}</span>
       <span class="dossier-title">
         ${p.name}
@@ -75,7 +78,7 @@ function renderProgramRow(p, dir) {
       </span>
       <span class="dossier-meta">
         <span class="ico-inline">${icon('calendar', 'ico ico--xs')}${p.duration}</span>
-        <span class="ico-inline">${icon('chart', 'ico ico--xs')}+${p.bounty_reward}</span>
+        ${p.bounty_reward > 0 ? `<span class="ico-inline">${icon('chart', 'ico ico--xs')}+${p.bounty_reward}</span>` : ''}
       </span>
       <span class="dossier-chevron">${icon('chevron-down', 'ico ico--sm')}</span>
     </button>
@@ -84,12 +87,12 @@ function renderProgramRow(p, dir) {
         <p class="dossier-desc">${p.description || ''}</p>
         ${tags.length ? `
           <div class="dossier-arsenal">
-            <span class="dossier-arsenal-label">${t('Арсенал')}</span>
+            <span class="dossier-arsenal-label">${t('Модулі навчання')}</span>
             <ul>${tags.map(tag => `<li>${tag}</li>`).join('')}</ul>
           </div>` : ''}
         <div class="dossier-actions">
           <a href="/course.html?id=${p.id}" class="btn btn--outline btn--sm">${t('Відкрити повну програму →')}</a>
-          <a href="${ctaHref}" class="btn btn--primary btn--sm">${ctaLabel}</a>
+          <a href="${ctaHref}" class="btn btn--primary btn--sm">${t('Подати заявку на напрям')}</a>
         </div>
       </div>
     </div>
@@ -223,7 +226,10 @@ export async function initProgramsSection() {
 
     if (contactSelect) {
       contactSelect.innerHTML = `<option value="" disabled selected>${t('Оберіть напрямок')}</option>`
-        + directionsData.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+        + directionsData.map(d => `<option value="${d.id}" data-slug="${esc(d.slug)}">${d.name}</option>`).join('');
+      const requestedDirection = new URLSearchParams(window.location.search).get('direction');
+      const requested = directionsData.find(d => d.slug === requestedDirection);
+      if (requested) contactSelect.value = String(requested.id);
     }
 
     const statNums = document.querySelectorAll('.stat-num[data-count]');

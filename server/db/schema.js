@@ -8,7 +8,8 @@ export const SCHEMA = `
     bounty_points INTEGER DEFAULT 0 NOT NULL,
     role TEXT DEFAULT 'student' NOT NULL,
     created_at TEXT DEFAULT (datetime('now')) NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+    referred_by_program_id INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS programs (
@@ -71,6 +72,8 @@ export const SCHEMA = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
+    callback_phone TEXT,
+    referral_program_id INTEGER,
     program TEXT NOT NULL,
     message TEXT,
     status TEXT DEFAULT 'pending' NOT NULL,

@@ -6,21 +6,31 @@ function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-export function renderTeacherTabs(active = 'overview') {
-  const tabs = [
-    { id: 'overview', label: 'Огляд', icon: 'grid' },
-    { id: 'groups', label: 'Групи', icon: 'users' },
-    { id: 'tasks', label: 'Задачі', icon: 'notes' },
-    { id: 'ctf', label: 'CTF', icon: 'shield' },
-    { id: 'quizzes', label: 'Тести', icon: 'book' },
-    { id: 'stats', label: 'Статистика', icon: 'chart' },
-    { id: 'schedule', label: 'Розклад', icon: 'calendar' },
-    { id: 'attendance', label: 'Відвідуваність', icon: 'video' },
+export function renderTeacherTabs(active = 'overview', badges = {}) {
+  const sections = [
+    { label: 'Панель', tabs: [
+      { id: 'overview', label: 'Огляд', icon: 'grid' },
+      { id: 'stats', label: 'Статистика', icon: 'chart' },
+    ] },
+    { label: 'Навчання', tabs: [
+      { id: 'groups', label: 'Групи', icon: 'users' },
+      { id: 'tasks', label: 'Задачі', icon: 'notes', badge: badges.tasks },
+      { id: 'homework', label: 'Перевірка ДЗ', icon: 'check', badge: badges.homework },
+      { id: 'quizzes', label: 'Тести', icon: 'book' },
+      { id: 'ctf', label: 'CTF', icon: 'shield' },
+      { id: 'schedule', label: 'Розклад', icon: 'calendar' },
+      { id: 'attendance', label: 'Відвідуваність', icon: 'video' },
+    ] },
   ];
-  return `<nav class="admin-tabs">${tabs.map(t => `
-    <button type="button" class="admin-tab${active === t.id ? ' active' : ''}" data-tab="${t.id}">
-      ${icon(t.icon, 'ico ico--sm')}${t.label}
-    </button>`).join('')}</nav>`;
+  return `<nav class="admin-sidebar" aria-label="Меню викладача">${sections.map(section => `
+    <div class="admin-sidebar-section">
+      <h2>${section.label}</h2>
+      ${section.tabs.map(t => `
+        <button type="button" class="admin-tab${active === t.id ? ' active' : ''}" data-tab="${t.id}"${active === t.id ? ' aria-current="page"' : ''}>
+          ${icon(t.icon, 'ico ico--sm')}<span>${t.label}</span>
+          ${t.badge ? `<span class="admin-nav-badge" aria-label="${t.badge} нових">${t.badge > 99 ? '99+' : t.badge}</span>` : ''}
+        </button>`).join('')}
+    </div>`).join('')}</nav>`;
 }
 
 export function renderGroupsPanel(groups, programs = [], directions = [], { allGroups = false } = {}) {
@@ -95,7 +105,7 @@ async function openGroupModal(groupId, title, showToast) {
             <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px">Роль в групі</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <select class="admin-inp member-role-select" data-uid="${m.id}" style="width:auto;min-width:110px;padding:6px 8px;font-size:0.75rem">
+            <select class="admin-inp member-role-select" data-uid="${m.id}" style="width:auto;min-width:110px;padding:6px 2rem 6px 8px;font-size:0.75rem">
               <option value="student" ${(m.member_role || 'student') === 'student' ? 'selected' : ''}>${STUDENT_MEMBER_ROLE_LABELS.student}</option>
               <option value="author" ${m.member_role === 'author' ? 'selected' : ''}>${STUDENT_MEMBER_ROLE_LABELS.author}</option>
             </select>
@@ -261,6 +271,89 @@ export function bindGroupsPanelEvents(showToast, reload, programs = [], directio
   });
 }
 
+function renderReviewQueue(reviewQueue) {
+  return `<section class="admin-panel admin-panel--wide">
+    <h3>На перевірці (${reviewQueue.length})</h3>
+    <div class="admin-list" id="review-queue">
+      ${reviewQueue.length ? reviewQueue.map(a => `
+        <div class="admin-list-item task-review-item" data-id="${a.id}">
+          <div>
+            <strong>${esc(a.title)}</strong>
+            <div style="font-size:0.75rem;color:var(--text-muted)">
+              @${esc(a.student_handle)} · ${esc(a.group_name)}
+              ${a.submitted_at ? ` · здано ${esc(a.submitted_at)}` : ''}
+              ${a.work_duration_seconds != null ? ` · ${Math.ceil(a.work_duration_seconds / 60)} хв` : ''}
+              ${a.submission_note ? ` · «${esc(a.submission_note)}»` : ''}
+            </div>
+            ${(a.submission_files || []).length ? `
+              <div class="task-submission-files">
+                ${a.submission_files.map(f => `
+                  <a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" class="task-submission-file" title="${esc(f.original_name)}">
+                    ${icon(f.mime_type?.startsWith('image/') ? 'image' : 'notes', 'ico ico--xs')}
+                    ${esc(f.original_name)}
+                  </a>`).join('')}
+              </div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn btn--primary btn--sm task-approve" data-id="${a.id}">${icon('check', 'ico ico--sm')}Зарахувати</button>
+            <button type="button" class="btn btn--ghost btn--sm task-reject" data-id="${a.id}" aria-label="Повернути на доопрацювання">${icon('edit', 'ico ico--sm')}</button>
+          </div>
+        </div>`).join('') : '<p class="empty-state">Немає домашніх завдань на перевірці</p>'}
+    </div>
+  </section>`;
+}
+
+export function renderHomeworkReviewPanel(tasksData = {}) {
+  const reviewQueue = tasksData.reviewQueue || [];
+  const completedWork = (tasksData.submissionHistory || []).filter((item) => item.status === 'completed');
+  const pastLessons = tasksData.pastLessons || [];
+  const renderFiles = (files) => (files || []).length ? `<div class="task-submission-files">
+    ${files.map((file) => `<a href="${esc(file.url)}" target="_blank" rel="noopener noreferrer" class="task-submission-file">
+      ${icon(file.mime_type?.startsWith('image/') ? 'image' : 'notes', 'ico ico--xs')}${esc(file.original_name)}
+    </a>`).join('')}
+  </div>` : '';
+  return `<section class="admin-panel admin-panel--wide">
+    <div class="admin-panel-head">
+      <h2>${icon('check', 'ico ico--md')}Перевірка домашніх завдань</h2>
+      <span class="sched-badge">${reviewQueue.length} на перевірці</span>
+    </div>
+    <p class="program-transfer-hint">Перегляньте відповіді та вкладення учнів. Підтверджене завдання позначається виконаним; повернуте знову стає доступним учню для редагування.</p>
+    ${renderReviewQueue(reviewQueue)}
+    <section class="admin-panel admin-panel--wide homework-history">
+      <h3>Зараховані домашні роботи (${completedWork.length})</h3>
+      <div class="admin-list">
+        ${completedWork.length ? completedWork.map((item) => `
+          <article class="admin-list-item homework-history-item">
+            <div>
+              <strong>${esc(item.title)}</strong>
+              <div class="homework-history-meta">@${esc(item.student_handle)} · ${esc(item.group_name)}
+                ${item.completed_at ? ` · зараховано ${esc(item.completed_at)}` : ''}
+                ${item.work_duration_seconds != null ? ` · ${Math.ceil(item.work_duration_seconds / 60)} хв` : ''}
+              </div>
+              ${item.submission_note ? `<p class="homework-history-note">${esc(item.submission_note)}</p>` : ''}
+              ${renderFiles(item.submission_files)}
+            </div>
+          </article>`).join('') : '<p class="empty-state">Зарахованих робіт поки немає.</p>'}
+      </div>
+    </section>
+    <section class="admin-panel admin-panel--wide homework-history">
+      <h3>Минулі заняття (${pastLessons.length})</h3>
+      <div class="admin-list">
+        ${pastLessons.length ? pastLessons.map((lesson) => `
+          <article class="admin-list-item homework-history-item">
+            <div>
+              <strong>${esc(lesson.title)}</strong>
+              <div class="homework-history-meta">${esc(lesson.group_name)} · ${esc(lesson.lesson_at)}
+                ${lesson.teacher_name ? ` · ${esc(lesson.teacher_name)}` : ''}
+              </div>
+              ${lesson.topic ? `<p class="homework-history-note">${esc(lesson.topic)}</p>` : ''}
+            </div>
+          </article>`).join('') : '<p class="empty-state">Минулі заняття з’являться тут.</p>'}
+      </div>
+    </section>
+  </section>`;
+}
+
 export function renderTasksPanel(groups, tasksData = {}) {
   const { tasks = [], reviewQueue = [] } = tasksData;
   const groupOpts = (groups || []).map(g =>
@@ -284,35 +377,7 @@ export function renderTasksPanel(groups, tasksData = {}) {
       <button type="button" class="btn btn--primary btn--sm" id="create-task-submit">Створити</button>
     </div>
     <div class="admin-grid" style="margin-top:16px">
-      <section class="admin-panel admin-panel--wide">
-        <h3>На перевірці (${reviewQueue.length})</h3>
-        <div class="admin-list" id="review-queue">
-          ${reviewQueue.length ? reviewQueue.map(a => `
-            <div class="admin-list-item task-review-item" data-id="${a.id}">
-              <div>
-                <strong>${esc(a.title)}</strong>
-                <div style="font-size:0.75rem;color:var(--text-muted)">
-                  @${esc(a.student_handle)} · ${esc(a.group_name)}
-                  ${a.submitted_at ? ` · здано ${esc(a.submitted_at)}` : ''}
-                  ${a.work_duration_seconds != null ? ` · ${Math.ceil(a.work_duration_seconds / 60)} хв` : ''}
-                  ${a.submission_note ? ` · «${esc(a.submission_note)}»` : ''}
-                </div>
-                ${(a.submission_files || []).length ? `
-                  <div class="task-submission-files">
-                    ${a.submission_files.map(f => `
-                      <a href="${esc(f.url)}" target="_blank" rel="noopener" class="task-submission-file" title="${esc(f.original_name)}">
-                        ${icon(f.mime_type?.startsWith('image/') ? 'image' : 'notes', 'ico ico--xs')}
-                        ${esc(f.original_name)}
-                      </a>`).join('')}
-                  </div>` : ''}
-              </div>
-              <div style="display:flex;gap:6px">
-                <button type="button" class="btn btn--primary btn--sm task-approve" data-id="${a.id}">${icon('check', 'ico ico--sm')}Завершено</button>
-                <button type="button" class="btn btn--ghost btn--sm task-reject" data-id="${a.id}">${icon('trash', 'ico ico--sm')}</button>
-              </div>
-            </div>`).join('') : '<p class="empty-state">Немає задач на перевірці</p>'}
-        </div>
-      </section>
+      ${renderReviewQueue(reviewQueue)}
       <section class="admin-panel admin-panel--wide">
         <h3>Усі задачі (${tasks.length})</h3>
         <div class="admin-list">

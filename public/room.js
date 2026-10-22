@@ -192,7 +192,8 @@ async function createPeer(socketId, isInitiator, userData) {
   tile.className = 'video-tile';
   tile.id = `tile-${socketId}`;
   tile.innerHTML = `
-    <video autoplay playsinline></video>
+    <video autoplay muted playsinline></video>
+    <audio autoplay hidden></audio>
     <div class="tile-label">
       <span>${userData?.handle ? `@${userData.handle}` : '...'}</span>
       <div class="tile-icons">
@@ -204,9 +205,13 @@ async function createPeer(socketId, isInitiator, userData) {
   updateGridClass();
 
   pc.ontrack = (e) => {
+    if (e.track.kind === 'audio') {
+      tile.querySelector('audio').srcObject = new MediaStream([e.track]);
+      return;
+    }
+
     const video = tile.querySelector('video');
-    if (!video.srcObject) video.srcObject = new MediaStream();
-    video.srcObject.addTrack(e.track);
+    video.srcObject = new MediaStream([e.track]);
   };
 
   pc.onicecandidate = (e) => {

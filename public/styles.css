@@ -15,6 +15,7 @@
   --radius-lg: 8px;
   --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --theme-transition: 0s;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 
   /* accent vars set dynamically by theme-engine.js */
   --accent: #00ff88;
@@ -43,6 +44,7 @@
 html {
   scroll-behavior: smooth;
   font-size: 16px;
+  color-scheme: dark;
 }
 
 body {
@@ -66,6 +68,129 @@ img { max-width: 100%; display: block; }
 ul { list-style: none; }
 button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
 input, select, textarea { font: inherit; color: inherit; }
+
+/* Shared form controls: component styles can still refine these defaults. */
+:where(
+  input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="file"],
+    [type="range"], [type="color"], [type="button"], [type="submit"], [type="reset"]),
+  select,
+  textarea
+) {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius);
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.45;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+:where(
+  input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="file"],
+    [type="range"], [type="color"], [type="button"], [type="submit"], [type="reset"]),
+  select,
+  textarea
+)::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+select {
+  appearance: none;
+  padding: 0.65rem 2rem 0.65rem 0.8rem;
+  border-radius: var(--radius);
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+select[class] {
+  padding-right: 2rem;
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+:where(
+  input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="file"],
+    [type="range"], [type="color"], [type="button"], [type="submit"], [type="reset"]),
+  select,
+  textarea
+):hover:not(:disabled):not(:focus-visible) {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-accent));
+}
+
+:where(
+  input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="file"],
+    [type="range"], [type="color"], [type="button"], [type="submit"], [type="reset"]),
+  select,
+  textarea
+):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-subtle);
+}
+
+:where(
+  input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="file"],
+    [type="range"], [type="color"], [type="button"], [type="submit"], [type="reset"]),
+  select,
+  textarea
+):disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+select option {
+  background-color: var(--bg-card);
+  color: var(--text);
+}
+
+input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+input[type="radio"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+input[type="file"] {
+  max-width: 100%;
+  color: var(--text-muted);
+  font: inherit;
+}
+
+input[type="file"]::file-selector-button {
+  margin-inline-end: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+input[type="file"]::file-selector-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
 
 /* ===== Custom checkboxes ===== */
 input[type="checkbox"] {
@@ -123,7 +248,8 @@ input[type="checkbox"]:active:not(:disabled) {
 }
 
 input[type="checkbox"]:focus-visible {
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
@@ -182,10 +308,6 @@ input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
-}
-
-input[type="number"]:focus {
-  outline: none;
 }
 
 .admin-inp[type="number"]:focus,
@@ -364,10 +486,13 @@ input[type="number"]:focus {
   left: 0;
   right: 0;
   z-index: 10001;
-  min-height: 72px;
-  background: rgba(10, 10, 10, 0.8);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
+  min-height: 78px;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
 }
 
 .nav {
@@ -375,7 +500,7 @@ input[type="number"]:focus {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 72px;
+  height: 78px;
   min-width: 0;
 }
 
@@ -420,11 +545,16 @@ input[type="number"]:focus {
 
 .nav-links {
   display: flex;
+  align-items: center;
   gap: 32px;
 }
 
 .nav-links a {
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 10px 2px;
+  font-size: 0.93rem;
   color: var(--text-muted);
   transition: color var(--transition);
   position: relative;
@@ -443,6 +573,14 @@ input[type="number"]:focus {
 
 .nav-links a:hover { color: var(--text); }
 .nav-links a:hover::after { width: 100%; }
+
+@media (min-width: 769px) and (max-width: 900px) {
+  .nav:not(.nav--app) .nav-links { display: none; }
+  .nav:not(.nav--app) .logo-text { display: none; }
+  .nav:not(.nav--app) .burger { display: flex; }
+  .nav:not(.nav--app) .nav-actions { gap: 8px; }
+  .nav:not(.nav--app) .nav-user { max-width: 8rem; }
+}
 
 .app-nav-links {
   gap: 4px;
@@ -466,8 +604,9 @@ input[type="number"]:focus {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 11px;
-  font-size: 0.82rem;
+  min-height: 46px;
+  padding: 10px 13px;
+  font-size: 0.88rem;
   white-space: nowrap;
   color: var(--text-muted);
   border: 1px solid transparent;
@@ -487,20 +626,42 @@ input[type="number"]:focus {
 }
 
 .nav--app .nav-links {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   justify-content: center;
+}
+
+.nav--app .nav-actions {
+  flex: 0 0 auto;
+  margin-left: auto;
+  gap: 10px;
+}
+
+/* Wider bar for the app header so links never slide under the logo or actions */
+.nav.nav--app { gap: 20px; }
+.nav--app .nav-links { justify-content: center; margin: 0 auto; padding: 2px 4px; }
+/* Same layout on the marketing header: links centred, actions pinned right */
+.nav:not(.nav--app) { gap: 20px; }
+.nav:not(.nav--app) .nav-links { flex: 1 1 0; min-width: 0; justify-content: center; gap: clamp(18px, 2.4vw, 32px); margin: 0 auto; }
+.nav:not(.nav--app) .nav-actions { flex: 0 0 auto; margin-left: auto; gap: 10px; }
+.nav--app .nav-enroll-slot:empty { display: none; }
+.nav--app .nav-logout-btn { margin-left: 4px; }
+.nav--app .nav-extra-slot:empty { display: none; }
+@media (min-width: 1361px) and (max-width: 1500px) {
+  .app-nav-links .app-nav-link { padding: 8px 10px; font-size: .84rem; }
 }
 
 .nav--app .logo {
   flex-shrink: 0;
 }
 
-@media (max-width: 1200px) {
-  .nav--app .logo-text {
-    display: none;
-  }
+.nav .logo,
+.nav-actions,
+.nav-links {
+  min-height: 44px;
+}
 
+@media (max-width: 1200px) {
   .app-nav-links .app-nav-link {
     padding: 8px 9px;
     font-size: 0.8rem;
@@ -530,7 +691,7 @@ input[type="number"]:focus {
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1400px) {
   .nav--app .nav-links {
     display: none;
   }
@@ -546,6 +707,11 @@ input[type="number"]:focus {
   gap: 12px;
   flex-shrink: 0;
   min-width: 0;
+}
+
+.nav-actions > .btn,
+.auth-nav > .btn {
+  min-height: 44px;
 }
 
 .auth-nav {
@@ -795,7 +961,6 @@ input[type="number"]:focus {
 }
 
 .app-dialog-input:focus {
-  outline: none;
   border-color: var(--accent);
 }
 
@@ -846,7 +1011,6 @@ input[type="number"]:focus {
   font-family: var(--mono);
   font-size: 0.72rem;
   cursor: pointer;
-  outline: none;
 }
 
 .lang-switch:hover,
@@ -982,9 +1146,28 @@ input[type="number"]:focus {
 
 .burger {
   display: none;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
   flex-direction: column;
   gap: 5px;
-  padding: 4px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-card) 75%, transparent);
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.burger:hover,
+.burger[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.burger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .burger span {
@@ -1443,11 +1626,10 @@ input[type="number"]:focus {
   color: var(--text);
   font-family: var(--font);
   font-size: 0.85rem;
-  outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 
-.programs-search::placeholder { color: var(--text-dim); }
+.programs-search::placeholder { color: var(--text-muted); }
 
 .programs-search:focus {
   border-color: var(--accent);
@@ -1531,10 +1713,24 @@ input[type="number"]:focus {
 .dossier-level-seg:nth-child(1) { height: 9px; }
 .dossier-level-seg:nth-child(2) { height: 13px; }
 .dossier-level-seg:nth-child(3) { height: 17px; }
+.dossier-level-seg:nth-child(4) { height: 21px; }
 
 .dossier-level-seg.is-on {
   background: var(--prog-accent, var(--accent));
   box-shadow: 0 0 8px color-mix(in srgb, var(--prog-accent, var(--accent)) 60%, transparent);
+}
+
+.dossier-level-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.dossier-level-label {
+  color: var(--prog-accent, var(--accent));
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .dossier-id {
@@ -1984,7 +2180,6 @@ input[type="number"]:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   transition: border-color var(--transition);
-  outline: none;
 }
 
 .contact-form input:focus,
@@ -1995,8 +2190,7 @@ input[type="number"]:focus {
 }
 
 .contact-form select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: var(--select-arrow);
   background-repeat: no-repeat;
   background-position: right 12px center;
 }
@@ -2065,25 +2259,40 @@ input[type="number"]:focus {
 .mobile-menu {
   display: none;
   position: fixed;
-  inset: 72px 0 0;
+  inset: calc(72px + env(safe-area-inset-top, 0px)) 0 0;
   z-index: 10000;
-  background: rgba(10, 10, 10, 0.95);
-  backdrop-filter: blur(20px);
-  padding: 32px 24px;
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  padding: 24px max(20px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .mobile-menu.open { display: flex; }
 
 .mobile-menu a {
-  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  font-size: 1rem;
   color: var(--text-muted);
-  padding: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   border-bottom: 1px solid var(--border);
 }
 
-.mobile-menu a:hover { color: var(--accent); }
+.mobile-menu a:hover,
+.mobile-menu a:focus-visible {
+  color: var(--accent);
+  border-color: var(--border);
+  background: var(--accent-subtle);
+  outline: none;
+}
 
 .mobile-menu .auth-nav,
 .mobile-menu #auth-nav-mobile {
@@ -2117,11 +2326,18 @@ input[type="number"]:focus {
 }
 
 @media (max-width: 768px) {
+  .header { min-height: calc(64px + env(safe-area-inset-top, 0px)); }
+  .nav { height: 64px; gap: 10px; }
+  .nav > .logo { flex: 0 0 auto; }
+  .nav--app .logo-text { display: inline; font-size: 1rem; }
+  .nav-actions { gap: 8px; }
   .nav-links { display: none; }
   .burger { display: flex; }
   .hide-mobile { display: none; }
   .nav-actions { gap: 6px; min-width: 0; }
   .auth-nav { gap: 4px; min-width: 0; }
+  .nav--app > .nav-actions > #auth-nav { display: none; }
+  .nav--app .nav-extra-slot:empty { display: none; }
   .nav-user {
     min-width: 0;
     max-width: 9.5rem;
@@ -2133,9 +2349,18 @@ input[type="number"]:focus {
     padding-left: 12px;
     padding-right: 12px;
   }
+  .mobile-menu { inset: calc(64px + env(safe-area-inset-top, 0px)) 0 0; }
   .conf-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  @media (max-width: 380px) {
+    .nav { gap: 6px; }
+    .nav--app .logo-text { display: none; }
+    .nav-actions { gap: 4px; }
+    .nav-actions .lang-switch { max-width: 72px; }
+    .nav--app .notif-bell-btn { width: 38px; height: 38px; }
   }
   .conf-header .btn {
     width: 100%;
@@ -2201,3 +2426,40 @@ input[type="number"]:focus {
 }
 
 .theme-switcher { display: none !important; }
+
+.referral-panel { margin: 20px 0; }
+.referral-link-row { display: flex; gap: 10px; align-items: center; }
+.referral-link-row .admin-inp { flex: 1; min-width: 0; }
+.referral-summary { margin-top: 12px; color: var(--text-muted); font-size: .9rem; }
+.referral-panel ul { margin: 8px 0 0; padding-left: 20px; color: var(--text-muted); }
+.student-referral-program-list { display: grid; gap: 12px; margin-top: 16px; }
+.student-referral-program { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: color-mix(in srgb, var(--bg-card) 78%, transparent); }
+.student-referral-program h3 { margin: 0 0 6px; font-size: 1rem; }
+.student-referral-program p { margin: 0 0 8px; color: var(--text-muted); font-size: .88rem; }
+.student-referral-program small { display: block; margin-bottom: 12px; color: var(--accent); }
+.dash-profile-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.referral-program-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: end; gap: 14px; margin: 16px 0 24px; }
+.referral-program-form > label:not(.admin-check) { display: grid; align-content: start; gap: 6px; font-size: .84rem; }
+.referral-program-form textarea { resize: vertical; }
+.referral-program-form small { color: var(--text-muted); font-size: .76rem; line-height: 1.45; }
+.referral-program-students { min-width: 0; }
+.referral-student-picker { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+.referral-student-picker summary { color: var(--text); font-size: .84rem; font-weight: 600; cursor: pointer; }
+.referral-student-search { margin: 10px 0; }
+.referral-student-options { display: grid; gap: 6px; max-height: 210px; overflow-y: auto; overscroll-behavior: contain; }
+.referral-student-option { display: flex; align-items: flex-start; gap: 8px; padding: 6px; border-radius: var(--radius); }
+.referral-student-option[hidden] { display: none; }
+.referral-student-option:hover { background: var(--accent-subtle); }
+.referral-student-option input { flex: 0 0 auto; margin-top: 2px; }
+.referral-program-card { padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--bg-card) 74%, transparent); }
+.referral-program-card-head { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.referral-program-list { display: grid; gap: 12px; }
+.referral-program-form > .btn { justify-self: start; }
+@media (max-width: 640px) {
+  .referral-link-row { align-items: stretch; flex-direction: column; }
+  .referral-link-row .btn { width: 100%; }
+  .dash-profile-actions { width: 100%; }
+  .dash-profile-actions .btn { flex: 1; }
+  .referral-program-form { grid-template-columns: 1fr; }
+  .referral-program-form > .btn { width: 100%; }
+}

@@ -4,6 +4,8 @@ import * as userService from '../services/user.service.js';
 import * as programService from '../services/program.service.js';
 import * as directionService from '../services/direction.service.js';
 import * as challengeService from '../services/challenge.service.js';
+import * as achievementService from '../services/achievement.service.js';
+import * as studentProfileService from '../services/student-profile.service.js';
 import * as taskService from '../services/task.service.js';
 import * as articleService from '../services/article.service.js';
 import * as contentService from '../services/content.service.js';
@@ -11,8 +13,12 @@ import * as manualService from '../services/manual.service.js';
 import * as scheduleService from '../services/schedule.service.js';
 import * as quizService from '../services/quiz.service.js';
 import * as applicationService from '../services/application.service.js';
+import * as referralService from '../services/referral.service.js';
+import * as marketingService from '../services/marketing.service.js';
+import * as supportService from '../services/support.service.js';
 import * as tabAccessService from '../services/tab-access.service.js';
 import * as paymentService from '../services/payment.service.js';
+import * as settingsService from '../services/settings.service.js';
 import { addBounty, getBountyLog, getUserRank } from '../services/bounty.service.js';
 import * as notificationService from '../services/notification.service.js';
 import * as errorLogService from '../services/error-log.service.js';
@@ -39,7 +45,7 @@ export async function getPrograms(req, res) {
   // filtering it by direction status would make a group tied to a since-
   // closed direction look broken in their own dropdowns even though the
   // group itself keeps working fine. Students only see what's newly
-  // enrollable.
+  // visible in the catalogue; student applications go through a direction.
   const programs = STAFF_ROLES.has(req.user.role)
     ? programService.getAll()
     : programService.getAvailableForEnrollment(req.user);
@@ -53,6 +59,7 @@ export async function getDirections(_req, res) {
 export async function getSitemap(_req, res) {
   const base = config.siteUrl.replace(/\/+$/, '');
   const programs = programService.getAll().filter((program) => {
+    if (!program.is_active) return false;
     if (!program.direction_id) return true;
     return directionService.getById(program.direction_id)?.is_active;
   });
@@ -81,11 +88,7 @@ export async function getPublicProgramPage(req, res) {
     throw new NotFoundError('Курс не знайдено');
   }
 
-  let page = null;
-  try {
-    page = contentService.getPageForViewer('program', programId, null, 'guest').page;
-  } catch { /* адмін ще не опублікував розширену сторінку курсу */ }
-
+  const page = contentService.getPublishedProgramPage(programId);
   res.json({ program, direction, page });
 }
 
@@ -96,6 +99,7 @@ export async function getLeaderboard(_req, res) {
       rank: i + 1,
       handle: u.handle,
       name: u.name,
+      profile_public: !!u.profile_public,
       bounty_points: u.bounty_points,
       tier: getTier(u.bounty_points).name,
     })),
@@ -141,6 +145,32 @@ export async function getSiteInfo(_req, res) {
     appUrl: config.appUrl,
     staticVersion: config.staticVersion,
   });
+}
+
+export async function recordAnalyticsEvent(req, res) {
+  marketingService.recordEvent(req.body, { ip: req.ip, userAgent: req.get('user-agent') || '' });
+  res.status(204).end();
+}
+
+export async function getMyReferralSummary(req, res) {
+  res.json({ referral: referralService.getStudentSummary(req.user.id) });
+}
+
+export async function listMySupportThreads(req, res) {
+  res.json({ threads: supportService.listUserThreads(req.user.id) });
+}
+
+export async function createSupportThread(req, res) {
+  const result = supportService.createThread(req.user.id, req.body);
+  res.status(201).json(result);
+}
+
+export async function getMySupportThread(req, res) {
+  res.json(supportService.getUserThread(req.user.id, parseInt(req.params.id, 10)));
+}
+
+export async function replyToSupportThread(req, res) {
+  res.json(await supportService.replyAsUser(req.user.id, parseInt(req.params.id, 10), req.body));
 }
 
 export async function submitApplication(req, res) {
@@ -194,6 +224,7 @@ export async function getDashboard(req, res) {
   const enrollments = programService.getEnrollments(req.user.id);
   const bountyLog = getBountyLog(req.user.id);
   const challenges = challengeService.getAllForUser(req.user.id);
+  const ctfAwards = achievementService.getCtfAwards(challenges);
   const completed = challenges.filter(c => c.completed).length;
   const tasks = taskService.listForStudent(req.user.id);
   const quizzes = quizService.listForStudent(req.user.id);
@@ -210,6 +241,7 @@ export async function getDashboard(req, res) {
     enrollments,
     bountyLog,
     challenges,
+    ctfAwards,
     tasks,
     quizzes,
     articles,
@@ -217,6 +249,10 @@ export async function getDashboard(req, res) {
     studentMemberRoles,
     myManuals,
     groupContent: contentService.listStudentGroupContent(req.user.id),
+    learningHistory: {
+      submissions: taskService.listSubmissionHistoryForStudent(req.user.id),
+      lessons: scheduleService.listStudentLessonHistory(req.user.id),
+    },
     stats: {
       programs_count: enrollments.length,
       challenges_completed: completed,
@@ -230,6 +266,60 @@ export async function getDashboard(req, res) {
     },
     tabAccess: tabAccessService.getAllowedTabs(req.user),
     billing: paymentService.getAccessStatus(req.user.id),
+  });
+}
+
+export async function getStudentPublicProfile(req, res) {
+  const user = userService.findByHandle(req.params.handle);
+  if (!user || user.role !== 'student') throw new NotFoundError('Профіль не знайдено');
+  if (user.id !== req.user.id && !user.profile_public) throw new NotFoundError('Профіль не знайдено');
+
+  const isOwnProfile = user.id === req.user.id;
+  const challenges = challengeService.getAllForUser(user.id);
+  const ctfAwards = achievementService.getCtfAwards(challenges);
+  const tasks = taskService.listForStudent(user.id);
+  const completedAssignments = taskService.listCompletedForProfile(user.id);
+  const quizzes = quizService.listForStudent(user.id);
+  const completedChallenges = challenges.filter((challenge) => challenge.completed).length;
+  const completedTasks = completedAssignments.length;
+  const passedQuizzes = quizzes.filter((quiz) => quiz.attempt?.passed).length;
+  const points = user.bounty_points || 0;
+  const tier = getTier(points);
+  const hiddenAwards = userService.toPublic(user).profile_hidden_awards;
+  const awards = [
+    ...(points > 0 ? [{ id: 'first-points', label: 'Перші нагороди', detail: 'Отримано перші bounty-бали', icon: 'star' }] : []),
+    ...(completedTasks > 0 ? [{ id: 'first-task', label: 'Перше завдання', detail: 'Завершено навчальне завдання', icon: 'check' }] : []),
+    ...(completedChallenges > 0 ? [{ id: 'first-challenge', label: 'Перший challenge', detail: 'Завершено практичний challenge', icon: 'shield' }] : []),
+    ...(passedQuizzes > 0 ? [{ id: 'first-quiz', label: 'Перша перевірка знань', detail: 'Успішно складено тест', icon: 'book' }] : []),
+    ...(tier.min > 0 ? [{ id: `tier-${tier.min}`, label: tier.name, detail: 'Досягнуто нового рівня', icon: 'award', earned: true }] : []),
+    ...ctfAwards,
+  ];
+  const completedCtf = studentProfileService.listCompletedCtf(user.id);
+  const sharedSolutions = user.profile_share_solutions
+    ? studentProfileService.listSharedCompletedTasks(user.id)
+    : [];
+
+  res.json({
+    profile: {
+      name: user.name,
+      handle: user.handle,
+      bio: user.profile_bio || '',
+      points,
+      tier: tier.name,
+      rank: getUserRank(points),
+      joinedAt: user.created_at,
+      isOwnProfile,
+      hiddenAwards: isOwnProfile ? hiddenAwards : [],
+      stats: {
+        completedTasks,
+        completedChallenges,
+        passedQuizzes,
+      },
+      awards: isOwnProfile ? awards : awards.filter((award) => !hiddenAwards.includes(award.id)),
+      completedCtf,
+      skillsByDirection: studentProfileService.listDirectionSkills(user.id),
+      sharedSolutions,
+    },
   });
 }
 
@@ -363,6 +453,23 @@ export async function getManualBySlug(req, res) {
   if (!manual) throw new NotFoundError('Мануал не знайдено');
   const { page } = contentService.getPageForViewer('manual', manual.id, req.user.id, req.user.role);
   res.json({ manual, page });
+}
+
+export async function listManualComments(req, res) {
+  const manualId = parseInt(req.params.id, 10);
+  const comments = manualService.listComments(manualId, req.user.id, req.user.role);
+  res.json({ comments });
+}
+
+export async function createManualComment(req, res) {
+  const manualId = parseInt(req.params.id, 10);
+  const comment = manualService.addComment(manualId, req.user.id, req.user.role, req.body.body);
+  res.status(201).json({ comment });
+}
+
+export async function deleteManualComment(req, res) {
+  manualService.deleteComment(parseInt(req.params.commentId, 10), req.user.id, req.user.role);
+  res.json({ success: true });
 }
 
 export async function getContentView(req, res) {

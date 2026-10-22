@@ -161,9 +161,9 @@ export function showCopyDialog(message, value, { title = null, okText = 'Зак�
 }
 
 /**
- * A small multi-field form dialog — text inputs and/or <select> dropdowns.
+ * A small multi-field form dialog — text/date/number inputs and/or <select> dropdowns.
  * Resolves with { fieldId: value, ... } on submit, or null on cancel.
- * fields: [{ id, label, type: 'text'|'select', value, placeholder, options: [{value,label}] }]
+ * fields: [{ id, label, type: 'text'|'date'|'datetime-local'|'number'|'select', value, placeholder, options: [{value,label}] }]
  */
 export function showForm(title, fields, { message = null, okText = 'Гаразд', cancelText = 'Скасувати' } = {}) {
   const uid = Math.random().toString(36).slice(2);
@@ -178,8 +178,9 @@ export function showForm(title, fields, { message = null, okText = 'Гаразд
         </select>
       </label>`;
     }
+    const inputType = ['date', 'datetime-local', 'number'].includes(f.type) ? f.type : 'text';
     return `<label class="app-dialog-field">${esc(f.label)}
-      <input id="${fid}" class="app-dialog-input" type="text" value="${esc(f.value || '')}" placeholder="${esc(f.placeholder || '')}">
+      <input id="${fid}" class="app-dialog-input" type="${inputType}" value="${esc(f.value || '')}" placeholder="${esc(f.placeholder || '')}">
     </label>`;
   }).join('')}</div>`;
 

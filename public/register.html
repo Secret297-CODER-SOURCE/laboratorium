@@ -44,6 +44,10 @@
         </label>
         <button type="submit" class="btn btn--primary btn--full" data-i18n="Зареєструватися">Зареєструватися</button>
       </form>
+      <button class="btn btn--outline btn--full google-login" id="google-register" type="button" disabled>
+        <span class="google-login-mark" aria-hidden="true">G</span>Створити акаунт через Google
+      </button>
+      <p class="google-login-note" id="google-register-note">Реєстрація через Google ще не налаштована на сервері.</p>
       <p class="auth-footer">
         <a href="/login.html" data-i18n="Вже є акаунт? Увійти">Вже є акаунт? Увійти</a>
       </p>
@@ -53,6 +57,8 @@
   <script type="module">
     import { api, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
     import { initI18n, t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
+    import { getAttribution } from '/marketing-attribution.js';
+    import { trackEvent, withAnalyticsAttribution } from '/analytics.js';
     initTheme();
     initI18n();
     document.getElementById('auth-lang-switch').innerHTML = renderLangSwitch();
@@ -78,6 +84,19 @@
         }
       });
 
+      const googleRegister = document.getElementById('google-register');
+      const referralCode = getAttribution().referral_code;
+      const next = withAnalyticsAttribution('/portal.html');
+      googleRegister.dataset.destination = `/api/auth/google/start?next=${encodeURIComponent(next)}`
+        + (referralCode ? `&referral_code=${encodeURIComponent(referralCode)}` : '');
+      googleRegister.addEventListener('click', () => {
+        if (googleRegister.dataset.destination) window.location.assign(googleRegister.dataset.destination);
+      });
+      api('/auth/google/status').then(({ enabled }) => {
+        googleRegister.disabled = !enabled;
+        document.getElementById('google-register-note').hidden = !!enabled;
+      }).catch((err) => console.warn('Google sign-in availability check failed:', err));
+
       document.getElementById('register-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const errEl = document.getElementById('form-error');
@@ -94,8 +113,10 @@
             body: JSON.stringify({
               name: fd.get('name'),
               email: fd.get('email'),
+              ...getAttribution(),
             }),
           });
+          trackEvent('registration');
           successEl.textContent = data.message;
           successEl.hidden = false;
           e.target.reset();
@@ -109,5 +130,6 @@
       });
     })();
   </script>
+  <script type="module" src="/analytics.js"></script>
 </body>
 </html>

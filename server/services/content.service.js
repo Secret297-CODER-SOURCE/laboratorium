@@ -5,7 +5,7 @@ import * as groupService from './group.service.js';
 import * as programService from './program.service.js';
 import * as manualService from './manual.service.js';
 
-const BLOCK_TYPES = new Set([
+export const BLOCK_TYPES = new Set([
   'heading', 'text', 'list', 'image', 'video', 'link', 'divider',
   'quote', 'callout', 'steps', 'cards',
 ]);
@@ -156,6 +156,15 @@ function loadPageTree(targetType, targetId) {
   }
 
   return mapPage(page, sections.map(s => mapSection(s, blocks)));
+}
+
+export function getPublishedProgramPage(programId) {
+  const page = loadPageTree('program', programId);
+  return page?.is_published ? page : null;
+}
+
+export function getProgramPageForExport(programId) {
+  return loadPageTree('program', programId);
 }
 
 function getOrCreatePageRow(targetType, targetId) {

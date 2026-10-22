@@ -8,6 +8,10 @@ import { loadTabAccess, dashTabAllowed, firstAllowedDashTab, setAllowedTabs } fr
 import { initI18n, t, getLocale } from '/i18n.js';
 import { showConfirm, showForm } from '/dialog.js';
 import { loadSandboxInfo, initCodeEditor } from '/code-editor.js';
+import { getAttribution } from '/marketing-attribution.js';
+import { trackPageView } from '/analytics.js';
+import { renderAchievementCard } from '/achievement-cards.js';
+import { mountUnifiedCalendar } from '/unified-calendar.js';
 
 function dateLocale() {
   return { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' }[getLocale()] || 'uk-UA';
@@ -52,6 +56,7 @@ function showToast(msg, type = 'success') {
 
 let taskTimerIntervals = [];
 let quizTimerInterval = null;
+let activeSupportThreadId = null;
 
 function clearTaskTimers() {
   taskTimerIntervals.forEach(clearInterval);
@@ -180,7 +185,7 @@ function renderDashboard(data) {
   dashboardData = data;
   const {
     user, rank, tier, nextTier, enrollments, bountyLog, challenges, tasks, stats,
-    canWriteArticles, articles,
+    canWriteArticles, articles, ctfAwards,
   } = data;
 
   document.getElementById('avatar').textContent = user.name.charAt(0).toUpperCase();
@@ -207,6 +212,16 @@ function renderDashboard(data) {
   document.getElementById('profile-name').value = user.name;
   document.getElementById('profile-handle').value = user.handle;
   document.getElementById('profile-email').value = user.email;
+  document.getElementById('profile-bio').value = user.profile_bio || '';
+  document.getElementById('profile-public').checked = user.profile_public !== false;
+  document.getElementById('profile-share-solutions').checked = user.profile_share_solutions === true;
+  renderProfileAwardControls(data);
+  const publicProfileLink = document.getElementById('public-profile-link');
+  publicProfileLink.href = `/student-profile.html?handle=${encodeURIComponent(user.handle)}`;
+  publicProfileLink.hidden = false;
+  publicProfileLink.title = user.profile_public === false
+    ? 'Профіль прихований від інших учасників'
+    : 'Переглянути, як профіль бачать інші учасники';
 
   renderEnrollments(enrollments);
   renderGroupContent(data.groupContent || []);
@@ -214,16 +229,145 @@ function renderDashboard(data) {
   renderChallenges(challenges);
   renderQuizzes(data.quizzes || []);
   renderTasks(tasks || [], stats);
+  renderLearningHistory(data.learningHistory || {});
   renderBountyLog(bountyLog);
+  renderCtfAwards(ctfAwards || []);
+  loadReferralSummary();
+  loadSupportCenter();
   setupDashTabs(canWriteArticles);
   if (canWriteArticles) {
     renderArticles(articles || []);
+  }
+
+  async function loadReferralSummary() {
+    const panel = document.getElementById('student-referral-panel');
+    if (!panel) return;
+    try {
+      const { referral } = await api('/referrals/me');
+      document.getElementById('student-referral-description').textContent = referral.enabled
+        ? 'Поділіться посиланням потрібної програми. Заявка має бути оформлена за ним і схвалена власником, щоб була нарахована відповідна винагорода.'
+        : 'Базові реферальні нагороди вимкнені. Якщо вам призначено окрему активну програму, її посилання та умови показані нижче.';
+      const programList = document.getElementById('student-referral-program-list');
+      programList.innerHTML = referral.programs.length
+        ? referral.programs.map(program => {
+          const rewards = [
+            Number(program.reward_points) > 0
+              ? `${Number(program.reward_points).toLocaleString(dateLocale())} bounty-балів`
+              : '',
+            Number(program.credit_amount) > 0
+              ? `${Number(program.credit_amount).toLocaleString(dateLocale())} кредиту-знижки`
+              : '',
+          ].filter(Boolean).join(' і ');
+          return `<article class="student-referral-program">
+            <div><h3>${escapeHtml(program.name)}</h3>
+              <p>${escapeHtml(program.description || 'Винагорода нараховується після схвалення заявки власником.')}</p>
+              <small>За схвалену заявку: ${escapeHtml(rewards || 'без винагороди')}</small>
+            </div>
+            <div class="referral-link-row">
+              <input class="admin-inp" readonly value="${escapeHtml(program.link)}" aria-label="Реферальне посилання: ${escapeHtml(program.name)}">
+              <button type="button" class="btn btn--outline btn--sm student-referral-copy" data-ref-link="${escapeHtml(program.link)}">Копіювати</button>
+            </div>
+          </article>`;
+        }).join('')
+        : `<article class="student-referral-program">
+            <div><h3>Особисте запрошення</h3>
+              <p>Поділіться цим посиланням з другом. Коли заявку за ним схвалять, ми зарахуємо її до вашого запрошення; винагороду нараховують за правилами активних програм.</p>
+            </div>
+            <div class="referral-link-row">
+              <input class="admin-inp" readonly value="${escapeHtml(referral.link)}" aria-label="Особисте реферальне посилання">
+              <button type="button" class="btn btn--outline btn--sm student-referral-copy" data-ref-link="${escapeHtml(referral.link)}">Копіювати</button>
+            </div>
+          </article>`;
+      document.getElementById('student-referral-summary').textContent =
+        `Прийняті заявки: ${referral.referrals} · Доступний кредит: ${Number(referral.credits.available || 0).toLocaleString(dateLocale())} · Використано: ${Number(referral.credits.applied || 0).toLocaleString(dateLocale())}`;
+      document.getElementById('student-referral-applications').innerHTML = referral.applications.length
+        ? `<h3>Заявки за посиланням</h3><ul>${referral.applications.map(app =>
+          `<li>${escapeHtml(app.program)} · ${escapeHtml(APPLICATION_STATUS_LABELS[app.status] || app.status)}${app.rewarded ? ' · нагороду нараховано' : ''}</li>`,
+        ).join('')}</ul>`
+        : '';
+      programList.querySelectorAll('.student-referral-copy').forEach(button => {
+        button.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(button.dataset.refLink);
+            showToast('Посилання скопійовано');
+          } catch {
+            button.closest('.referral-link-row').querySelector('input').select();
+            showToast('Виділіть і скопіюйте посилання');
+          }
+        };
+      });
+    } catch (err) {
+      panel.hidden = true;
+      document.querySelector('.profile-invite-link')?.setAttribute('hidden', '');
+      console.error('Could not load referral summary:', err);
+    }
   }
   renderMyManuals(data.myManuals || []);
   if (activeDashTab === 'ctf') loadCtfPanel();
   if (activeDashTab === 'tests') loadQuizzesPanel();
   if (activeDashTab === 'lab') loadLabPanel();
   if (activeDashTab === 'code') initCodeEditor();
+}
+
+function renderCtfAwards(awards) {
+  const root = document.getElementById('student-achievements');
+  if (!root) return;
+  root.innerHTML = awards.map(award => renderAchievementCard(award, { compact: true })).join('');
+}
+
+function renderProfileAwardControls(data) {
+  const root = document.getElementById('profile-award-controls');
+  if (!root) return;
+  const { user, ctfAwards = [], stats = {} } = data;
+  const hasCompletedHomework = (data.learningHistory?.submissions || [])
+    .some((submission) => submission.status === 'completed');
+  const candidates = [
+    ...(user.bounty_points > 0 ? [{ id: 'first-points', label: 'Перші нагороди' }] : []),
+    ...(hasCompletedHomework ? [{ id: 'first-task', label: 'Перше завдання' }] : []),
+    ...(stats.challenges_completed > 0 ? [{ id: 'first-challenge', label: 'Перший challenge' }] : []),
+    ...(stats.quizzes_passed > 0 ? [{ id: 'first-quiz', label: 'Перша перевірка знань' }] : []),
+    ...(data.tier?.min > 0 ? [{ id: `tier-${data.tier.min}`, label: data.tier.name }] : []),
+    ...ctfAwards.filter((award) => award.earned),
+  ];
+  const hidden = new Set(user.profile_hidden_awards || []);
+  root.innerHTML = candidates.length
+    ? candidates.map((award) => `<label class="profile-award-toggle">
+        <input type="checkbox" data-profile-hidden-award="${escapeHtml(award.id)}" ${hidden.has(award.id) ? 'checked' : ''}>
+        <span>${t('Приховати «{award}»', { award: escapeHtml(award.label) })}</span>
+      </label>`).join('')
+    : `<span class="empty-state">${t('Поки немає отриманих нагород.')}</span>`;
+}
+
+function renderLearningHistory(history) {
+  const root = document.getElementById('learning-history');
+  if (!root) return;
+  const submissions = history.submissions || [];
+  const lessons = history.lessons || [];
+  const statusLabels = { review: t('На перевірці'), completed: t('Зараховано') };
+  const assignmentsHtml = submissions.length ? submissions.map((item) => `
+    <article class="learning-history-item">
+      <div class="learning-history-item-head">
+        <h3>${escapeHtml(item.title)}</h3>
+        <span class="status-pill ${item.status}">${statusLabels[item.status] || escapeHtml(item.status)}</span>
+      </div>
+      <p>${escapeHtml(item.group_name || 'Навчальна група')} · ${item.completed_at || item.submitted_at ? formatDue(item.completed_at || item.submitted_at) : 'Дата не вказана'}</p>
+      ${item.submission_note ? `<div class="learning-history-note">${escapeHtml(item.submission_note)}</div>` : ''}
+      ${(item.submission_files || []).length ? `<div class="task-submission-files">${item.submission_files.map((file) => `
+        <a href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer" class="task-submission-file">
+          ${icon(file.mime_type?.startsWith('image/') ? 'image' : 'notes', 'ico ico--xs')}${escapeHtml(file.original_name)}
+        </a>`).join('')}</div>` : ''}
+    </article>`).join('') : `<p class="empty-state">${t('Зданих домашніх завдань поки немає.')}</p>`;
+  const lessonsHtml = lessons.length ? lessons.map((lesson) => `
+    <article class="learning-history-item learning-history-lesson">
+      <h3>${escapeHtml(lesson.title)}</h3>
+      <p>${escapeHtml(lesson.group_name)} · ${formatDue(lesson.lesson_at)}</p>
+      ${lesson.topic ? `<div class="learning-history-note">${escapeHtml(lesson.topic)}</div>` : ''}
+      ${lesson.my_absence ? `<span class="status-pill">${t('Ви повідомили про відсутність')}</span>` : ''}
+    </article>`).join('') : `<p class="empty-state">${t('Минулі заняття з’являться після уроку.')}</p>`;
+  root.innerHTML = `<div class="learning-history-columns">
+    <section><h3>${t('Мої здані домашні завдання')}</h3>${assignmentsHtml}</section>
+    <section><h3>${t('Уроки, що вже відбулися')}</h3>${lessonsHtml}</section>
+  </div>`;
 }
 
 const ALL_TABS = ['home', 'ctf', 'tests', 'lab', 'code', 'article', 'manuals'];
@@ -276,6 +420,7 @@ if (!window.__dashTabsBound) {
     if (activeDashTab === 'home') url.searchParams.delete('tab');
     else url.searchParams.set('tab', activeDashTab);
     history.replaceState(null, '', url);
+    trackPageView();
     setupDashTabs(dashboardData?.canWriteArticles);
     stopCtfActivityPolling();
     if (activeDashTab === 'ctf') loadCtfPanel();
@@ -573,7 +718,7 @@ function renderTaskCard(task) {
 function renderEnrollments(enrollments) {
   const el = document.getElementById('enrollments-list');
   if (!enrollments.length) {
-    el.innerHTML = `<p class="empty-state">${t('Ви ще не записані на програми. Натисніть «+ Записатися».')}</p>`;
+    el.innerHTML = `<p class="empty-state">${t('Заявки на навчання подаються на весь напрям, а не на окремий модуль.')}</p>`;
     return;
   }
 
@@ -829,18 +974,6 @@ function renderBountyLog(log) {
   `).join('');
 }
 
-async function loadPrograms() {
-  const { programs } = await api('/programs');
-  const select = document.getElementById('program-select');
-  const enrolled = new Set((dashboardData?.enrollments || []).map(e => e.program_id));
-
-  select.innerHTML = `<option value="">${t('Оберіть програму')}</option>` +
-    programs
-      .filter(p => !enrolled.has(p.id))
-      .map(p => `<option value="${p.id}">${p.name} (${p.level})</option>`)
-      .join('');
-}
-
 let canUseCode = false;
 
 async function loadDashboard() {
@@ -856,7 +989,6 @@ async function loadDashboard() {
     canUseCode = (await loadSandboxInfo()).canUse;
   } catch { canUseCode = false; }
   renderDashboard(data);
-  await loadPrograms();
 }
 
 const APPLICATION_STATUS_LABELS = {
@@ -882,9 +1014,103 @@ function renderRestrictedDashboard(data) {
     document.getElementById(id).hidden = true;
   });
   document.getElementById('dash-restricted-view').hidden = false;
+  loadSupportCenter();
 
   loadRestrictedDirections();
   loadMyApplications();
+}
+
+function supportDate(value) {
+  return value ? new Date(`${value.replace(' ', 'T')}Z`).toLocaleString(dateLocale(), {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  }) : '';
+}
+
+async function loadSupportCenter() {
+  const panel = document.getElementById('student-support-panel');
+  if (!panel) return;
+  const newForm = document.getElementById('support-new-thread');
+  const replyForm = document.getElementById('support-user-reply');
+  if (!newForm.dataset.bound) {
+    newForm.dataset.bound = '1';
+    newForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = newForm.querySelector('button[type="submit"]');
+      button.disabled = true;
+      try {
+        const created = await api('/support/threads', {
+          method: 'POST',
+          body: JSON.stringify(Object.fromEntries(new FormData(newForm))),
+        });
+        activeSupportThreadId = created.thread.id;
+        newForm.reset();
+        showToast('Звернення надіслано');
+        await loadSupportCenter();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+  if (!replyForm.dataset.bound) {
+    replyForm.dataset.bound = '1';
+    replyForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!activeSupportThreadId) return;
+      const button = replyForm.querySelector('button[type="submit"]');
+      button.disabled = true;
+      try {
+        await api(`/support/threads/${activeSupportThreadId}/replies`, {
+          method: 'POST',
+          body: JSON.stringify({ body: new FormData(replyForm).get('body') }),
+        });
+        replyForm.reset();
+        await loadSupportCenter();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  try {
+    const { threads } = await api('/support/threads');
+    if (!threads.some(thread => thread.id === activeSupportThreadId)) {
+      activeSupportThreadId = threads[0]?.id || null;
+    }
+    document.getElementById('support-user-threads').innerHTML = threads.length
+      ? threads.map(thread => `<button type="button" class="support-user-thread${thread.id === activeSupportThreadId ? ' is-active' : ''}" data-support-user-thread="${thread.id}">
+          <strong>${escapeHtml(thread.subject)}</strong>
+          <span>${escapeHtml(thread.last_message || '')}</span>
+          <small>${thread.unread_user ? 'Нова відповідь · ' : ''}${supportDate(thread.updated_at)}</small>
+        </button>`).join('')
+      : '<p class="empty-state">Поки немає звернень. Напишіть нам — відповідь з’явиться тут.</p>';
+    document.querySelectorAll('[data-support-user-thread]').forEach(button => {
+      button.addEventListener('click', () => {
+        activeSupportThreadId = Number(button.dataset.supportUserThread);
+        loadSupportCenter();
+      });
+    });
+    if (!activeSupportThreadId) {
+      document.getElementById('support-user-messages').innerHTML = '<p class="empty-state">Оберіть звернення або створіть нове.</p>';
+      replyForm.hidden = true;
+      return;
+    }
+    const { thread, messages } = await api(`/support/threads/${activeSupportThreadId}`);
+    document.getElementById('support-user-messages').innerHTML = `<header class="support-user-thread-head">
+      <div><strong>${escapeHtml(thread.subject)}</strong><span>${thread.status === 'closed' ? 'Звернення закрите — нове повідомлення відкриє його знову.' : 'Команда відповість у цьому чаті та на вашу пошту.'}</span></div>
+    </header>${messages.map(message => `<article class="support-message support-message--${message.sender_role}">
+        <div class="support-message-meta"><strong>${message.sender_role === 'owner' ? 'Команда laboratorium.' : 'Ви'}</strong><time>${supportDate(message.created_at)}</time></div>
+        <p>${escapeHtml(message.body)}</p>
+      </article>`).join('')}`;
+    replyForm.hidden = false;
+    const messageList = document.getElementById('support-user-messages');
+    messageList.scrollTop = messageList.scrollHeight;
+  } catch (err) {
+    document.getElementById('support-user-threads').innerHTML = `<p class="empty-state">${escapeHtml(err.message)}</p>`;
+  }
 }
 
 async function loadRestrictedDirections() {
@@ -933,8 +1159,9 @@ if (!window.__restrictedFormBound) {
     try {
       const res = await api('/applications', {
         method: 'POST',
-        body: JSON.stringify({ direction_id: parseInt(direction_id, 10), message }),
+        body: JSON.stringify({ direction_id: parseInt(direction_id, 10), message, ...getAttribution() }),
       });
+      window.labTrackEvent?.('application_submitted');
       e.target.reset();
       showToast(res.message);
       await loadMyApplications();
@@ -951,28 +1178,6 @@ document.getElementById('logout-btn')?.addEventListener('click', () => {
   window.location.href = '/';
 });
 
-document.getElementById('enroll-toggle').addEventListener('click', () => {
-  const form = document.getElementById('enroll-form');
-  form.hidden = !form.hidden;
-});
-
-document.getElementById('enroll-btn').addEventListener('click', async () => {
-  const programId = document.getElementById('program-select').value;
-  if (!programId) return showToast(t('Оберіть програму'), 'error');
-
-  try {
-    const res = await api('/enroll', {
-      method: 'POST',
-      body: JSON.stringify({ programId: parseInt(programId, 10) }),
-    });
-    document.getElementById('enroll-form').hidden = true;
-    await loadDashboard();
-    showToast(res.message);
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-});
-
 document.getElementById('profile-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(e.target);
@@ -982,6 +1187,11 @@ document.getElementById('profile-form').addEventListener('submit', async (e) => 
       body: JSON.stringify({
         name: fd.get('name'),
         handle: fd.get('handle'),
+        profile_bio: fd.get('profile_bio'),
+        profile_public: fd.get('profile_public') === 'on',
+        profile_share_solutions: fd.get('profile_share_solutions') === 'on',
+        profile_hidden_awards: [...document.querySelectorAll('[data-profile-hidden-award]:checked')]
+          .map((input) => input.dataset.profileHiddenAward),
       }),
     });
     setSession(localStorage.getItem('lab_token'), res.user);
@@ -1057,9 +1267,30 @@ function fmtScheduleDate(iso) {
   });
 }
 
+function calendarDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+let studentCalendar = null;
+
+async function loadStudentCalendar() {
+  const root = document.getElementById('student-calendar');
+  if (!root) return;
+  root.setAttribute('aria-label', t('Календар подій учня'));
+  if (!studentCalendar) {
+    studentCalendar = mountUnifiedCalendar(root, {
+      locale: dateLocale(),
+      t,
+      fetchEvents: async (month) => (await api(`/calendar/events?month=${encodeURIComponent(month)}`)).events,
+    });
+  }
+  await studentCalendar.load();
+}
+
 async function loadSchedule() {
   const el = document.getElementById('schedule-list');
   if (!el) return;
+  loadStudentCalendar();
   el.innerHTML = `<p class="empty-state">${t('Завантаження...')}</p>`;
   try {
     const { lessons } = await api('/schedule');
@@ -1082,6 +1313,7 @@ async function loadSchedule() {
             <strong>${escapeHtml(l.title)}</strong>
             <div class="sched-dash-meta">${fmtScheduleDate(l.lesson_at)} · ${escapeHtml(l.group_name)} · ${t('{min} хв', { min: l.duration_minutes })}</div>
             ${l.topic ? `<div class="sched-dash-topic">${escapeHtml(l.topic)}</div>` : ''}
+            ${l.is_exception ? '<div class="sched-dash-reported">Перенесене заняття</div>' : ''}
             ${reported ? `<div class="sched-dash-reported">${t('Ви повідомили про відсутність: «{reason}»', { reason: escapeHtml(l.my_absence.reason) })}</div>` : ''}
           </div>
           ${!reported ? `<button type="button" class="btn btn--outline btn--sm sched-absence-btn" data-id="${l.id}" data-title="${escapeHtml(l.title)}">${t('Не зможу бути')}</button>` : `<span class="status-pill stopped">${t('відсутність')}</span>`}
@@ -1645,8 +1877,80 @@ if (!window.__labSubtabsBound) {
     document.querySelectorAll('.lab-subtab').forEach(t => t.classList.toggle('active', t === tab));
     document.getElementById('lab-panel-vm').hidden = tab.dataset.lab !== 'vm';
     document.getElementById('lab-panel-docker').hidden = tab.dataset.lab !== 'docker';
+    document.getElementById('lab-panel-tools').hidden = tab.dataset.lab !== 'tools';
   });
 }
+
+function setLocalToolOutput(id, value) {
+  const output = document.getElementById(id);
+  if (output) output.textContent = value;
+}
+
+function textToBase64(value) {
+  const bytes = new TextEncoder().encode(value);
+  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+  return btoa(binary);
+}
+
+function base64ToText(value) {
+  const binary = atob(value.trim());
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+}
+
+document.getElementById('tool-url-encode')?.addEventListener('click', () => {
+  setLocalToolOutput('tool-url-output', encodeURIComponent(document.getElementById('tool-url-input').value));
+});
+document.getElementById('tool-url-decode')?.addEventListener('click', () => {
+  try {
+    setLocalToolOutput('tool-url-output', decodeURIComponent(document.getElementById('tool-url-input').value));
+  } catch {
+    setLocalToolOutput('tool-url-output', t('Не вдалося декодувати: перевірте формат рядка.'));
+  }
+});
+document.getElementById('tool-base64-encode')?.addEventListener('click', () => {
+  try {
+    setLocalToolOutput('tool-base64-output', textToBase64(document.getElementById('tool-base64-input').value));
+  } catch {
+    setLocalToolOutput('tool-base64-output', t('Не вдалося закодувати текст.'));
+  }
+});
+document.getElementById('tool-base64-decode')?.addEventListener('click', () => {
+  try {
+    setLocalToolOutput('tool-base64-output', base64ToText(document.getElementById('tool-base64-input').value));
+  } catch {
+    setLocalToolOutput('tool-base64-output', t('Некоректний Base64 або текст не є UTF-8.'));
+  }
+});
+document.getElementById('tool-hash-run')?.addEventListener('click', async () => {
+  try {
+    const value = document.getElementById('tool-hash-input').value;
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    setLocalToolOutput('tool-hash-output', [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, '0')).join(''));
+  } catch {
+    setLocalToolOutput('tool-hash-output', t('SHA-256 недоступний у цьому браузері.'));
+  }
+});
+document.getElementById('tool-headers-check')?.addEventListener('click', () => {
+  const headers = new Map(document.getElementById('tool-headers-input').value.split(/\r?\n/)
+    .map((line) => line.match(/^\s*([^:]+)\s*:\s*(.*)$/))
+    .filter(Boolean)
+    .map((match) => [match[1].toLowerCase(), match[2]]));
+  const checks = [
+    [t('Content-Security-Policy'), headers.has('content-security-policy')],
+    [t('Strict-Transport-Security'), headers.has('strict-transport-security')],
+    [t('X-Content-Type-Options: nosniff'), headers.get('x-content-type-options')?.toLowerCase() === 'nosniff'],
+    [t('Захист від вбудовування (frame-ancestors або X-Frame-Options)'), headers.has('x-frame-options')
+      || /frame-ancestors/i.test(headers.get('content-security-policy') || '')],
+    [t('Secure / HttpOnly у Set-Cookie (якщо є cookies)'), !headers.has('set-cookie')
+      || /;\s*secure/i.test(headers.get('set-cookie')) && /;\s*httponly/i.test(headers.get('set-cookie'))],
+  ];
+  const output = document.getElementById('tool-headers-output');
+  output.innerHTML = `<ul class="lab-tool-checklist">${checks.map(([label, passed]) => `
+    <li class="${passed ? 'is-ok' : 'is-review'}"><span aria-hidden="true">${passed ? '✓' : '!'}</span>${label}</li>
+  `).join('')}</ul><p>${t('Це навчальна підказка, а не повний аудит конфігурації.')}</p>`;
+});
 
 document.getElementById('docker-deploy-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1667,3 +1971,47 @@ document.getElementById('docker-deploy-form')?.addEventListener('submit', async 
 });
 
 window.addEventListener('localechange', () => loadDashboard());
+
+function initDashSections() {
+  const links = [...document.querySelectorAll('.dash-jump-btn')];
+  const panelFor = (link) => document.querySelector(link.getAttribute('href'));
+  const panels = links.map(panelFor).filter(Boolean);
+  const referral = document.getElementById('student-referral-panel');
+  if (referral && !panels.includes(referral)) panels.push(referral);
+  const hero = document.querySelector('.dash-hero');
+  hero?.classList.add('dash-sections-ready');
+
+  function open(target) {
+    panels.forEach((panel) => panel.classList.toggle('dash-section-closed', panel !== target));
+    links.forEach((link) => {
+      const active = panelFor(link) === target;
+      link.classList.toggle('is-active', active);
+      link.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  function sync() {
+    links.forEach((link) => {
+      const target = panelFor(link);
+      link.hidden = !target || target.hidden;
+    });
+  }
+
+  links.forEach((link) => link.addEventListener('click', (event) => {
+    event.preventDefault();
+    const target = panelFor(link);
+    const isOpen = target && !target.classList.contains('dash-section-closed');
+    open(isOpen ? null : target);
+  }));
+  document.querySelectorAll('a.profile-invite-link').forEach((link) => link.addEventListener('click', (event) => {
+    event.preventDefault();
+    open(referral);
+  }));
+
+  [document.getElementById('group-content-panel'), referral].forEach((el) => {
+    if (el) new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  });
+  sync();
+  open(panels[0] || null);
+}
+initDashSections();

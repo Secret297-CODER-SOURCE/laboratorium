@@ -100,6 +100,12 @@ export const config = {
     resetTokenHours: envInt('RESET_TOKEN_HOURS', 24),
   },
 
+  googleOAuth: {
+    clientId: env('GOOGLE_OAUTH_CLIENT_ID', ''),
+    clientSecret: env('GOOGLE_OAUTH_CLIENT_SECRET', ''),
+    redirectUri: env('GOOGLE_OAUTH_REDIRECT_URI', `${env('APP_URL', 'https://laboratorium.club').replace(/\/+$/, '')}/api/auth/google/callback`),
+  },
+
   smtp: {
     host: env('SMTP_HOST', ''),
     port: envInt('SMTP_PORT', 587),

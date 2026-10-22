@@ -240,7 +240,6 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  outline: none;
   font-size: 0.85rem;
 }
 

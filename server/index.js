@@ -7,6 +7,7 @@ import { ensureCtfImageBuilt, isAgentEnabled } from './services/lab-agent.servic
 import { startBackupScheduler } from './services/backup-scheduler.service.js';
 import { setIo as setNotificationIo } from './services/notification.service.js';
 import { startBillingReminderScheduler } from './services/billing-reminder.service.js';
+import { startCtfCalendarScheduler } from './services/calendar.service.js';
 import * as errorLogService from './services/error-log.service.js';
 
 const app = createApp();
@@ -41,6 +42,7 @@ server.listen(config.port, config.host, () => {
 
   startBackupScheduler();
   startBillingReminderScheduler();
+  startCtfCalendarScheduler();
 });
 
 function shutdown(signal) {

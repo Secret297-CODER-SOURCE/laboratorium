@@ -1,6 +1,8 @@
 import { api, initTheme } from '/auth.js';
 import { icon } from '/icons.js';
+import { getAttribution } from '/marketing-attribution.js';
 import { getCurrentAccentColor } from '/theme-engine.js';
+import { trackEvent } from '/analytics.js';
 
 try {
   initTheme();
@@ -10,14 +12,14 @@ try {
 
 const terminal = document.getElementById('terminal');
 const lines = [
-  { type: 'prompt', text: '$ nmap -sV target.lab' },
-  { type: 'output', text: 'PORT   STATE SERVICE' },
-  { type: 'output', text: '22/tcp open  ssh' },
-  { type: 'output', text: '80/tcp open  http' },
-  { type: 'output', text: '443/tcp open https' },
-  { type: 'prompt', text: '$ ./exploit.py --target 10.0.0.1' },
-  { type: 'output', text: '[+] Shell obtained!' },
-  { type: 'output', text: '[+] Bounty +150 pts' },
+  { type: 'prompt', text: '$ lab status --scope training-net' },
+  { type: 'output', text: 'Environment: isolated training lab' },
+  { type: 'output', text: 'Network: no external targets' },
+  { type: 'output', text: 'Exercise: review sample security events' },
+  { type: 'output', text: 'Result: findings documented for instructor review' },
+  { type: 'prompt', text: '$ submit-lab-report --check' },
+  { type: 'output', text: '[ok] Scope and evidence documented' },
+  { type: 'output', text: '[ok] Recommendations ready for review' },
 ];
 
 let lineIdx = 0, charIdx = 0, currentEl = null;
@@ -118,7 +120,7 @@ async function loadLeaderboard() {
       el.innerHTML = '<li class="leaderboard-empty">Рейтинг поки порожній</li>';
       return;
     }
-    el.innerHTML = top.map(u => `<li><span class="rank">${String(u.rank).padStart(2, '0')}</span><span class="name">@${escHtml(u.handle)}</span><span class="pts">${u.bounty_points.toLocaleString('uk-UA')}</span></li>`).join('');
+    el.innerHTML = top.map(u => `<li><span class="rank">${String(u.rank).padStart(2, '0')}</span><span class="name">${u.profile_public ? `<a href="/student-profile.html?handle=${encodeURIComponent(u.handle)}">@${escHtml(u.handle)}</a>` : `@${escHtml(u.handle)}`}</span><span class="pts">${u.bounty_points.toLocaleString('uk-UA')}</span></li>`).join('');
   } catch {
     el.innerHTML = '<li class="leaderboard-empty">Рейтинг тимчасово недоступний</li>';
   }
@@ -143,9 +145,11 @@ document.getElementById('contact-form')?.addEventListener('submit', async e => {
         name: fd.get('name'),
         email: fd.get('email'),
         direction_id: parseInt(fd.get('direction_id'), 10),
-        message: fd.get('message'),
+        phone: fd.get('phone'),
+        ...getAttribution(),
       }),
     });
+    trackEvent('application_submitted');
     btn.innerHTML = `${icon('check', 'ico ico--sm')}Заявку прийнято`; e.target.reset();
     setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
   } catch (err) {

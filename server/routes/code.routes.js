@@ -10,10 +10,13 @@ router.use(authRequired);
 router.get('/info', asyncHandler(codeCtrl.getSandboxInfo));
 router.get('/workspaces', asyncHandler(codeCtrl.listWorkspaces));
 router.post('/workspaces', asyncHandler(codeCtrl.createWorkspace));
+router.get('/workspaces/:id/git', asyncHandler(codeCtrl.getGitStatus));
+router.post('/workspaces/:id/git/commit', asyncHandler(codeCtrl.createGitCommit));
 router.get('/workspaces/:id', asyncHandler(codeCtrl.getWorkspace));
 router.put('/workspaces/:id/files', asyncHandler(codeCtrl.saveWorkspaceFiles));
 router.delete('/workspaces/:id', asyncHandler(codeCtrl.deleteWorkspace));
 router.post('/workspaces/:id/run', asyncHandler(codeCtrl.runWorkspace));
+router.post('/workspaces/:id/test', asyncHandler(codeCtrl.runWorkspaceTests));
 router.post('/workspaces/:id/run-web', asyncHandler(codeCtrl.runWorkspaceWeb));
 router.post('/workspaces/:id/stop-web', asyncHandler(codeCtrl.stopWorkspaceWeb));
 

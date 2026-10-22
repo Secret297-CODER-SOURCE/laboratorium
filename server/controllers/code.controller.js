@@ -29,12 +29,31 @@ export async function saveWorkspaceFiles(req, res) {
 }
 
 export async function deleteWorkspace(req, res) {
-  const result = codeService.remove(req.user.id, parseInt(req.params.id, 10));
+  const result = await codeService.remove(req.user.id, parseInt(req.params.id, 10));
+  res.json(result);
+}
+
+export async function getGitStatus(req, res) {
+  const status = await codeService.getGitStatus(req.user.id, parseInt(req.params.id, 10));
+  res.json({ status });
+}
+
+export async function createGitCommit(req, res) {
+  const result = await codeService.createGitCommit(
+    req.user.id,
+    parseInt(req.params.id, 10),
+    req.body.message,
+  );
   res.json(result);
 }
 
 export async function runWorkspace(req, res) {
   const run = await codeService.run(req.user.id, parseInt(req.params.id, 10));
+  res.json({ run });
+}
+
+export async function runWorkspaceTests(req, res) {
+  const run = await codeService.runTests(req.user.id, parseInt(req.params.id, 10));
   res.json({ run });
 }
 

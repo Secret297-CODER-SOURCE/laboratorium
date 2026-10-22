@@ -45,6 +45,10 @@
         </label>
         <button type="submit" class="btn btn--primary btn--full" data-i18n="Увійти">Увійти</button>
       </form>
+      <button class="btn btn--outline btn--full google-login" id="google-login" type="button" aria-label="Увійти за допомогою Google" disabled>
+        <span class="google-login-mark" aria-hidden="true">G</span>Продовжити з Google
+      </button>
+      <p class="google-login-note" id="google-login-note">Вхід через Google ще не налаштовано на сервері.</p>
       <p class="auth-footer">
         <a href="/forgot-password.html" data-i18n="Забули пароль?">Забули пароль?</a>
         ·
@@ -56,6 +60,7 @@
   <script type="module">
     import { api, setSession, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
     import { initI18n, t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
+    import { getAnalyticsAttribution, trackEvent, withAnalyticsAttribution } from '/analytics.js';
     initTheme();
     initI18n();
     document.getElementById('auth-lang-switch').innerHTML = renderLangSwitch();
@@ -68,10 +73,50 @@
     const params = new URLSearchParams(location.search);
 
     (async () => {
+      const googleCode = params.get('google_code');
+      if (googleCode) {
+        try {
+          const callbackAttribution = getAnalyticsAttribution(
+            new URL(params.get('next') || '/portal.html', location.origin).search,
+          );
+          const data = await api('/auth/google/complete', {
+            method: 'POST',
+            body: JSON.stringify({ code: googleCode }),
+          });
+          setSession(data.token, data.user);
+          trackEvent('login', '', callbackAttribution);
+          window.location.replace(resolveLoginRedirect(params.get('next') || data.next, data.user.role));
+          return;
+        } catch (err) {
+          const el = document.getElementById('form-error');
+          el.textContent = err.message;
+          el.hidden = false;
+        }
+      }
+
+      if (params.has('google_error')) {
+        const el = document.getElementById('form-error');
+        el.textContent = 'Не вдалося підтвердити вхід через Google. Спробуйте ще раз.';
+        el.hidden = false;
+      }
+
       if (await validateSession()) {
         window.location.replace(resolveLoginRedirect(params.get('next'), getUser()?.role));
         return;
       }
+
+      const googleButton = document.getElementById('google-login');
+      googleButton.addEventListener('click', () => {
+        if (googleButton.dataset.destination) window.location.assign(googleButton.dataset.destination);
+      });
+      api('/auth/google/status').then(({ enabled }) => {
+        const next = withAnalyticsAttribution(params.get('next') || '/portal.html');
+        googleButton.dataset.destination = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
+        googleButton.disabled = !enabled;
+        document.getElementById('google-login-note').hidden = !!enabled;
+      }).catch((err) => {
+        console.warn('Google sign-in availability check failed:', err);
+      });
 
       checkServerReady().then(ok => {
         if (!ok) {
@@ -101,6 +146,7 @@
             body: JSON.stringify({ login: fd.get('login'), password: fd.get('password') }),
           });
           setSession(data.token, data.user);
+          trackEvent('login');
           window.location.replace(resolveLoginRedirect(params.get('next'), data.user.role));
         } catch (err) {
           errEl.textContent = err.message;
@@ -111,5 +157,6 @@
       });
     })();
   </script>
+  <script type="module" src="/analytics.js"></script>
 </body>
 </html>

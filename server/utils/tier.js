@@ -14,6 +14,13 @@ export function getNextTier(points) {
 
 export function sanitizeUser(user) {
   const tier = getTier(user.bounty_points);
+  let hiddenAwards = [];
+  try {
+    const parsed = JSON.parse(user.profile_hidden_awards || '[]');
+    if (Array.isArray(parsed)) hiddenAwards = parsed.filter((id) => typeof id === 'string');
+  } catch {
+    hiddenAwards = [];
+  }
   return {
     id: user.id,
     email: user.email,
@@ -23,6 +30,10 @@ export function sanitizeUser(user) {
     bounty_points: user.bounty_points,
     tier: tier.name,
     is_restricted: !!user.is_restricted,
+    profile_public: user.profile_public !== 0,
+    profile_bio: user.profile_bio || '',
+    profile_hidden_awards: hiddenAwards,
+    profile_share_solutions: user.profile_share_solutions === 1,
     created_at: user.created_at,
   };
 }

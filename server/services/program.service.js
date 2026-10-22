@@ -32,7 +32,7 @@ export function getAll() {
 
 export function getAllAdmin() {
   return db.prepare(`
-    SELECT p.*, d.name as direction_name
+    SELECT p.*, d.name as direction_name, d.slug as direction_slug
     FROM programs p
     LEFT JOIN directions d ON d.id = p.direction_id
     ORDER BY p.sort_order, p.id
@@ -44,12 +44,9 @@ export function getById(id) {
 }
 
 /**
- * Programs a student may newly discover/enroll in: excludes programs under
- * a closed direction (direction.is_active = 0) or one denied for this user
- * via a tab-access rule. Deliberately NOT used for already-enrolled
- * students (getEnrollments) or for teacher/owner group management (getAll)
- * — closing a direction must stop *new* engagement without touching
- * existing enrollments or groups already tied to it.
+ * Student catalogue visibility excludes programs under a closed direction
+ * or one denied via a tab-access rule. Applications are made for a direction;
+ * this list does not grant self-enrollment in an individual program block.
  */
 export function getAvailableForEnrollment(user) {
   return getAll().filter((p) => {
@@ -71,22 +68,10 @@ export function getEnrollments(userId) {
 }
 
 export function enroll(userId, programId, user) {
-  const program = getById(programId);
-  if (!program || !program.is_active) return { error: 'not_found' };
-  if (program.direction_id) {
-    const direction = directionService.getById(program.direction_id);
-    if (direction && !direction.is_active) return { error: 'not_found' };
-    if (!tabAccessService.isDirectionAllowed(user, program.direction_id)) return { error: 'not_found' };
-  }
-
-  const existing = db.prepare('SELECT id FROM enrollments WHERE user_id = ? AND program_id = ?')
-    .get(userId, programId);
-  if (existing) return { error: 'conflict' };
-
-  db.prepare(`INSERT INTO enrollments (user_id, program_id, progress, status) VALUES (?, ?, 0, 'active')`)
-    .run(userId, programId);
-
-  return { program };
+  void userId;
+  void programId;
+  void user;
+  throw new ValidationError('Подайте заявку на весь напрямок, а не на окремий навчальний блок');
 }
 
 export function updateProgress(userId, enrollmentId, progress) {

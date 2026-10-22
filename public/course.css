@@ -1,6 +1,6 @@
 .course-hero {
   position: relative;
-  padding: 64px 0 0;
+  padding: 104px 0 0;
   overflow: hidden;
 }
 
@@ -22,13 +22,28 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--prog-accent, var(--accent)) 45%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--prog-accent, var(--accent)) 10%, var(--bg-card));
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
   margin-bottom: 28px;
+  transition: border-color var(--transition), background var(--transition), color var(--transition);
 }
 
-.course-back:hover { color: var(--prog-accent, var(--accent)); }
+.course-back:hover {
+  border-color: var(--prog-accent, var(--accent));
+  background: color-mix(in srgb, var(--prog-accent, var(--accent)) 16%, var(--bg-card));
+  color: var(--prog-accent, var(--accent));
+}
+
+.course-back:focus-visible {
+  outline: 2px solid var(--prog-accent, var(--accent));
+  outline-offset: 3px;
+}
 
 .course-hero-top {
   display: flex;
@@ -120,6 +135,7 @@
 .course-level-seg:nth-child(1) { height: 10px; }
 .course-level-seg:nth-child(2) { height: 15px; }
 .course-level-seg:nth-child(3) { height: 20px; }
+.course-level-seg:nth-child(4) { height: 25px; }
 
 .course-level-seg.is-on {
   background: var(--prog-accent, var(--accent));
@@ -173,7 +189,133 @@
 .course-hero--empty .btn { margin: 0 auto; }
 
 @media (max-width: 640px) {
-  .course-hero { padding-top: 40px; }
+  .course-hero { padding-top: 84px; }
   .course-hero-top { flex-direction: column; align-items: flex-start; gap: 14px; }
   .course-stats { gap: 20px; }
+  .course-actions > .btn { flex: 1 1 100%; justify-content: center; }
+}
+.manual-comments {
+  max-width: 920px;
+  padding-top: 24px;
+  padding-bottom: 64px;
+}
+
+.manual-comments-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.manual-comments-head h2 {
+  margin: 8px 0 0;
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
+}
+
+.manual-comments-head > p {
+  max-width: 320px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.manual-comments-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.manual-comment,
+.manual-comments-empty {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+
+.manual-comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.manual-comment-meta time {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+
+.manual-comment > p {
+  margin: 10px 0 0;
+  color: var(--text);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.manual-comment-delete {
+  margin-top: 10px;
+  padding: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.manual-comment-delete:hover { color: var(--accent); }
+
+.manual-comment-form {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+}
+
+.manual-comment-form label {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.manual-comment-form textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.manual-comment-submit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.manual-comment-submit > span {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+
+.manual-comment-error {
+  margin: 0;
+  color: #ff6b7a;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 600px) {
+  .manual-comments-head { align-items: start; flex-direction: column; gap: 8px; }
+  .manual-comment-submit { align-items: flex-end; flex-direction: column; }
+  .manual-comment-submit .btn { width: 100%; }
 }

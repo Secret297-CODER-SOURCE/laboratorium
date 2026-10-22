@@ -242,3 +242,47 @@ export function returnToDraft(actorId, actorRole, id) {
   }
   return getById(id);
 }
+
+function assertManualCommentAccess(manualId, userId, userRole) {
+  const visible = listPublished(userId, userRole).some((manual) => manual.id === manualId);
+  if (!visible) throw new NotFoundError('Мануал не знайдено');
+}
+
+export function listComments(manualId, userId, userRole) {
+  assertManualCommentAccess(manualId, userId, userRole);
+  return db.prepare(`
+    SELECT c.id, c.manual_id, c.user_id, c.body, c.created_at,
+      u.handle, u.name
+    FROM manual_comments c
+    LEFT JOIN users u ON u.id = c.user_id
+    WHERE c.manual_id = ?
+    ORDER BY c.created_at, c.id
+  `).all(manualId);
+}
+
+export function addComment(manualId, userId, userRole, body) {
+  assertManualCommentAccess(manualId, userId, userRole);
+  const text = String(body || '').trim();
+  if (!text) throw new ValidationError('Напишіть коментар');
+  if (text.length > 2000) throw new ValidationError('Коментар має містити не більше 2000 символів');
+
+  const result = db.prepare(`
+    INSERT INTO manual_comments (manual_id, user_id, body)
+    VALUES (?, ?, ?)
+  `).run(manualId, userId, text);
+  return db.prepare(`
+    SELECT c.id, c.manual_id, c.user_id, c.body, c.created_at,
+      u.handle, u.name
+    FROM manual_comments c
+    LEFT JOIN users u ON u.id = c.user_id
+    WHERE c.id = ?
+  `).get(result.lastInsertRowid);
+}
+
+export function deleteComment(commentId, userId, userRole) {
+  const comment = db.prepare('SELECT id, manual_id, user_id FROM manual_comments WHERE id = ?').get(commentId);
+  if (!comment) throw new NotFoundError('Коментар не знайдено');
+  assertManualCommentAccess(comment.manual_id, userId, userRole);
+  if (comment.user_id !== userId && !isStaffRole(userRole)) throw new ForbiddenError();
+  db.prepare('DELETE FROM manual_comments WHERE id = ?').run(commentId);
+}

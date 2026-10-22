@@ -4,6 +4,7 @@ import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, pageAllowed } from '/tab-access.js';
 import { initNumberInputs } from '/number-inputs.js';
+import { mountUnifiedCalendar } from '/unified-calendar.js';
 
 initTheme();
 initNumberInputs();
@@ -26,15 +27,16 @@ if (!(await requireUnrestrictedAsync())) throw new Error('auth');
 const MONTHS = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const DAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 
-let calYear = new Date().getFullYear();
-let calMonth = new Date().getMonth();
+const unifiedCalendar = mountUnifiedCalendar(document.getElementById('unified-calendar'), {
+  fetchEvents: async (month) => (await api(`/calendar/events?month=${encodeURIComponent(month)}`)).events,
+});
 let allConferences = [];
 let teacherRequiresGroup = false;
 
 async function loadConferences() {
   const { conferences } = await api('/conferences');
   allConferences = conferences;
-  renderCalendar();
+  unifiedCalendar.load();
   renderUpcoming();
   renderAll();
 }
@@ -108,50 +110,6 @@ function confCardHTML(c) {
   </article>`;
 }
 
-function renderCalendar() {
-  document.getElementById('cal-title').textContent = `${MONTHS[calMonth]} ${calYear}`;
-
-  const first = new Date(calYear, calMonth, 1);
-  const last = new Date(calYear, calMonth + 1, 0);
-  let startDow = (first.getDay() + 6) % 7;
-
-  let html = DAYS_SHORT.map(d => `<div class="cal-day-label">${d}</div>`).join('');
-
-  const today = new Date();
-
-  for (let i = 0; i < startDow; i++) {
-    const d = new Date(calYear, calMonth, -startDow + 1 + i);
-    html += `<div class="cal-day other-month"><div class="cal-day-num">${d.getDate()}</div></div>`;
-  }
-
-  for (let d = 1; d <= last.getDate(); d++) {
-    const date = new Date(calYear, calMonth, d);
-    const isToday = date.toDateString() === today.toDateString();
-    const dayConfs = allConferences.filter(c => {
-      const cd = new Date(c.scheduled_at);
-      return cd.getFullYear() === calYear && cd.getMonth() === calMonth && cd.getDate() === d;
-    });
-
-    const events = dayConfs.map(c =>
-      `<a class="cal-event ${c.status}" href="/room.html?id=${c.id}" title="${c.title}">
-        ${String(new Date(c.scheduled_at).getHours()).padStart(2,'0')}:${String(new Date(c.scheduled_at).getMinutes()).padStart(2,'0')} ${c.title}
-      </a>`
-    ).join('');
-
-    html += `<div class="cal-day ${isToday ? 'today' : ''}">
-      <div class="cal-day-num">${d}</div>
-      ${events}
-    </div>`;
-  }
-
-  const remaining = 42 - startDow - last.getDate();
-  for (let i = 1; i <= remaining; i++) {
-    html += `<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
-  }
-
-  document.getElementById('calendar-grid').innerHTML = html;
-}
-
 function renderUpcoming() {
   const upcoming = allConferences
     .filter(c => (c.status === 'scheduled' || c.status === 'live') && new Date(c.scheduled_at) >= new Date(Date.now() - 3600000))
@@ -178,18 +136,6 @@ document.querySelectorAll('.conf-tab').forEach(btn => {
     const tab = btn.dataset.tab;
     document.getElementById(`tab-${tab}`).hidden = false;
   });
-});
-
-document.getElementById('cal-prev').addEventListener('click', () => {
-  calMonth--;
-  if (calMonth < 0) { calMonth = 11; calYear--; }
-  renderCalendar();
-});
-
-document.getElementById('cal-next').addEventListener('click', () => {
-  calMonth++;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
-  renderCalendar();
 });
 
 const modal = document.getElementById('create-modal');

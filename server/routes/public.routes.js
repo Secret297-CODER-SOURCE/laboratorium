@@ -24,6 +24,7 @@ router.get('/qr', asyncHandler(apiCtrl.getSiteQr));
 router.get('/directions', asyncHandler(apiCtrl.getDirections));
 router.get('/programs/:id/page', asyncHandler(apiCtrl.getPublicProgramPage));
 router.post('/applications', optionalAuth, asyncHandler(apiCtrl.submitApplication));
+router.post('/analytics/events', optionalAuth, asyncHandler(apiCtrl.recordAnalyticsEvent));
 router.post('/client-error', clientErrorLimiter, optionalAuth, asyncHandler(apiCtrl.reportClientError));
 
 export default router;

@@ -3,19 +3,17 @@
 // to Ukrainian instead of breaking. Adding a language = adding one dictionary file.
 
 import { en } from '/i18n-en.js';
-import { ru } from '/i18n-ru.js';
 
 export const LOCALES = [
   { code: 'uk', label: 'UA', name: 'Українська' },
   { code: 'en', label: 'EN', name: 'English' },
-  { code: 'ru', label: 'RU', name: 'Русский' },
 ];
 
 const STORAGE_KEY = 'lab_locale';
 const DEFAULT_LOCALE = 'uk';
 const SUPPORTED = LOCALES.map(l => l.code);
 
-const DICTS = { en, ru };
+const DICTS = { en };
 
 export function registerStrings(locale, entries) {
   if (!DICTS[locale]) DICTS[locale] = {};
@@ -82,7 +80,7 @@ export function setLocale(locale) {
 }
 
 export function renderLangSwitch() {
-  return `<select class="lang-switch" id="lang-switch" aria-label="Мова / Language / Язык">
+  return `<select class="lang-switch" id="lang-switch" aria-label="Мова / Language">
     ${LOCALES.map(l => `<option value="${l.code}"${l.code === currentLocale ? ' selected' : ''}>${l.label}</option>`).join('')}
   </select>`;
 }

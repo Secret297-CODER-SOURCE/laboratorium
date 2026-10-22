@@ -14,6 +14,7 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/dashboard.css">
+  <link rel="stylesheet" href="/unified-calendar.css">
   <link rel="stylesheet" href="/icons.css">
   <link rel="stylesheet" href="/vendor/codemirror/lib/codemirror.css">
   <link rel="stylesheet" href="/vendor/codemirror/theme/material-darker.css">
@@ -69,6 +70,64 @@
             <span class="dash-stat-label" data-i18n="програм">програм</span>
           </div>
         </div>
+        <div class="dash-profile-actions">
+          <a class="btn btn--outline btn--sm profile-public-link" id="public-profile-link" href="#" hidden>Мій профіль для спільноти</a>
+          <a class="btn btn--primary btn--sm profile-invite-link" href="#student-referral-panel">Запросити друга</a>
+        </div>
+      </section>
+
+      <nav class="dash-jump" id="dash-jump" aria-label="Розділи кабінету">
+        <a class="dash-jump-btn" href="#learning-history-panel" data-i18n="Моя історія навчання">Моя історія навчання</a>
+        <a class="dash-jump-btn" href="#schedule-panel" data-i18n="Розклад занять">Розклад занять</a>
+        <a class="dash-jump-btn" href="#tasks-panel" data-i18n="Мої задачі">Мої задачі</a>
+        <a class="dash-jump-btn" href="#conferences-panel" data-i18n="Майбутні конференції">Майбутні конференції</a>
+        <a class="dash-jump-btn" href="#group-content-panel" data-i18n="Матеріали груп">Матеріали груп</a>
+        <a class="dash-jump-btn" href="#enrollments-panel" data-i18n="Мої програми">Мої програми</a>
+        <a class="dash-jump-btn" href="#challenges-panel">Challenges</a>
+        <a class="dash-jump-btn" href="#student-achievements-panel" data-i18n="Досягнення">Досягнення</a>
+        <a class="dash-jump-btn" href="#bounty-panel" data-i18n="Історія bounty">Історія bounty</a>
+        <a class="dash-jump-btn" href="#student-referral-panel" data-i18n="Запросити друга">Запросити друга</a>
+        <a class="dash-jump-btn" href="#student-support-panel" data-i18n="Повідомлення команді">Повідомлення команді</a>
+        <a class="dash-jump-btn" href="#profile-panel" data-i18n="Профіль">Профіль</a>
+      </nav>
+
+      <section class="dash-panel referral-panel" id="student-referral-panel">
+        <div class="panel-header"><h2>Запросити друга</h2></div>
+        <p id="student-referral-description" class="empty-state" style="text-align:left;padding:0"></p>
+        <div class="student-referral-program-list" id="student-referral-program-list"></div>
+        <div class="referral-summary" id="student-referral-summary"></div>
+        <div id="student-referral-applications"></div>
+      </section>
+
+      <section class="dash-panel support-student-panel" id="student-support-panel">
+        <div class="panel-header"><div><h2>Повідомлення команді</h2><p>Створіть звернення та продовжуйте листування тут. Відповідь також прийде на вашу пошту.</p></div></div>
+        <form id="support-new-thread" class="support-new-form">
+          <label>Тема<input class="admin-inp" name="subject" required maxlength="160" placeholder="Наприклад, питання щодо заняття"></label>
+          <label>Повідомлення<textarea class="admin-inp" name="body" required maxlength="5000" rows="3" placeholder="Опишіть, чим можемо допомогти"></textarea></label>
+          <button type="submit" class="btn btn--primary btn--sm">Надіслати звернення</button>
+        </form>
+        <div class="support-student-layout">
+          <div class="support-student-threads" id="support-user-threads" aria-label="Мої звернення"></div>
+          <div class="support-user-conversation">
+            <div id="support-user-messages" class="support-message-list" aria-live="polite">
+              <p class="empty-state">Оберіть звернення або створіть нове.</p>
+            </div>
+            <form id="support-user-reply" class="support-reply-form" hidden>
+              <textarea class="admin-inp" name="body" rows="3" maxlength="5000" required placeholder="Напишіть відповідь…"></textarea>
+              <button type="submit" class="btn btn--outline btn--sm">Надіслати повідомлення</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="dash-panel student-achievements-panel" id="student-achievements-panel" aria-labelledby="student-achievements-title">
+        <div class="panel-header">
+          <div>
+            <h2 id="student-achievements-title">Картки досягнень CTF</h2>
+            <p>Відзнаки відкриваються після повного проходження CTF у відповідній категорії. Вони не додають bounty-балів.</p>
+          </div>
+        </div>
+        <div class="student-achievement-grid" id="student-achievements" aria-live="polite"></div>
       </section>
 
       <div class="tier-progress-wrap" id="tier-progress-wrap">
@@ -83,7 +142,7 @@
 
       <div class="dash-grid">
         <!-- Upcoming conferences -->
-        <section class="dash-panel dash-panel--wide">
+        <section class="dash-panel dash-panel--wide" id="conferences-panel">
           <div class="panel-header">
             <h2 data-i18n="Майбутні конференції">Майбутні конференції</h2>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -97,17 +156,20 @@
         </section>
 
         <!-- Schedule -->
-        <section class="dash-panel dash-panel--wide">
+        <section class="dash-panel dash-panel--wide" id="schedule-panel">
           <div class="panel-header">
             <h2 data-i18n="Розклад занять">Розклад занять</h2>
           </div>
+          <section class="student-calendar" id="student-calendar" aria-label="Календар подій учня" aria-live="polite">
+            <p class="empty-state">Завантаження календаря...</p>
+          </section>
           <div id="schedule-list">
             <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
           </div>
         </section>
 
         <!-- Tasks -->
-        <section class="dash-panel dash-panel--wide">
+        <section class="dash-panel dash-panel--wide" id="tasks-panel">
           <div class="panel-header">
             <h2 data-i18n="Мої задачі">Мої задачі</h2>
             <div class="task-stats" id="task-stats"></div>
@@ -115,6 +177,16 @@
           <div class="tasks-kanban" id="tasks-kanban">
             <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
           </div>
+        </section>
+
+        <section class="dash-panel dash-panel--wide learning-history-panel" id="learning-history-panel" aria-labelledby="learning-history-title">
+          <div class="panel-header">
+            <div>
+              <h2 id="learning-history-title" data-i18n="Моя історія навчання">Моя історія навчання</h2>
+              <p data-i18n="Тут видно лише ваші здані домашні завдання та заняття, що вже відбулися.">Тут видно лише ваші здані домашні завдання та заняття, що вже відбулися.</p>
+            </div>
+          </div>
+          <div id="learning-history"></div>
         </section>
 
         <!-- Group materials -->
@@ -126,16 +198,10 @@
         </section>
 
         <!-- Enrollments -->
-        <section class="dash-panel">
+        <section class="dash-panel" id="enrollments-panel">
           <div class="panel-header">
             <h2 data-i18n="Мої програми">Мої програми</h2>
-            <button class="btn btn--outline btn--sm" id="enroll-toggle" data-i18n="+ Записатися">+ Записатися</button>
-          </div>
-          <div id="enroll-form" class="enroll-form" hidden>
-            <select id="program-select">
-              <option value="" data-i18n="Оберіть програму">Оберіть програму</option>
-            </select>
-            <button class="btn btn--primary btn--sm" id="enroll-btn" data-i18n="Записатися">Записатися</button>
+            <a href="/#programs" class="btn btn--outline btn--sm" data-i18n="Обрати напрям">Обрати напрям</a>
           </div>
           <div id="enrollments-list" class="enrollments-list">
             <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
@@ -143,9 +209,9 @@
         </section>
 
         <!-- Challenges -->
-        <section class="dash-panel">
+        <section class="dash-panel" id="challenges-panel" aria-labelledby="challenges-title">
           <div class="panel-header">
-            <h2>Challenges</h2>
+            <h2 id="challenges-title">Challenges</h2>
             <span class="panel-tag">bounty lab</span>
           </div>
           <div id="challenges-list" class="challenges-list">
@@ -154,7 +220,7 @@
         </section>
 
         <!-- Bounty log -->
-        <section class="dash-panel dash-panel--wide">
+        <section class="dash-panel dash-panel--wide" id="bounty-panel">
           <div class="panel-header">
             <h2 data-i18n="Історія bounty">Історія bounty</h2>
           </div>
@@ -164,7 +230,7 @@
         </section>
 
         <!-- Profile settings -->
-        <section class="dash-panel">
+        <section class="dash-panel" id="profile-panel">
           <div class="panel-header">
             <h2 data-i18n="Профіль">Профіль</h2>
           </div>
@@ -181,6 +247,23 @@
               <span>Email</span>
               <input type="email" id="profile-email" disabled>
             </label>
+            <label>
+              <span>Коротко про себе</span>
+              <textarea name="profile_bio" id="profile-bio" rows="3" maxlength="280" placeholder="Що цікаво в навчанні та розробці?"></textarea>
+            </label>
+            <label class="profile-visibility">
+              <input type="checkbox" name="profile_public" id="profile-public">
+              <span>Показувати мій профіль іншим учасникам платформи</span>
+            </label>
+            <label class="profile-visibility">
+              <input type="checkbox" name="profile_share_solutions" id="profile-share-solutions">
+              <span data-i18n="Дозволити показувати в профілі мої здані роботи та прикріплені файли">Дозволити показувати в профілі мої здані роботи та прикріплені файли</span>
+            </label>
+            <fieldset class="profile-award-visibility" id="profile-award-visibility">
+              <legend data-i18n="Нагороди у публічному профілі">Нагороди у публічному профілі</legend>
+              <p data-i18n="Позначте відзнаки, які не потрібно показувати іншим учасникам.">Позначте відзнаки, які не потрібно показувати іншим учасникам.</p>
+              <div id="profile-award-controls"></div>
+            </fieldset>
             <button type="submit" class="btn btn--primary btn--sm" data-i18n="Зберегти">Зберегти</button>
           </form>
         </section>
@@ -260,6 +343,7 @@
         <div class="lab-subtabs">
           <button type="button" class="lab-subtab active" data-lab="vm" data-i18n="Моя машина">Моя машина</button>
           <button type="button" class="lab-subtab" data-lab="docker">Docker</button>
+          <button type="button" class="lab-subtab" data-lab="tools" data-i18n="Інструменти">Інструменти</button>
         </div>
         <div id="lab-panel-vm">
           <section class="dash-panel dash-panel--wide">
@@ -288,6 +372,57 @@
               <button type="submit" class="btn btn--primary btn--sm" data-i18n="Розгорнути">Розгорнути</button>
             </form>
             <div id="docker-list" class="docker-list"></div>
+          </section>
+        </div>
+        <div id="lab-panel-tools" hidden>
+          <section class="dash-panel dash-panel--wide">
+            <div class="panel-header">
+              <div>
+                <h2 data-i18n="Навчальні вебінструменти">Навчальні вебінструменти</h2>
+                <p data-i18n="Обробка відбувається у вашому браузері. Тут немає сканування мережі чи надсилання даних на сервер.">Обробка відбувається у вашому браузері. Тут немає сканування мережі чи надсилання даних на сервер.</p>
+              </div>
+              <span class="panel-tag">локально</span>
+            </div>
+            <div class="lab-tools-grid">
+              <article class="lab-tool-card">
+                <h3 data-i18n="Кодування URL">Кодування URL</h3>
+                <label for="tool-url-input" data-i18n="Текст або URL-компонент">Текст або URL-компонент</label>
+                <textarea id="tool-url-input" rows="3" spellcheck="false"></textarea>
+                <div class="lab-tool-actions">
+                  <button type="button" class="btn btn--outline btn--sm" id="tool-url-encode" data-i18n="Кодувати">Кодувати</button>
+                  <button type="button" class="btn btn--outline btn--sm" id="tool-url-decode" data-i18n="Декодувати">Декодувати</button>
+                </div>
+                <output class="lab-tool-output" id="tool-url-output" aria-live="polite"></output>
+              </article>
+              <article class="lab-tool-card">
+                <h3>Base64</h3>
+                <label for="tool-base64-input" data-i18n="Текст">Текст</label>
+                <textarea id="tool-base64-input" rows="3" spellcheck="false"></textarea>
+                <div class="lab-tool-actions">
+                  <button type="button" class="btn btn--outline btn--sm" id="tool-base64-encode" data-i18n="Кодувати">Кодувати</button>
+                  <button type="button" class="btn btn--outline btn--sm" id="tool-base64-decode" data-i18n="Декодувати">Декодувати</button>
+                </div>
+                <output class="lab-tool-output" id="tool-base64-output" aria-live="polite"></output>
+              </article>
+              <article class="lab-tool-card">
+                <h3>SHA-256</h3>
+                <label for="tool-hash-input" data-i18n="Текст для локального хешування">Текст для локального хешування</label>
+                <textarea id="tool-hash-input" rows="3" spellcheck="false"></textarea>
+                <div class="lab-tool-actions">
+                  <button type="button" class="btn btn--outline btn--sm" id="tool-hash-run" data-i18n="Обчислити">Обчислити</button>
+                </div>
+                <output class="lab-tool-output" id="tool-hash-output" aria-live="polite"></output>
+              </article>
+              <article class="lab-tool-card">
+                <h3 data-i18n="Перевірка HTTP-заголовків">Перевірка HTTP-заголовків</h3>
+                <label for="tool-headers-input" data-i18n="Вставте заголовки відповіді">Вставте заголовки відповіді</label>
+                <textarea id="tool-headers-input" rows="5" spellcheck="false" placeholder="content-security-policy: ..."></textarea>
+                <div class="lab-tool-actions">
+                  <button type="button" class="btn btn--outline btn--sm" id="tool-headers-check" data-i18n="Перевірити">Перевірити</button>
+                </div>
+                <div class="lab-tool-output" id="tool-headers-output" aria-live="polite"></div>
+              </article>
+            </div>
           </section>
         </div>
       </div>
