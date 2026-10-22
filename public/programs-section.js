@@ -232,8 +232,16 @@ export async function initProgramsSection() {
       if (requested) contactSelect.value = String(requested.id);
     }
 
-    const statNums = document.querySelectorAll('.stat-num[data-count]');
-    if (statNums[0]) statNums[0].dataset.count = String(directionsData.length);
+    const allPrograms = directionsData.flatMap(d => d.programs || []);
+    const setStat = (id, value) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.dataset.count = String(value);
+      el.textContent = String(value);
+    };
+    setStat('stat-directions', directionsData.length);
+    setStat('stat-programs-total', allPrograms.length);
+    setStat('stat-programs-described', allPrograms.filter(p => p.has_content).length);
 
     selectDirection(directionsData[0].id);
 

@@ -55,7 +55,7 @@
   </div>
 
   <script type="module">
-    import { api, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
+    import { api, getUser, resolveLoginRedirect, initTheme, validateSession } from '/auth.js';
     import { initI18n, t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
     import { getAttribution } from '/marketing-attribution.js';
     import { trackEvent, withAnalyticsAttribution } from '/analytics.js';
@@ -76,13 +76,6 @@
         return;
       }
 
-      checkServerReady().then(ok => {
-        if (!ok) {
-          const el = document.getElementById('form-error');
-          el.textContent = 'Сервер не оновлений. У терміналі: lsof -ti :3000 | xargs kill -9 && cd /Users/worker/websites/laboratorium && npm start';
-          el.hidden = false;
-        }
-      });
 
       const googleRegister = document.getElementById('google-register');
       const referralCode = getAttribution().referral_code;

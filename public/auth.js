@@ -188,15 +188,16 @@ export async function api(path, options = {}) {
   return data;
 }
 
-/** Перевірка що працює новий сервер (для login / forgot-password) */
+/** Перевіряє, що сервер підтримує публічну авторизацію. Тимчасові збої (429, 5xx, мережа) не вважаються застарілою версією. */
 export async function checkServerReady() {
   try {
     const res = await fetch('/api/auth/status');
-    if (!res.ok) return false;
+    if (res.status === 404) return false;
+    if (!res.ok) return true;
     const data = await res.json();
-    return data.ok && data.publicAuth;
+    return !!(data.ok && data.publicAuth);
   } catch {
-    return false;
+    return true;
   }
 }
 

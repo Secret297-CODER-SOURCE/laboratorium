@@ -93,8 +93,10 @@ typeTerminal();
 
 function animateCounters() {
   document.querySelectorAll('.stat-num').forEach(el => {
-    const target = parseInt(el.dataset.count, 10), start = performance.now();
+    const start = performance.now();
+    if (!Number.isFinite(parseInt(el.dataset.count, 10))) return;
     function update(now) {
+      const target = parseInt(el.dataset.count, 10) || 0;
       const p = Math.min((now-start)/2000, 1);
       el.textContent = Math.round(target * (1 - Math.pow(1-p, 3)));
       if (p < 1) requestAnimationFrame(update);

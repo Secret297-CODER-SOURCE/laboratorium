@@ -58,7 +58,7 @@
   </div>
 
   <script type="module">
-    import { api, setSession, getUser, resolveLoginRedirect, initTheme, checkServerReady, validateSession } from '/auth.js';
+    import { api, setSession, getUser, resolveLoginRedirect, initTheme, validateSession } from '/auth.js';
     import { initI18n, t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
     import { getAnalyticsAttribution, trackEvent, withAnalyticsAttribution } from '/analytics.js';
     initTheme();
@@ -118,13 +118,6 @@
         console.warn('Google sign-in availability check failed:', err);
       });
 
-      checkServerReady().then(ok => {
-        if (!ok) {
-          const el = document.getElementById('form-error');
-          el.textContent = 'Сервер не оновлений. У терміналі: lsof -ti :3000 | xargs kill -9 && cd /Users/worker/websites/laboratorium && npm start';
-          el.hidden = false;
-        }
-      });
 
       if (params.get('reset') === 'ok') {
         const info = document.getElementById('form-info');

@@ -8,6 +8,7 @@ import * as apiCtrl from '../controllers/api.controller.js';
 const router = Router();
 
 const clientErrorLimiter = rateLimit({
+  skip: () => config.rateLimit.disabled,
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.max,
   standardHeaders: true,

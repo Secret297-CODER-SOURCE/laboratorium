@@ -123,7 +123,8 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
       <button type="button" class="btn btn--primary btn--sm" id="create-user-submit">Створити і надіслати пароль</button>
     </div>
     <input type="search" class="admin-inp admin-search" id="users-search" placeholder="Пошук за handle, ім'ям чи email...">
-    <table class="admin-table">
+    <div class="admin-table-wrap">
+    <table class="admin-table admin-table--users">
       <thead><tr><th>Handle</th><th>Ім'я</th><th>Email</th><th>Роль</th><th>Дії</th></tr></thead>
       <tbody>${(users || []).map(u => `
         <tr data-search="${esc(`${u.handle} ${u.name} ${u.email}`.toLowerCase())}"${u.is_frozen ? ' style="opacity:0.55"' : ''}>
@@ -148,6 +149,7 @@ export function renderUsersPanelExtended(users, role, smtp = {}) {
         </tr>`).join('')}
       </tbody>
     </table>
+    </div>
   </section>
   <div id="person-modal" class="group-modal" hidden>
     <div class="group-modal-inner group-modal-inner--wide">

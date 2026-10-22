@@ -240,6 +240,7 @@ export function createApp() {
   app.use(requestLogger);
 
   const limiter = rateLimit({
+    skip: () => config.rateLimit.disabled,
     windowMs: config.rateLimit.windowMs,
     max: config.rateLimit.max,
     standardHeaders: true,

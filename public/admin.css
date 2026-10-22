@@ -1883,3 +1883,18 @@ body.traffic-open { overflow: hidden; }
 .sched-conf-title { margin-top: 20px; }
 .sched-conf-item { border-left: 3px solid var(--accent); }
 .sched-conf-badge { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+
+.admin-table-wrap { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: var(--radius); }
+.admin-table-wrap .admin-table { margin: 0; }
+.admin-table-wrap .admin-table tr:last-child td { border-bottom: 0; }
+.admin-table--users { min-width: 760px; table-layout: fixed; }
+.admin-table--users th:nth-child(1) { width: 18%; }
+.admin-table--users th:nth-child(2) { width: 16%; }
+.admin-table--users th:nth-child(3) { width: 29%; }
+.admin-table--users th:nth-child(4) { width: 15%; }
+.admin-table--users th:nth-child(5) { width: 22%; }
+.admin-table--users td { vertical-align: middle; overflow-wrap: anywhere; }
+.admin-table--users td:nth-child(3) { font-size: .78rem; }
+.admin-table--users .role-select { width: 100%; max-width: 140px; }
+.admin-table--users .admin-actions { flex-wrap: nowrap; gap: 2px; }
+.admin-table--users .admin-actions .btn { padding: 6px; min-width: 32px; justify-content: center; }

@@ -83,6 +83,7 @@ export const config = {
   },
 
   rateLimit: {
+    disabled: envBool('RATE_LIMIT_DISABLED', false),
     windowMs: envInt('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
     max: envInt('RATE_LIMIT_MAX', 100),
     authMax: envInt('AUTH_RATE_LIMIT_MAX', 20),

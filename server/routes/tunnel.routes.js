@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import config from '../config/index.js';
 import { handleTunnelProxy } from '../services/tunnel.service.js';
 
 const router = Router();
 
 const tunnelLimiter = rateLimit({
+  skip: () => config.rateLimit.disabled,
   windowMs: 60_000,
   max: 120,
   standardHeaders: true,

@@ -8,6 +8,7 @@ import * as authCtrl from '../controllers/auth.controller.js';
 const router = Router();
 
 const authLimiter = rateLimit({
+  skip: () => config.rateLimit.disabled,
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.authMax,
   standardHeaders: true,
