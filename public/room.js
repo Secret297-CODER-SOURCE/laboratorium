@@ -87,8 +87,22 @@ function updateLocalVideo() {
 async function applyLocalTracks(socketId) {
   const senders = peerSenders.get(socketId);
   if (!senders || !localStream) return;
-  await senders.audio.replaceTrack(localStream.getAudioTracks()[0] || null);
-  await senders.video.replaceTrack(localStream.getVideoTracks()[0] || null);
+  await senders.audio?.replaceTrack(localStream.getAudioTracks()[0] || null);
+  const screenTrack = screenSharing && screenStream ? screenStream.getVideoTracks()[0] : null;
+  await senders.video?.replaceTrack(screenTrack || localStream.getVideoTracks()[0] || null);
+}
+
+/** Answerer side: reuse the transceivers created by the remote offer as our senders. */
+async function adoptOfferedSenders(socketId, pc) {
+  const senders = {};
+  for (const transceiver of pc.getTransceivers()) {
+    const kind = transceiver.receiver.track?.kind;
+    if (!kind || senders[kind]) continue;
+    transceiver.direction = 'sendrecv';
+    senders[kind] = transceiver.sender;
+  }
+  peerSenders.set(socketId, senders);
+  await applyLocalTracks(socketId);
 }
 
 /** Swaps the given kind's outgoing track (mic/cam/screen) on every peer — no
@@ -177,15 +191,16 @@ async function createPeer(socketId, isInitiator, userData) {
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   peers.set(socketId, pc);
 
-  // Always negotiate one audio + one video slot immediately, even with no
-  // track yet (mic/cam start off) — see applyLocalTracks/setSenderTrack.
-  peerSenders.set(socketId, {
-    audio: pc.addTransceiver('audio', { direction: 'sendrecv' }).sender,
-    video: pc.addTransceiver('video', { direction: 'sendrecv' }).sender,
-  });
-  await applyLocalTracks(socketId);
-  if (screenSharing && screenStream) {
-    await peerSenders.get(socketId).video.replaceTrack(screenStream.getVideoTracks()[0]);
+  // The initiator negotiates one audio + one video slot immediately, even with
+  // no track yet (mic/cam start off). The answerer must NOT pre-create its own
+  // transceivers: they would not be matched to the offer's m-lines and its
+  // media would never reach the initiator (see adoptOfferedSenders).
+  if (isInitiator) {
+    peerSenders.set(socketId, {
+      audio: pc.addTransceiver('audio', { direction: 'sendrecv' }).sender,
+      video: pc.addTransceiver('video', { direction: 'sendrecv' }).sender,
+    });
+    await applyLocalTracks(socketId);
   }
 
   const tile = document.createElement('div');
@@ -279,6 +294,7 @@ socket.on('participants:update', ({ participants }) => renderParticipants(partic
 socket.on('signal:offer', async ({ from, offer, user }) => {
   const pc = await createPeer(from, false, user);
   await pc.setRemoteDescription(new RTCSessionDescription(offer));
+  await adoptOfferedSenders(from, pc);
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   socket.emit('signal:answer', { targetSocketId: from, answer });
