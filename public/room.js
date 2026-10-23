@@ -323,19 +323,37 @@ function renderPeerState(peer) {
 }
 
 function syncScreenTile(peer) {
-  const has = peer.state.screen && peer.screenStream.getVideoTracks().length > 0;
-  if (has && !peer.screenTile) {
-    const t = makeTile({
-      id: `tile-screen-${peer.socketId}`,
-      handle: peer.user?.handle, screen: true, muted: false,
-    });
-    const v = t.querySelector('video');
-    v.srcObject = peer.screenStream;
-    videoGrid.prepend(t);
-    peer.screenTile = t;
-    safePlay(v);
-    updateGridClass();
-  } else if (!has && peer.screenTile) {
+  const track = peer.screenStream.getVideoTracks().find(
+    (item) => item.readyState === 'live'
+  );
+
+  // Плитка зависит от реального входящего видеотрека, а не от метаданных.
+  if (track) {
+    peer.state.screen = true;
+
+    if (!peer.screenTile) {
+      const tile = makeTile({
+        id: `tile-screen-${peer.socketId}`,
+        handle: peer.user?.handle,
+        screen: true,
+        muted: false,
+      });
+
+      const video = tile.querySelector('video');
+      video.srcObject = peer.screenStream;
+
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch((error) => {
+          console.warn('[screen-share] Playback failed:', error);
+        });
+      }, { once: true });
+
+      videoGrid.prepend(tile);
+      peer.screenTile = tile;
+      safePlay(video);
+      updateGridClass();
+    }
+  } else if (peer.screenTile) {
     peer.screenTile.remove();
     peer.screenTile = null;
     updateGridClass();
