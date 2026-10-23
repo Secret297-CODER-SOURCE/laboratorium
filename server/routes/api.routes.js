@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authRequired, requireUnrestricted } from '../middleware/auth.js';
@@ -12,6 +13,37 @@ import * as calendarCtrl from '../controllers/calendar.controller.js';
 const router = Router();
 
 router.use(authRequired);
+
+router.get('/ice-servers', (req, res) => {
+  const host = process.env.TURN_HOST;
+  const secret = process.env.TURN_SECRET;
+
+  if (!host || !secret) {
+    return res.status(503).json({ error: 'TURN not configured' });
+  }
+
+  const expiry = Math.floor(Date.now() / 1000) + 12 * 60 * 60;
+  const username = `${expiry}:${req.user.id}`;
+  const credential = crypto
+    .createHmac('sha1', secret)
+    .update(username)
+    .digest('base64');
+
+  return res.json({
+    iceServers: [
+      { urls: `stun:${host}:3478` },
+      {
+        urls: [
+          `turn:${host}:3478?transport=udp`,
+          `turn:${host}:3478?transport=tcp`,
+        ],
+        username,
+        credential,
+      },
+    ],
+  });
+});
+
 
 router.get('/billing/status', asyncHandler(apiCtrl.getBillingStatus));
 
