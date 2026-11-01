@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /course.html
 Disallow: /admin.html
 Disallow: /dashboard.html
 Disallow: /portal.html
@@ -12,6 +13,10 @@ Disallow: /conferences.html
 Disallow: /payment-blocked.html
 Disallow: /forgot-password.html
 Disallow: /reset-password.html
+Disallow: /student-profile.html
+Disallow: /login.html
 Disallow: /api/
+Disallow: /uploads/
+Disallow: /socket.io/
 
 Sitemap: https://laboratorium.club/sitemap.xml
