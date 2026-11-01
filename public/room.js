@@ -32,10 +32,16 @@ let ICE_SERVERS = [
 async function loadIceServers() {
   try {
     const r = await fetch('/api/ice-servers', { headers: { Authorization: `Bearer ${TOKEN}` } });
-    if (!r.ok) return;
+    if (!r.ok) throw new Error(`ICE server request failed (${r.status})`);
     const d = await r.json();
-    if (Array.isArray(d.iceServers) && d.iceServers.length) ICE_SERVERS = d.iceServers;
-  } catch { /* остаёмся на значениях по умолчанию */ }
+    if (!Array.isArray(d.iceServers) || !d.iceServers.length) {
+      throw new Error('ICE server response did not contain any servers');
+    }
+    ICE_SERVERS = [...ICE_SERVERS.filter(server => String(server.urls).startsWith('stun:')), ...d.iceServers];
+  } catch (error) {
+    console.error('[room] Could not load TURN/ICE servers:', error);
+    addSystemMessage('Не вдалося завантажити TURN-сервери. Спробуємо з’єднатися через STUN; для деяких мереж це може не спрацювати.');
+  }
 }
 
 /* ───────────────────────── Стили новых элементов ───────────────────────── */
@@ -51,14 +57,6 @@ style.textContent = `
 .video-tile .tile-fs{position:absolute;top:8px;right:8px;opacity:0;transition:opacity .15s;border:0;cursor:pointer;
   background:rgba(0,0,0,.55);color:#fff;border-radius:8px;padding:4px 8px;font-size:14px}
 .video-tile:hover .tile-fs{opacity:1}
-#video-grid.has-screen{display:grid!important;grid-template-columns:minmax(0,1fr) 240px;grid-auto-rows:minmax(130px,1fr);gap:8px}
-#video-grid.has-screen .video-tile{grid-column:2;min-height:0}
-#video-grid.has-screen .video-tile.screen-share{grid-column:1;grid-row:1 / span 6}
-@media (max-width:800px){
-  #video-grid.has-screen{grid-template-columns:1fr 1fr}
-  #video-grid.has-screen .video-tile{grid-column:auto}
-  #video-grid.has-screen .video-tile.screen-share{grid-column:1 / span 2;grid-row:auto;min-height:220px}
-}
 #sound-banner{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:50;display:none;
   background:var(--accent,#ec4899);color:#fff;border:0;border-radius:999px;padding:10px 18px;cursor:pointer;font-weight:600}
 `;
@@ -167,6 +165,11 @@ function updateGridClass() {
   videoGrid.className = `video-grid ${
     count <= 1 ? 'grid-1' : count === 2 ? 'grid-2' : count <= 4 ? 'grid-3' : 'grid-many'
   }${hasScreen ? ' has-screen' : ''}`;
+  if (hasScreen) {
+    videoGrid.style.setProperty('--screen-participant-count', Math.max(1, count - 1));
+  } else {
+    videoGrid.style.removeProperty('--screen-participant-count');
+  }
 }
 
 /* ───────────────────────── Отправка треков ───────────────────────── */
@@ -186,9 +189,15 @@ async function applyAllTracks(peer) {
 }
 
 async function setSlot(slot, track) {
+  let successful = true;
   for (const peer of peers.values()) {
-    try { await peer.tx[slot].sender.replaceTrack(track); } catch (e) { console.warn('replaceTrack', slot, e); }
+    try { await peer.tx[slot].sender.replaceTrack(track); }
+    catch (error) {
+      successful = false;
+      console.error(`[room] Could not replace ${slot} track for ${peer.socketId}:`, error);
+    }
   }
+  return successful;
 }
 
 function sendMeta() {
@@ -362,15 +371,21 @@ function syncScreenTile(peer) {
 
 /* ───────────────────────── WebRTC ───────────────────────── */
 async function createPeer(socketId, isInitiator, userData) {
-  if (peers.has(socketId)) return peers.get(socketId);
+  if (peers.has(socketId)) {
+    const existing = peers.get(socketId);
+    await existing.ready;
+    return existing;
+  }
 
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 4 });
   const peer = {
     socketId, pc, isInitiator, user: userData,
     camStream: new MediaStream(), screenStream: new MediaStream(),
-    pendingIce: [], dc: null, restarted: false,
+    pendingIce: [], dc: null, polite: !isInitiator, makingOffer: false,
+    ignoreOffer: false, restartTimer: null, restartTimeout: null,
+    restartAttempts: 0, restarting: false,
     state: { audio: !!userData?.audioEnabled, video: !!userData?.videoEnabled, screen: false },
-    tile: null, screenTile: null, tx: {},
+    tile: null, screenTile: null, tx: {}, ready: null,
   };
   peers.set(socketId, peer);
 
@@ -407,6 +422,10 @@ async function createPeer(socketId, isInitiator, userData) {
         if (tr === peer.tx.screen) peer.state.screen = true; // страховка, если канал метаданных не доехал
         syncScreenTile(peer);
       };
+      e.track.onended = () => {
+        peer.screenStream.removeTrack(e.track);
+        syncScreenTile(peer);
+      };
       syncScreenTile(peer);
       peer.screenTile?.querySelector('video')?.play().catch(() => {});
     } else {
@@ -422,41 +441,96 @@ async function createPeer(socketId, isInitiator, userData) {
     if (e.candidate) socket.emit('signal:ice-candidate', { targetSocketId: socketId, candidate: e.candidate });
   };
 
-  pc.onconnectionstatechange = async () => {
-    const s = pc.connectionState;
-    if (s === 'failed') {
-      // одна попытка перезапуска ICE инициатором, потом — убираем
-      if (peer.isInitiator && !peer.restarted) {
-        peer.restarted = true;
-        try {
-          pc.restartIce();
-          const offer = await pc.createOffer({ iceRestart: true });
-          await pc.setLocalDescription(offer);
-          socket.emit('signal:offer', { targetSocketId: socketId, offer });
-          return;
-        } catch {}
-      }
-      addSystemMessage(`Не вдалося з'єднатися з @${peer.user?.handle || 'учасником'} (потрібен TURN-сервер)`);
-      removePeer(socketId);
-    } else if (s === 'closed') {
-      removePeer(socketId);
+  pc.oniceconnectionstatechange = () => {
+    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      clearTimeout(peer.restartTimer);
+      clearTimeout(peer.restartTimeout);
+      peer.restartTimer = null;
+      peer.restartTimeout = null;
+      peer.restarting = false;
+      peer.restartAttempts = 0;
+    } else if (pc.iceConnectionState === 'disconnected') {
+      clearTimeout(peer.restartTimer);
+      peer.restartTimer = setTimeout(() => restartIce(peer), 5000);
+    } else if (pc.iceConnectionState === 'failed') {
+      restartIce(peer);
     }
   };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'closed') removePeer(socketId);
+  };
 
-  await applyAllTracks(peer);
-
-  if (isInitiator) {
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit('signal:offer', { targetSocketId: socketId, offer });
-  }
+  peer.ready = (async () => {
+    try {
+      await applyAllTracks(peer);
+      if (isInitiator) await sendOffer(peer);
+    } catch (error) {
+      console.error('[room] Failed to initialize WebRTC peer:', error);
+      addSystemMessage(`Не вдалося підготувати з’єднання з @${peer.user?.handle || 'учасником'}`);
+      removePeer(socketId);
+    }
+  })();
+  await peer.ready;
   return peer;
+}
+
+async function sendOffer(peer, options) {
+  const { pc } = peer;
+  if (pc.signalingState !== 'stable' || peer.makingOffer) return;
+  peer.makingOffer = true;
+  try {
+    await pc.setLocalDescription(await pc.createOffer(options));
+    socket.emit('signal:offer', { targetSocketId: peer.socketId, offer: pc.localDescription });
+  } catch (error) {
+    console.error('[room] Failed to create WebRTC offer:', error);
+    addSystemMessage(`Не вдалося створити з’єднання з @${peer.user?.handle || 'учасником'}`);
+  } finally {
+    peer.makingOffer = false;
+  }
+}
+
+async function restartIce(peer) {
+  if (!peers.has(peer.socketId) || peer.restarting) return;
+  clearTimeout(peer.restartTimer);
+  peer.restartTimer = null;
+  if (peer.restartAttempts >= 2) {
+    addSystemMessage(`Не вдалося відновити з’єднання з @${peer.user?.handle || 'учасником'}`);
+    removePeer(peer.socketId);
+    return;
+  }
+  peer.restartAttempts += 1;
+  peer.restarting = true;
+  try {
+    peer.pc.restartIce();
+    await sendOffer(peer, { iceRestart: true });
+    if (peer.pc.signalingState === 'stable') {
+      peer.restarting = false;
+      if (peer.restartAttempts < 2) {
+        peer.restartTimer = setTimeout(() => restartIce(peer), 5000);
+      } else {
+        addSystemMessage(`Не вдалося відновити з’єднання з @${peer.user?.handle || 'учасником'}`);
+        removePeer(peer.socketId);
+      }
+    } else {
+      clearTimeout(peer.restartTimeout);
+      peer.restartTimeout = setTimeout(() => {
+        peer.restarting = false;
+        restartIce(peer);
+      }, 15000);
+    }
+  } catch (error) {
+    peer.restarting = false;
+    console.error('[room] ICE restart failed:', error);
+    peer.restartTimer = setTimeout(() => restartIce(peer), 5000);
+  }
 }
 
 function removePeer(socketId) {
   const peer = peers.get(socketId);
   if (!peer) return;
   peers.delete(socketId);
+  clearTimeout(peer.restartTimer);
+  clearTimeout(peer.restartTimeout);
   stopWatching(socketId);
   try { peer.dc?.close(); } catch {}
   try { peer.pc.close(); } catch {}
@@ -466,8 +540,17 @@ function removePeer(socketId) {
 }
 
 async function flushIce(peer) {
+  const ufrags = peer.pc.remoteDescription?.sdp
+    ?.match(/(?:^|\r?\n)a=ice-ufrag:([^\r\n]+)/g)
+    ?.map(line => line.slice(line.indexOf(':') + 1)) || [];
   const list = peer.pendingIce.splice(0);
-  for (const c of list) { try { await peer.pc.addIceCandidate(c); } catch {} }
+  for (const c of list) {
+    if (c.usernameFragment && ufrags.length && !ufrags.includes(c.usernameFragment)) continue;
+    try { await peer.pc.addIceCandidate(c); }
+    catch (error) {
+      if (!peer.ignoreOffer) console.warn('[room] Failed to add queued ICE candidate:', error);
+    }
+  }
 }
 
 /* ───────────────────────── Сокет-события ───────────────────────── */
@@ -502,20 +585,37 @@ socket.on('participant:left', ({ participant }) => {
 socket.on('participants:update', ({ participants }) => renderParticipants(participants));
 
 socket.on('signal:offer', async ({ from, offer, user }) => {
-  const peer = await createPeer(from, false, user);
-  await peer.pc.setRemoteDescription(new RTCSessionDescription(offer));
-  await flushIce(peer);
-  await applyAllTracks(peer);
-  const answer = await peer.pc.createAnswer();
-  await peer.pc.setLocalDescription(answer);
-  socket.emit('signal:answer', { targetSocketId: from, answer });
+  try {
+    const peer = await createPeer(from, false, user);
+    while (peer.makingOffer) await new Promise(resolve => setTimeout(resolve, 0));
+    const readyForOffer = peer.pc.signalingState === 'stable';
+    const offerCollision = offer.type === 'offer' && !readyForOffer;
+    peer.ignoreOffer = !peer.polite && offerCollision;
+    if (peer.ignoreOffer) return;
+    if (offerCollision && peer.pc.signalingState !== 'stable') {
+      await peer.pc.setLocalDescription({ type: 'rollback' });
+    }
+    await peer.pc.setRemoteDescription(new RTCSessionDescription(offer));
+    await flushIce(peer);
+    await applyAllTracks(peer);
+    await peer.pc.setLocalDescription(await peer.pc.createAnswer());
+    socket.emit('signal:answer', { targetSocketId: from, answer: peer.pc.localDescription });
+    peer.restarting = false;
+  } catch (error) {
+    console.error('[room] Failed to process WebRTC offer:', error);
+  }
 });
 
 socket.on('signal:answer', async ({ from, answer }) => {
   const peer = peers.get(from);
   if (!peer) return;
-  await peer.pc.setRemoteDescription(new RTCSessionDescription(answer));
-  await flushIce(peer);
+  try {
+    await peer.pc.setRemoteDescription(new RTCSessionDescription(answer));
+    await flushIce(peer);
+    peer.restarting = false;
+  } catch (error) {
+    console.error('[room] Failed to process WebRTC answer:', error);
+  }
 });
 
 socket.on('signal:ice-candidate', async ({ from, candidate }) => {
@@ -523,8 +623,19 @@ socket.on('signal:ice-candidate', async ({ from, candidate }) => {
   if (!peer || !candidate) return;
   const c = new RTCIceCandidate(candidate);
   // Кандидат может прийти раньше offer/answer — раньше он молча терялся.
-  if (peer.pc.remoteDescription) { try { await peer.pc.addIceCandidate(c); } catch {} }
-  else peer.pendingIce.push(c);
+  const remoteUfrags = peer.pc.remoteDescription?.sdp
+    ?.match(/(?:^|\r?\n)a=ice-ufrag:([^\r\n]+)/g)
+    ?.map(line => line.slice(line.indexOf(':') + 1)) || [];
+  if (!peer.pc.remoteDescription ||
+      (c.usernameFragment && remoteUfrags.length && !remoteUfrags.includes(c.usernameFragment))) {
+    if (peer.pendingIce.length >= 100) peer.pendingIce.shift();
+    peer.pendingIce.push(c);
+  } else {
+    try { await peer.pc.addIceCandidate(c); }
+    catch (error) {
+      if (!peer.ignoreOffer) console.warn('[room] Failed to add ICE candidate:', error);
+    }
+  }
 });
 
 socket.on('chat:message', (msg) => addChatMessage(msg));
@@ -614,12 +725,22 @@ document.getElementById('screen-btn').addEventListener('click', async () => {
       video: { frameRate: { ideal: 30 } },
       audio: true, // системный звук вкладки/экрана, если браузер даёт
     });
-  } catch { return addSystemMessage('Демонстрація екрана скасована'); }
+  } catch (error) {
+    console.warn('[room] Screen sharing could not start:', error);
+    return addSystemMessage(error?.name === 'NotAllowedError'
+      ? 'Демонстрацію екрана скасовано або заборонено браузером'
+      : `Не вдалося почати демонстрацію екрана: ${error?.message || 'невідома помилка'}`);
+  }
 
+  const vTrack = screenStream.getVideoTracks()[0];
+  if (!vTrack) {
+    screenStream.getTracks().forEach(track => track.stop());
+    screenStream = null;
+    return addSystemMessage('Браузер не повернув відеотрек для демонстрації екрана');
+  }
   screenSharing = true;
   document.getElementById('screen-btn').classList.add('active');
 
-  const vTrack = screenStream.getVideoTracks()[0];
   const aTrack = screenStream.getAudioTracks()[0] || null;
   try { vTrack.contentHint = 'detail'; } catch {}
   vTrack.onended = () => stopScreenShare();
@@ -632,8 +753,14 @@ document.getElementById('screen-btn').addEventListener('click', async () => {
   updateGridClass();
 
   // Демка — в ОТДЕЛЬНЫЙ слот, камера и микрофон продолжают работать.
-  await setSlot('screen', vTrack);
-  await setSlot('screenAudio', aTrack);
+  const screenVideoSent = await setSlot('screen', vTrack);
+  const screenAudioSent = await setSlot('screenAudio', aTrack);
+  if (!screenVideoSent) {
+    addSystemMessage('Не вдалося передати демонстрацію учасникам. Спробуйте почати її ще раз.');
+    await stopScreenShare();
+    return;
+  }
+  if (aTrack && !screenAudioSent) addSystemMessage('Відео екрана передається, але системний звук недоступний для учасників');
   // Поднимем битрейт для читаемого текста на экране
   for (const peer of peers.values()) {
     try {
