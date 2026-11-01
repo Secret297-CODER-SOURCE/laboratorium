@@ -28,20 +28,27 @@ router.get('/ice-servers', (req, res) => {
     .createHmac('sha1', secret)
     .update(username)
     .digest('base64');
+  const iceServers = [
+    { urls: `stun:${host}:3478` },
+    {
+      urls: [
+        `turn:${host}:3478?transport=udp`,
+        `turn:${host}:3478?transport=tcp`,
+      ],
+      username,
+      credential,
+    },
+  ];
+  const tlsPort = Number.parseInt(process.env.TURN_TLS_PORT, 10);
+  if (Number.isInteger(tlsPort) && tlsPort > 0 && tlsPort <= 65535) {
+    iceServers.push({
+      urls: `turns:${host}:${tlsPort}?transport=tcp`,
+      username,
+      credential,
+    });
+  }
 
-  return res.json({
-    iceServers: [
-      { urls: `stun:${host}:3478` },
-      {
-        urls: [
-          `turn:${host}:3478?transport=udp`,
-          `turn:${host}:3478?transport=tcp`,
-        ],
-        username,
-        credential,
-      },
-    ],
-  });
+  return res.json({ iceServers });
 });
 
 
