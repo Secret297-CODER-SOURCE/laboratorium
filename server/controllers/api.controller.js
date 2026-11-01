@@ -56,6 +56,16 @@ export async function getDirections(_req, res) {
   res.json({ directions: directionService.getPublicWithPrograms() });
 }
 
+function escapeXml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+}
+
+function toSitemapDate(value) {
+  if (!value) return null;
+  const d = new Date(String(value).includes('T') ? value : `${value.replace(' ', 'T')}Z`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
 export async function getSitemap(_req, res) {
   const base = config.siteUrl.replace(/\/+$/, '');
   const programs = programService.getAll().filter((program) => {
@@ -66,15 +76,24 @@ export async function getSitemap(_req, res) {
 
   const urls = [
     { loc: `${base}/`, priority: '1.0' },
-    ...programs.map(p => ({ loc: `${base}/course.html?id=${p.id}`, priority: '0.7' })),
+    ...programs.map(p => ({
+      loc: `${base}/course.html?id=${p.id}`,
+      priority: '0.7',
+      changefreq: 'weekly',
+      lastmod: toSitemapDate(p.updated_at),
+    })),
   ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n`
     + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`
-    + urls.map(u => `  <url><loc>${u.loc}</loc><priority>${u.priority}</priority></url>`).join('\n')
+    + urls.map(u => `  <url><loc>${escapeXml(u.loc)}</loc>`
+      + (u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : '')
+      + (u.changefreq ? `<changefreq>${u.changefreq}</changefreq>` : '')
+      + `<priority>${u.priority}</priority></url>`).join('\n')
     + `\n</urlset>\n`;
 
   res.set('Content-Type', 'application/xml; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
   res.send(xml);
 }
 

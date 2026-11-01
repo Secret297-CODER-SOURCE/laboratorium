@@ -173,11 +173,35 @@ function updateGridClass() {
 }
 
 /* ───────────────────────── Отправка треков ───────────────────────── */
-// У каждого пира 4 заранее согласованных слота (порядок одинаков на обеих сторонах):
+// У каждого пира 4 заранее согласованных слота. Их создаёт инициатор (addTransceiver),
+// а принимающая сторона берёт трансиверы из оффера в том же порядке m-line (bindSlots):
+// addTransceiver на принимающей стороне НЕ связывается с m-line оффера, и такие
+// трансиверы никогда ничего не отправляют.
 //   audio (микрофон) · cam (камера) · screen (демка) · screenAudio (звук демки)
 // Благодаря этому камера и демка идут ОДНОВРЕМЕННО, а включение/выключение —
 // это просто replaceTrack без пересогласования.
+const SLOT_KINDS = [['audio', 'audio'], ['cam', 'video'], ['screen', 'video'], ['screenAudio', 'audio']];
+
+function bindSlots(peer) {
+  if (peer.tx.audio) return true;
+  const list = peer.pc.getTransceivers();
+  if (list.length < SLOT_KINDS.length) return false;
+  const slots = {};
+  for (let i = 0; i < SLOT_KINDS.length; i++) {
+    const [name, kind] = SLOT_KINDS[i];
+    if (list[i].receiver.track.kind !== kind) {
+      console.error('[room] Unexpected transceiver order in remote offer', i, kind);
+      return false;
+    }
+    slots[name] = list[i];
+  }
+  Object.assign(peer.tx, slots);
+  Object.values(slots).forEach(t => { try { t.direction = 'sendrecv'; } catch {} });
+  return true;
+}
+
 async function applyAllTracks(peer) {
+  if (!peer.tx.audio) return;
   const a = camStreamLocal.getAudioTracks()[0] || null;
   const v = camStreamLocal.getVideoTracks()[0] || null;
   const sv = screenStream?.getVideoTracks()[0] || null;
@@ -191,6 +215,7 @@ async function applyAllTracks(peer) {
 async function setSlot(slot, track) {
   let successful = true;
   for (const peer of peers.values()) {
+    if (!peer.tx[slot]) continue; // слоты появятся после первого оффера, applyAllTracks их заполнит
     try { await peer.tx[slot].sender.replaceTrack(track); }
     catch (error) {
       successful = false;
@@ -336,10 +361,10 @@ function syncScreenTile(peer) {
     (item) => item.readyState === 'live'
   );
 
-  // Плитка зависит от реального входящего видеотрека, а не от метаданных.
-  if (track) {
-    peer.state.screen = true;
-
+  // Входящий трек существует всегда (слот согласован заранее), поэтому плитку
+  // показываем, когда есть живой трек И собеседник сообщил о демонстрации
+  // (канал метаданных, сокет или реальный unmute трека).
+  if (track && peer.state.screen) {
     if (!peer.screenTile) {
       const tile = makeTile({
         id: `tile-screen-${peer.socketId}`,
@@ -384,16 +409,19 @@ async function createPeer(socketId, isInitiator, userData) {
     pendingIce: [], dc: null, polite: !isInitiator, makingOffer: false,
     ignoreOffer: false, restartTimer: null, restartTimeout: null,
     restartAttempts: 0, restarting: false,
-    state: { audio: !!userData?.audioEnabled, video: !!userData?.videoEnabled, screen: false },
+    state: { audio: !!userData?.audioEnabled, video: !!userData?.videoEnabled, screen: !!userData?.screenSharing },
+    serverScreen: !!userData?.screenSharing,
     tile: null, screenTile: null, tx: {}, ready: null,
   };
   peers.set(socketId, peer);
 
-  // Порядок добавления ВАЖЕН и одинаков на обеих сторонах.
-  peer.tx.audio       = pc.addTransceiver('audio', { direction: 'sendrecv' });
-  peer.tx.cam         = pc.addTransceiver('video', { direction: 'sendrecv' });
-  peer.tx.screen      = pc.addTransceiver('video', { direction: 'sendrecv' });
-  peer.tx.screenAudio = pc.addTransceiver('audio', { direction: 'sendrecv' });
+  // Порядок ВАЖЕН: принимающая сторона сопоставляет слоты по порядку m-line.
+  if (isInitiator) {
+    peer.tx.audio       = pc.addTransceiver('audio', { direction: 'sendrecv' });
+    peer.tx.cam         = pc.addTransceiver('video', { direction: 'sendrecv' });
+    peer.tx.screen      = pc.addTransceiver('video', { direction: 'sendrecv' });
+    peer.tx.screenAudio = pc.addTransceiver('audio', { direction: 'sendrecv' });
+  }
 
   // Канал метаданных (кто включил микрофон/камеру/демку).
   const bindDc = (dc) => {
@@ -415,6 +443,7 @@ async function createPeer(socketId, isInitiator, userData) {
   renderPeerState(peer);
 
   pc.ontrack = (e) => {
+    bindSlots(peer);
     const tr = e.transceiver;
     if (tr === peer.tx.screen || tr === peer.tx.screenAudio) {
       if (!peer.screenStream.getTracks().includes(e.track)) peer.screenStream.addTrack(e.track);
@@ -582,7 +611,17 @@ socket.on('participant:left', ({ participant }) => {
   removePeer(participant.socketId);
 });
 
-socket.on('participants:update', ({ participants }) => renderParticipants(participants));
+socket.on('participants:update', ({ participants }) => {
+  renderParticipants(participants);
+  // Запасной канал: сервер знает, кто сейчас показывает экран.
+  for (const p of participants) {
+    const peer = peers.get(p.socketId);
+    if (!peer || peer.serverScreen === !!p.screenSharing) continue;
+    peer.serverScreen = !!p.screenSharing;
+    peer.state.screen = peer.serverScreen;
+    syncScreenTile(peer);
+  }
+});
 
 socket.on('signal:offer', async ({ from, offer, user }) => {
   try {
@@ -596,6 +635,7 @@ socket.on('signal:offer', async ({ from, offer, user }) => {
       await peer.pc.setLocalDescription({ type: 'rollback' });
     }
     await peer.pc.setRemoteDescription(new RTCSessionDescription(offer));
+    if (!bindSlots(peer)) throw new Error('remote offer does not contain the expected media sections');
     await flushIce(peer);
     await applyAllTracks(peer);
     await peer.pc.setLocalDescription(await peer.pc.createAnswer());
