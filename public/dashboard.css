@@ -1618,7 +1618,21 @@
 .homework-history-item { align-items: flex-start; }
 .homework-history-meta { margin-top: 4px; color: var(--text-muted); font-size: 0.75rem; }
 .homework-history-note { margin: 8px 0 0; color: var(--text-muted); font-size: 0.82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+#lab-tools-lab { display: grid; gap: 14px; }
+#lab-tools-lab h3 { margin: 6px 0 0; font-size: 0.95rem; }
+.lt-notice { padding: 12px 14px; border: 1px solid #f0b44d; border-radius: var(--radius); color: var(--text); background: rgba(240, 180, 77, 0.08); font-size: 0.8rem; line-height: 1.5; }
+.lt-filters { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+.lt-filters input, .lt-filters select { padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font: inherit; min-width: 0; }
+.lt-paths { display: grid; gap: 8px; }
+.lt-path { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; flex-wrap: wrap; }
+.lt-path progress { flex: 1; min-width: 120px; }
+.lt-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.lt-meta, .lt-card p { margin: 0; font-size: 0.78rem; line-height: 1.5; color: var(--text-muted); }
+.lt-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; }
+.lt-cases { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; font-size: 0.78rem; }
+.lt-cases li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 @media (max-width: 720px) {
+  .lt-filters { grid-template-columns: minmax(0, 1fr); }
   .learning-history-columns, .lab-tools-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
