@@ -379,76 +379,54 @@
           <section class="dash-panel dash-panel--wide" id="lab-tools-lab">
             <div class="panel-header">
               <div>
-                <h2 data-i18n="Лабораторія AI-безпеки">Лабораторія AI-безпеки</h2>
-                <p data-i18n="Каталог інструментів для навчання, маршрути та безпечна симуляція. Тут нічого не запускається і не скануються цілі.">Каталог інструментів для навчання, маршрути та безпечна симуляція. Тут нічого не запускається і не скануються цілі.</p>
+                <h2 data-i18n="Лабораторія розвідки">Лабораторія розвідки</h2>
+                <p data-i18n="Створіть проєкт-розслідування, застосовуйте інструменти зліва до власних даних і збирайте знахідки в центрі. Усе працює локально у браузері — платформа не звертається до жодних зовнішніх цілей.">Створіть проєкт-розслідування, застосовуйте інструменти зліва до власних даних і збирайте знахідки в центрі. Усе працює локально у браузері — платформа не звертається до жодних зовнішніх цілей.</p>
               </div>
-              <span class="panel-tag" data-i18n="лише навчання">лише навчання</span>
+              <span class="panel-tag" data-i18n="локально, без цілей">локально, без цілей</span>
             </div>
-            <div class="lt-notice" role="note" data-i18n="Використовуйте будь-які інструменти лише на власних системах, навчальних стендах або за письмовим дозволом власника. Тестування чужих систем без дозволу незаконне.">Використовуйте будь-які інструменти лише на власних системах, навчальних стендах або за письмовим дозволом власника. Тестування чужих систем без дозволу незаконне.</div>
-            <div class="lt-filters">
-              <input type="search" data-lt="search" data-i18n-placeholder="Пошук інструментів" placeholder="Пошук інструментів" aria-label="Пошук інструментів">
-              <select data-lt="category" aria-label="Категорія"></select>
-              <select data-lt="difficulty" aria-label="Складність"></select>
+            <div class="lt-notice" role="note" data-i18n="Інструменти обробляють лише дані, які ви самі вставляєте (логи, заголовки, токени тощо). Сканування мереж, чужих сайтів чи систем тут немає і не буде.">Інструменти обробляють лише дані, які ви самі вставляєте (логи, заголовки, токени тощо). Сканування мереж, чужих сайтів чи систем тут немає і не буде.</div>
+
+            <div class="lt-project-bar">
+              <select data-wb="project-select" aria-label="Проєкт"></select>
+              <button type="button" class="btn btn--outline btn--sm" data-wb="new-project" data-i18n="Новий проєкт">Новий проєкт</button>
+              <button type="button" class="btn btn--outline btn--sm" data-wb="rename-project" data-i18n="Перейменувати">Перейменувати</button>
+              <button type="button" class="btn btn--outline btn--sm" data-wb="export-project" data-i18n="Експорт">Експорт</button>
+              <button type="button" class="btn btn--outline btn--sm" data-wb="delete-project" data-i18n="Видалити">Видалити</button>
             </div>
-            <h3 data-i18n="Навчальні маршрути">Навчальні маршрути</h3>
-            <div class="lt-paths" data-lt="paths"></div>
-            <div class="lab-tools-grid" data-lt="list"></div>
-            <h3 data-i18n="Безпечна вправа: тріаж prompt injection">Безпечна вправа: тріаж prompt injection</h3>
-            <div class="lab-tool-card" data-lt="scenario"></div>
-            <h3 data-i18n="Локальні утиліти">Локальні утиліти</h3>
+
+            <div class="lt-workbench">
+              <aside class="lt-sidebar" data-wb="tool-list" aria-label="Інструменти"></aside>
+              <div class="lt-workspace">
+                <form class="lt-tool-form" data-wb="tool-form">
+                  <h3 data-wb="tool-title"></h3>
+                  <label data-wb="tool-input-label" for="wb-input"></label>
+                  <textarea id="wb-input" data-wb="tool-input" rows="5" spellcheck="false"></textarea>
+                  <div class="lt-tool-extra" data-wb="tool-extra" hidden></div>
+                  <div class="lab-tool-actions" data-wb="tool-actions"></div>
+                </form>
+                <h3 data-i18n="Знахідки проєкту">Знахідки проєкту</h3>
+                <div class="lt-findings" data-wb="findings"></div>
+              </div>
+            </div>
           </section>
+
           <section class="dash-panel dash-panel--wide">
-            <div class="panel-header">
-              <div>
-                <h2 data-i18n="Навчальні вебінструменти">Навчальні вебінструменти</h2>
-                <p data-i18n="Обробка відбувається у вашому браузері. Тут немає сканування мережі чи надсилання даних на сервер.">Обробка відбувається у вашому браузері. Тут немає сканування мережі чи надсилання даних на сервер.</p>
+            <details class="lt-reference">
+              <summary data-i18n="Довідник: інструменти та навчальні маршрути AI-безпеки">Довідник: інструменти та навчальні маршрути AI-безпеки</summary>
+              <div class="lt-filters">
+                <input type="search" data-lt="search" data-i18n-placeholder="Пошук інструментів" placeholder="Пошук інструментів" aria-label="Пошук інструментів">
+                <select data-lt="category" aria-label="Категорія"></select>
+                <select data-lt="difficulty" aria-label="Складність"></select>
               </div>
-              <span class="panel-tag">локально</span>
-            </div>
-            <div class="lab-tools-grid">
-              <article class="lab-tool-card">
-                <h3 data-i18n="Кодування URL">Кодування URL</h3>
-                <label for="tool-url-input" data-i18n="Текст або URL-компонент">Текст або URL-компонент</label>
-                <textarea id="tool-url-input" rows="3" spellcheck="false"></textarea>
-                <div class="lab-tool-actions">
-                  <button type="button" class="btn btn--outline btn--sm" id="tool-url-encode" data-i18n="Кодувати">Кодувати</button>
-                  <button type="button" class="btn btn--outline btn--sm" id="tool-url-decode" data-i18n="Декодувати">Декодувати</button>
-                </div>
-                <output class="lab-tool-output" id="tool-url-output" aria-live="polite"></output>
-              </article>
-              <article class="lab-tool-card">
-                <h3>Base64</h3>
-                <label for="tool-base64-input" data-i18n="Текст">Текст</label>
-                <textarea id="tool-base64-input" rows="3" spellcheck="false"></textarea>
-                <div class="lab-tool-actions">
-                  <button type="button" class="btn btn--outline btn--sm" id="tool-base64-encode" data-i18n="Кодувати">Кодувати</button>
-                  <button type="button" class="btn btn--outline btn--sm" id="tool-base64-decode" data-i18n="Декодувати">Декодувати</button>
-                </div>
-                <output class="lab-tool-output" id="tool-base64-output" aria-live="polite"></output>
-              </article>
-              <article class="lab-tool-card">
-                <h3>SHA-256</h3>
-                <label for="tool-hash-input" data-i18n="Текст для локального хешування">Текст для локального хешування</label>
-                <textarea id="tool-hash-input" rows="3" spellcheck="false"></textarea>
-                <div class="lab-tool-actions">
-                  <button type="button" class="btn btn--outline btn--sm" id="tool-hash-run" data-i18n="Обчислити">Обчислити</button>
-                </div>
-                <output class="lab-tool-output" id="tool-hash-output" aria-live="polite"></output>
-              </article>
-              <article class="lab-tool-card">
-                <h3 data-i18n="Перевірка HTTP-заголовків">Перевірка HTTP-заголовків</h3>
-                <label for="tool-headers-input" data-i18n="Вставте заголовки відповіді">Вставте заголовки відповіді</label>
-                <textarea id="tool-headers-input" rows="5" spellcheck="false" placeholder="content-security-policy: ..."></textarea>
-                <div class="lab-tool-actions">
-                  <button type="button" class="btn btn--outline btn--sm" id="tool-headers-check" data-i18n="Перевірити">Перевірити</button>
-                </div>
-                <div class="lab-tool-output" id="tool-headers-output" aria-live="polite"></div>
-              </article>
-            </div>
+              <h3 data-i18n="Навчальні маршрути">Навчальні маршрути</h3>
+              <div class="lt-paths" data-lt="paths"></div>
+              <div class="lab-tools-grid" data-lt="list"></div>
+              <h3 data-i18n="Безпечна вправа: тріаж prompt injection">Безпечна вправа: тріаж prompt injection</h3>
+              <div class="lab-tool-card" data-lt="scenario"></div>
+            </details>
           </section>
         </div>
       </div>
-
       <div id="dash-panel-code" hidden>
         <section class="dash-panel dash-panel--wide code-editor-panel">
           <div class="panel-header">
