@@ -6,6 +6,7 @@ import { icon, initNavIcons } from '/icons.js';
 import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, dashTabAllowed, firstAllowedDashTab, setAllowedTabs } from '/tab-access.js';
 import { initI18n, t, getLocale } from '/i18n.js';
+import { initLabTools } from '/lab-tools.js';
 import { showConfirm, showForm } from '/dialog.js';
 import { loadSandboxInfo, initCodeEditor } from '/code-editor.js';
 import { getAttribution } from '/marketing-attribution.js';
@@ -1878,6 +1879,7 @@ if (!window.__labSubtabsBound) {
     document.getElementById('lab-panel-vm').hidden = tab.dataset.lab !== 'vm';
     document.getElementById('lab-panel-docker').hidden = tab.dataset.lab !== 'docker';
     document.getElementById('lab-panel-tools').hidden = tab.dataset.lab !== 'tools';
+    if (tab.dataset.lab === 'tools') initLabTools();
   });
 }
 
