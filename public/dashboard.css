@@ -1631,9 +1631,30 @@
 .lt-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; }
 .lt-cases { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; font-size: 0.78rem; }
 .lt-cases li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lt-reference summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; padding: 4px 0; }
+.lt-reference[open] summary { margin-bottom: 14px; }
+.lt-project-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.lt-project-bar select { flex: 1; min-width: 160px; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font: inherit; }
+.lt-workbench { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: start; }
+.lt-sidebar { display: grid; gap: 6px; align-content: start; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); position: sticky; top: 0; }
+.lt-tool-btn { text-align: left; padding: 9px 10px; border: 1px solid transparent; border-radius: var(--radius); background: transparent; color: var(--text); font: inherit; font-size: 0.82rem; cursor: pointer; }
+.lt-tool-btn:hover { background: var(--bg-card); }
+.lt-tool-btn.active { border-color: var(--accent); background: var(--accent-subtle); color: var(--accent); font-weight: 600; }
+.lt-workspace { display: grid; gap: 16px; min-width: 0; }
+.lt-tool-form { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.lt-tool-form textarea { width: 100%; min-height: 110px; padding: 10px; resize: vertical; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font: 0.82rem var(--mono); }
+.lt-tool-extra { display: flex; gap: 8px; flex-wrap: wrap; }
+.lt-tool-extra input { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font: 0.82rem var(--mono); flex: 1; min-width: 100px; }
+.lt-findings { display: grid; gap: 10px; }
+.lt-finding { padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.lt-finding-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+.lt-finding-body { margin-top: 8px; }
+.lt-finding-body pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .lt-filters { grid-template-columns: minmax(0, 1fr); }
   .learning-history-columns, .lab-tools-grid { grid-template-columns: minmax(0, 1fr); }
+  .lt-workbench { grid-template-columns: minmax(0, 1fr); }
+  .lt-sidebar { position: static; grid-auto-flow: column; overflow-x: auto; }
 }
 
 
