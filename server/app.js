@@ -286,6 +286,13 @@ export function createApp() {
     },
   }));
 
+  app.use((req, res, next) => {
+    if (/\.html?$/i.test(req.path) && !['/index.html', '/course.html'].includes(req.path)) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+    next();
+  });
+
   app.use(express.static(publicDir, {
     etag: true,
     index: false,
@@ -295,8 +302,12 @@ export function createApp() {
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     if (req.method !== 'GET') return next();
-    const page = req.path.endsWith('.html') ? req.path.slice(1) : 'index.html';
-    sendHtmlPage(res, join(publicDir, page), join(publicDir, 'index.html'));
+    if (req.path === '/' || req.path === '/index.html') {
+      return sendHtmlPage(res, join(publicDir, 'index.html'), join(publicDir, 'index.html'));
+    }
+    res.status(404).set('X-Robots-Tag', 'noindex').type('html').send(
+      '<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Сторінку не знайдено — laboratorium.</title><meta name="robots" content="noindex"></head><body style="font-family:system-ui,sans-serif;background:#0a0a0a;color:#e8e8e8;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;text-align:center"><main><h1>Сторінку не знайдено</h1><p>Ця адреса не існує або була переміщена.</p><p><a href="/" style="color:#7dd3fc">На головну</a></p></main></body></html>',
+    );
   });
 
   app.use(notFoundHandler);

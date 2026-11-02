@@ -1,5 +1,6 @@
 /* ===== CSS Variables & Themes ===== */
 :root {
+  --header-h: 78px;
   --bg: #0a0a0a;
   --bg-2: #111111;
   --bg-card: #141414;
@@ -43,6 +44,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-h, 78px) + env(safe-area-inset-top, 0px) + 12px);
   font-size: 16px;
   color-scheme: dark;
 }
@@ -53,6 +55,7 @@ body {
   color: var(--text);
   line-height: 1.6;
   overflow-x: hidden;
+  max-width: 100%;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -1328,6 +1331,8 @@ input[type="number"]::-webkit-inner-spin-button {
   flex-direction: column;
   align-items: center;
   gap: 24px;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .icosahedron-wrap {
@@ -2259,8 +2264,10 @@ input[type="number"]::-webkit-inner-spin-button {
 .mobile-menu {
   display: none;
   position: fixed;
-  inset: calc(72px + env(safe-area-inset-top, 0px)) 0 0;
+  inset: calc(var(--header-h, 78px) + env(safe-area-inset-top, 0px)) 0 0;
   z-index: 10000;
+  max-height: calc(100dvh - var(--header-h, 78px) - env(safe-area-inset-top, 0px));
+  -webkit-overflow-scrolling: touch;
   background: color-mix(in srgb, var(--bg) 96%, transparent);
   backdrop-filter: blur(24px) saturate(150%);
   -webkit-backdrop-filter: blur(24px) saturate(150%);
@@ -2272,6 +2279,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .mobile-menu.open { display: flex; }
+body.menu-open { overflow: hidden; }
 
 .mobile-menu a {
   display: flex;
@@ -2326,6 +2334,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 @media (max-width: 768px) {
+  :root { --header-h: 64px; }
   .header { min-height: calc(64px + env(safe-area-inset-top, 0px)); }
   .nav { height: 64px; gap: 10px; }
   .nav > .logo { flex: 0 0 auto; }
@@ -2334,6 +2343,9 @@ input[type="number"]::-webkit-inner-spin-button {
   .nav-links { display: none; }
   .burger { display: flex; }
   .hide-mobile { display: none; }
+  .nav-logout-slot, .nav-enroll-slot { display: none; }
+  .nav-logout-btn { min-width: 0; }
+  .burger { flex-shrink: 0; }
   .nav-actions { gap: 6px; min-width: 0; }
   .auth-nav { gap: 4px; min-width: 0; }
   .nav--app > .nav-actions > #auth-nav { display: none; }
@@ -2349,10 +2361,13 @@ input[type="number"]::-webkit-inner-spin-button {
     padding-left: 12px;
     padding-right: 12px;
   }
-  .mobile-menu { inset: calc(64px + env(safe-area-inset-top, 0px)) 0 0; }
   .conf-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  @media (max-width: 480px) {
+    .nav:not(.nav--app) .logo-text { display: none; }
   }
 
   @media (max-width: 380px) {

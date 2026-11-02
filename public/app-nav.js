@@ -1,4 +1,4 @@
-import { getUser } from '/auth.js';
+import { getUser, initBurger } from '/auth.js';
 import { icon } from '/icons.js';
 import { isAdminUser, isRestrictedUser } from '/roles.js';
 import { canAccessTab, pageAllowed } from '/tab-access.js';
@@ -70,4 +70,5 @@ export function refreshAppNav({ activePath = '', user = getUser() } = {}) {
   const wrap = document.createElement('div');
   wrap.innerHTML = renderAppNavLinks({ activePath: activePath || location.pathname, user });
   oldLinks.replaceWith(wrap.firstElementChild);
+  initBurger();
 }
