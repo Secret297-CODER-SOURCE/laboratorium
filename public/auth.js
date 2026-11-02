@@ -266,11 +266,23 @@ export function initBurger() {
     mobileMenu.appendChild(authClone);
   }
 
+  const setOpen = (open) => {
+    mobileMenu.classList.toggle('open', open);
+    document.body.classList.toggle('menu-open', open);
+    burger.setAttribute('aria-expanded', String(open));
+  };
+
   if (!burger.dataset.bound) {
     burger.dataset.bound = '1';
-    burger.addEventListener('click', () => {
-      const open = mobileMenu.classList.toggle('open');
-      burger.setAttribute('aria-expanded', open);
+    burger.addEventListener('click', () => setOpen(!mobileMenu.classList.contains('open')));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && mobileMenu.classList.contains('open')) {
+        setOpen(false);
+        burger.focus();
+      }
+    });
+    window.addEventListener('resize', () => {
+      if (getComputedStyle(burger).display === 'none') setOpen(false);
     });
   }
 
@@ -278,8 +290,7 @@ export function initBurger() {
     if (link.dataset.bound) return;
     link.dataset.bound = '1';
     link.addEventListener('click', () => {
-      mobileMenu.classList.remove('open');
-      burger.setAttribute('aria-expanded', 'false');
+      setOpen(false);
     });
   });
 }
