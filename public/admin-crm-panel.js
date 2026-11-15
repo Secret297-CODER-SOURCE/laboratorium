@@ -17,8 +17,8 @@ function money(value, currency = 'UAH') {
 
 const INTENT_LABELS = {
   individual: 'Індивідуально',
-  corporate: 'Корпоратив',
-  team: 'Команда',
+  corporate: 'Корпоративний курс',
+  team: 'Група / клас',
 };
 
 let crmCache = null;
@@ -43,11 +43,11 @@ export async function loadCrmData() {
 
 function renderStats(stats = {}) {
   return `<div class="crm-stats">
-    <div class="crm-stat"><span class="crm-stat-val">${stats.open || 0}</span><span class="crm-stat-label">Відкриті угоди</span></div>
-    <div class="crm-stat"><span class="crm-stat-val">${money(stats.pipeline_value)}</span><span class="crm-stat-label">Вартість воронки</span></div>
-    <div class="crm-stat"><span class="crm-stat-val">${stats.companies || 0}</span><span class="crm-stat-label">Компанії</span></div>
-    <div class="crm-stat"><span class="crm-stat-val">${stats.contacts || 0}</span><span class="crm-stat-label">Контакти</span></div>
-    <div class="crm-stat"><span class="crm-stat-val">${stats.won_30d || 0}</span><span class="crm-stat-label">Виграно / 30д</span></div>
+    <div class="crm-stat"><span class="crm-stat-val">${stats.open || 0}</span><span class="crm-stat-label">Активні заявки</span></div>
+    <div class="crm-stat"><span class="crm-stat-val">${money(stats.pipeline_value)}</span><span class="crm-stat-label">Потенціал оплат</span></div>
+    <div class="crm-stat"><span class="crm-stat-val">${stats.companies || 0}</span><span class="crm-stat-label">Організації</span></div>
+    <div class="crm-stat"><span class="crm-stat-val">${stats.contacts || 0}</span><span class="crm-stat-label">Ліди / учні</span></div>
+    <div class="crm-stat"><span class="crm-stat-val">${stats.won_30d || 0}</span><span class="crm-stat-label">Стали учнями / 30д</span></div>
   </div>`;
 }
 
@@ -61,7 +61,7 @@ function renderCard(opp) {
   return `<article class="crm-card" draggable="true" data-opp-id="${opp.id}" data-stage="${esc(opp.stage)}">
     <button type="button" class="crm-card-open" data-opp-id="${opp.id}">
       <strong>${esc(opp.title)}</strong>
-      <span class="crm-card-meta">${esc(opp.company_name || opp.contact_name || 'Без компанії')}</span>
+      <span class="crm-card-meta">${esc(opp.contact_name || opp.company_name || 'Без контакту')}</span>
       <span class="crm-card-meta">${esc(opp.contact_email || opp.program || '—')}</span>
       <div class="crm-card-footer">
         <span class="crm-pill">${esc(INTENT_LABELS[opp.intent] || opp.intent || 'lead')}</span>
@@ -101,7 +101,7 @@ function renderPipeline(data) {
 
 function renderCompanies(companies) {
   return `<div class="admin-table-wrap"><table class="admin-table">
-    <thead><tr><th>Компанія</th><th>Галузь</th><th>Розмір</th><th>Контакти</th><th>Угоди</th><th>Сайт</th></tr></thead>
+    <thead><tr><th>Організація / школа</th><th>Сфера</th><th>Розмір</th><th>Люди</th><th>Заявки</th><th>Сайт</th></tr></thead>
     <tbody>
       ${companies.map((c) => `<tr>
         <td><strong>${esc(c.name)}</strong></td>
@@ -110,14 +110,14 @@ function renderCompanies(companies) {
         <td>${c.contacts_count || 0}</td>
         <td>${c.open_deals || 0}</td>
         <td>${c.website ? `<a href="${esc(c.website)}" target="_blank" rel="noopener">${esc(c.website)}</a>` : '—'}</td>
-      </tr>`).join('') || '<tr><td colspan="6" class="empty-state">Додайте першу компанію</td></tr>'}
+      </tr>`).join('') || '<tr><td colspan="6" class="empty-state">Додайте організацію (за потреби)</td></tr>'}
     </tbody>
   </table></div>`;
 }
 
 function renderContacts(contacts) {
   return `<div class="admin-table-wrap"><table class="admin-table">
-    <thead><tr><th>Контакт</th><th>Email</th><th>Телефон</th><th>Посада</th><th>Компанія</th></tr></thead>
+    <thead><tr><th>Лід / учень</th><th>Email</th><th>Телефон</th><th>Роль</th><th>Організація</th></tr></thead>
     <tbody>
       ${contacts.map((c) => `<tr>
         <td><strong>${esc(c.name)}</strong></td>
@@ -125,7 +125,7 @@ function renderContacts(contacts) {
         <td>${c.phone ? `<a href="tel:${esc(String(c.phone).replace(/[^\d+]/g, ''))}">${esc(c.phone)}</a>` : '—'}</td>
         <td>${esc(c.job_title || '—')}</td>
         <td>${esc(c.company_name || '—')}</td>
-      </tr>`).join('') || '<tr><td colspan="5" class="empty-state">Контактів поки немає</td></tr>'}
+      </tr>`).join('') || '<tr><td colspan="5" class="empty-state">Лідів поки немає — вони зʼявляться з заявок сайту</td></tr>'}
     </tbody>
   </table></div>`;
 }
@@ -136,7 +136,7 @@ function renderDetail(detail) {
   return `<aside class="crm-drawer" id="crm-drawer">
     <header class="crm-drawer-head">
       <div>
-        <span class="section-tag">угода #${o.id}</span>
+        <span class="section-tag">заявка #${o.id}</span>
         <h3>${esc(o.title)}</h3>
       </div>
       <button type="button" class="btn btn--ghost btn--sm" id="crm-drawer-close">${icon('x', 'ico ico--sm')}</button>
@@ -147,21 +147,21 @@ function renderDetail(detail) {
           ${stageOptions(o.stage)}
         </select>
       </label>
-      <label>Вартість
+      <label>Сума курсу
         <input type="number" id="crm-value-input" data-opp-id="${o.id}" value="${Number(o.value) || 0}" min="0" step="100">
       </label>
-      <label>Намір
+      <label>Формат
         <select id="crm-intent-select" data-opp-id="${o.id}">
           ${Object.entries(INTENT_LABELS).map(([k, v]) => `<option value="${k}" ${o.intent === k ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
       </label>
-      <label>Очікуване закриття
+      <label>Очікуваний старт / оплата
         <input type="date" id="crm-close-input" data-opp-id="${o.id}" value="${esc((o.expected_close || '').slice(0, 10))}">
       </label>
     </div>
     <div class="crm-drawer-meta">
-      <p><strong>Контакт:</strong> ${esc(contact?.name || '—')} · ${esc(contact?.email || '')}</p>
-      <p><strong>Компанія:</strong> ${esc(company?.name || '—')}</p>
+      <p><strong>Учень / лід:</strong> ${esc(contact?.name || '—')} · ${esc(contact?.email || '')}</p>
+      <p><strong>Організація:</strong> ${esc(company?.name || '—')}</p>
       <p><strong>Програма:</strong> ${esc(o.program || '—')}</p>
       <p><strong>Джерело:</strong> ${esc(o.source || '—')}</p>
     </div>
@@ -191,17 +191,17 @@ export function renderCrmPanel(data, detail = null) {
   return `<section class="admin-panel admin-panel--wide crm-panel">
     <div class="admin-panel-head crm-panel-head">
       <div>
-        <h2>${icon('target', 'ico ico--md')}CRM · воронка заявок</h2>
-        <p class="crm-panel-sub">Компанії, контакти та угоди з заявок сайту — у стилі сучасної CRM.</p>
+        <h2>${icon('target', 'ico ico--md')}CRM школи</h2>
+        <p class="crm-panel-sub">Воронка від заявки до учня: дзвінки, умови, оплата, зарахування.</p>
       </div>
       <div class="crm-toolbar">
         <div class="crm-view-switch" role="tablist">
           <button type="button" class="crm-view-btn${crmView === 'pipeline' ? ' active' : ''}" data-crm-view="pipeline">Воронка</button>
-          <button type="button" class="crm-view-btn${crmView === 'companies' ? ' active' : ''}" data-crm-view="companies">Компанії</button>
-          <button type="button" class="crm-view-btn${crmView === 'contacts' ? ' active' : ''}" data-crm-view="contacts">Контакти</button>
+          <button type="button" class="crm-view-btn${crmView === 'companies' ? ' active' : ''}" data-crm-view="companies">Організації</button>
+          <button type="button" class="crm-view-btn${crmView === 'contacts' ? ' active' : ''}" data-crm-view="contacts">Ліди</button>
         </div>
-        <button type="button" class="btn btn--outline btn--sm" id="crm-add-company">${icon('plus', 'ico ico--sm')}Компанія</button>
-        <button type="button" class="btn btn--primary btn--sm" id="crm-add-deal">${icon('plus', 'ico ico--sm')}Угода</button>
+        <button type="button" class="btn btn--outline btn--sm" id="crm-add-company">${icon('plus', 'ico ico--sm')}Організація</button>
+        <button type="button" class="btn btn--primary btn--sm" id="crm-add-deal">${icon('plus', 'ico ico--sm')}Заявка</button>
       </div>
     </div>
     ${renderStats(data.stats)}
@@ -268,16 +268,16 @@ export function bindCrmPanelEvents(showToast, load) {
   });
 
   const createDeal = async (stage = 'lead') => {
-    const title = await showPrompt('Назва угоди (напр. Acme — AppSec команда)');
+    const title = await showPrompt('Назва заявки (напр. Іван — Web Security)');
     if (!title) return;
     try {
       const { opportunity } = await api('/admin/crm/opportunities', {
         method: 'POST',
-        body: JSON.stringify({ title, stage, intent: 'corporate', source: 'manual' }),
+        body: JSON.stringify({ title, stage, intent: 'individual', source: 'manual' }),
       });
       selectedOppId = opportunity.id;
       crmView = 'pipeline';
-      showToast('Угоду створено');
+      showToast('Заявку створено');
       await refresh(showToast, load);
     } catch (err) {
       showToast(err.message, 'error');
@@ -285,11 +285,11 @@ export function bindCrmPanelEvents(showToast, load) {
   };
 
   document.getElementById('crm-add-company')?.addEventListener('click', async () => {
-    const name = await showPrompt('Назва компанії');
+    const name = await showPrompt('Назва організації / школи');
     if (!name) return;
     try {
       await api('/admin/crm/companies', { method: 'POST', body: JSON.stringify({ name }) });
-      showToast('Компанію створено');
+      showToast('Організацію створено');
       crmView = 'companies';
       await refresh(showToast, load);
     } catch (err) {

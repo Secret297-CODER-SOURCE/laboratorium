@@ -37,6 +37,7 @@ function mapAssignment(row) {
     bounty_reward: row.bounty_reward,
     due_at: row.due_at,
     time_limit_minutes: row.time_limit_minutes,
+    circuit_project_id: row.circuit_project_id || null,
     group_id: row.group_id,
     group_name: row.group_name,
     group_color: row.group_color,
@@ -61,6 +62,7 @@ const assignmentSelect = `
     t.bounty_reward,
     t.due_at,
     t.time_limit_minutes,
+    t.circuit_project_id,
     t.group_id,
     t.created_at as task_created_at,
     g.name as group_name,
@@ -168,21 +170,38 @@ export function createTask(actorId, actorRole, data) {
   const time_limit_minutes = data.time_limit_minutes
     ? parseInt(data.time_limit_minutes, 10)
     : null;
+  let circuit_project_id = data.circuit_project_id
+    ? parseInt(data.circuit_project_id, 10)
+    : null;
+  if (circuit_project_id) {
+    const exists = db.prepare('SELECT id FROM circuit_projects WHERE id = ?').get(circuit_project_id);
+    if (!exists) throw new ValidationError('Проєкт схеми не знайдено');
+  } else {
+    circuit_project_id = null;
+  }
 
   const result = db.prepare(`
-    INSERT INTO tasks (group_id, created_by, title, description, bounty_reward, due_at, time_limit_minutes)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(groupId, actorId, title, description, bounty_reward, due_at, time_limit_minutes);
+    INSERT INTO tasks (group_id, created_by, title, description, bounty_reward, due_at, time_limit_minutes, circuit_project_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(groupId, actorId, title, description, bounty_reward, due_at, time_limit_minutes, circuit_project_id);
 
   const taskId = result.lastInsertRowid;
   const members = groupService.listGroupMembers(groupId, actorId, actorRole);
+  const requestedIds = Array.isArray(data.student_ids)
+    ? data.student_ids.map((id) => parseInt(id, 10)).filter(Number.isFinite)
+    : null;
+  const assignees = requestedIds?.length
+    ? members.filter((m) => requestedIds.includes(m.id))
+    : members;
+  if (!assignees.length) throw new ValidationError('Немає учнів для призначення');
+
   const insertAssignment = db.prepare(`
     INSERT INTO task_assignments (task_id, user_id, status)
     VALUES (?, ?, 'available')
   `);
 
   const tx = db.transaction(() => {
-    for (const m of members) {
+    for (const m of assignees) {
       insertAssignment.run(taskId, m.id);
     }
   });

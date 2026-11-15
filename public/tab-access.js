@@ -16,6 +16,8 @@ const DASH_TAB_MAP = {
   ctf: 'dash.ctf',
   tests: 'dash.tests',
   lab: 'dash.lab',
+  code: 'dash.code',
+  circuits: 'dash.circuits',
   article: 'dash.article',
   manuals: 'dash.manuals',
 };
@@ -56,6 +58,6 @@ export function pageAllowed(pageKey) {
 }
 
 export function firstAllowedDashTab(fallback = 'home') {
-  const order = ['home', 'ctf', 'tests', 'lab', 'article', 'manuals'];
+  const order = ['home', 'ctf', 'tests', 'lab', 'code', 'circuits', 'article', 'manuals'];
   return order.find(t => dashTabAllowed(t)) || fallback;
 }

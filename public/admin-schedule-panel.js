@@ -1,6 +1,7 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
 import { showConfirm, showForm } from '/dialog.js';
+import { handleLink } from '/user-handle.js';
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (char) => ({
@@ -45,7 +46,7 @@ function renderStudentBars(byStudent) {
   return `<div class="sched-student-bars">
     ${byStudent.map(s => `
       <div class="sched-student-row">
-        <span class="sched-student-name">@${esc(s.handle)}</span>
+        <span class="sched-student-name">${handleLink(s.handle)}</span>
         <div class="sched-student-track">
           <div class="sched-student-fill" style="width:${s.attendance_pct}%"></div>
         </div>
@@ -188,7 +189,7 @@ export function renderSchedulePanel(groups, scheduleData = {}, groupFilter = '',
           ${absences.length ? absences.map(a => `
             <article class="sched-absence-item ${a.status}">
               <div>
-                <strong>@${esc(a.student_handle)}</strong> · ${esc(a.group_name)}
+                <strong>${handleLink(a.student_handle)}</strong> · ${esc(a.group_name)}
                 <div class="sched-lesson-meta">${esc(a.lesson_title)} · ${fmtLessonDate(a.lesson_at)}</div>
                 <blockquote class="sched-reason">${esc(a.reason)}</blockquote>
               </div>

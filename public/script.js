@@ -122,7 +122,7 @@ async function loadLeaderboard() {
       el.innerHTML = '<li class="leaderboard-empty">Рейтинг поки порожній</li>';
       return;
     }
-    el.innerHTML = top.map(u => `<li><span class="rank">${String(u.rank).padStart(2, '0')}</span><span class="name">${u.profile_public ? `<a href="/student-profile.html?handle=${encodeURIComponent(u.handle)}">@${escHtml(u.handle)}</a>` : `@${escHtml(u.handle)}`}</span><span class="pts">${u.bounty_points.toLocaleString('uk-UA')}</span></li>`).join('');
+    el.innerHTML = top.map(u => `<li><span class="rank">${String(u.rank).padStart(2, '0')}</span><span class="name"><a class="user-handle-link" href="/student-profile.html?handle=${encodeURIComponent(u.handle)}">@${escHtml(u.handle)}</a></span><span class="pts">${u.bounty_points.toLocaleString('uk-UA')}</span></li>`).join('');
   } catch {
     el.innerHTML = '<li class="leaderboard-empty">Рейтинг тимчасово недоступний</li>';
   }

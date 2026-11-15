@@ -9,6 +9,7 @@ import { initI18n, t, getLocale } from '/i18n.js';
 import { initLabTools } from '/lab-tools.js';
 import { showConfirm, showForm } from '/dialog.js';
 import { loadSandboxInfo, initCodeEditor } from '/code-editor.js';
+import { loadCircuitsInfo, initCircuitsLab } from '/circuits-lab.js';
 import { getAttribution } from '/marketing-attribution.js';
 import { trackPageView } from '/analytics.js';
 import { renderAchievementCard } from '/achievement-cards.js';
@@ -308,6 +309,7 @@ function renderDashboard(data) {
   if (activeDashTab === 'tests') loadQuizzesPanel();
   if (activeDashTab === 'lab') loadLabPanel();
   if (activeDashTab === 'code') initCodeEditor();
+  if (activeDashTab === 'circuits') initCircuitsLab();
 }
 
 function renderCtfAwards(awards) {
@@ -371,19 +373,22 @@ function renderLearningHistory(history) {
   </div>`;
 }
 
-const ALL_TABS = ['home', 'ctf', 'tests', 'lab', 'code', 'article', 'manuals'];
+const ALL_TABS = ['home', 'ctf', 'tests', 'lab', 'code', 'circuits', 'article', 'manuals'];
 
 function setupDashTabs(canWriteArticles) {
   const tabsEl = document.getElementById('dash-tabs');
   const articleBtn = document.getElementById('tab-article-btn');
   const codeBtn = document.getElementById('tab-code-btn');
+  const circuitsBtn = document.getElementById('tab-circuits-btn');
   const articleAllowed = canWriteArticles && dashTabAllowed('article');
   const codeAllowed = canUseCode && dashTabAllowed('code');
+  const circuitsAllowed = canUseCircuits && dashTabAllowed('circuits');
 
   if (!ALL_TABS.includes(activeDashTab)) activeDashTab = 'home';
   if (!dashTabAllowed(activeDashTab)) activeDashTab = firstAllowedDashTab('home');
   if (activeDashTab === 'article' && !articleAllowed) activeDashTab = firstAllowedDashTab('home');
   if (activeDashTab === 'code' && !codeAllowed) activeDashTab = firstAllowedDashTab('home');
+  if (activeDashTab === 'circuits' && !circuitsAllowed) activeDashTab = firstAllowedDashTab('home');
 
   tabsEl.hidden = false;
   tabsEl.querySelectorAll('.dash-tab').forEach(tab => {
@@ -393,6 +398,8 @@ function setupDashTabs(canWriteArticles) {
       tab.hidden = !articleAllowed;
     } else if (id === 'code') {
       tab.hidden = !codeAllowed;
+    } else if (id === 'circuits') {
+      tab.hidden = !circuitsAllowed;
     } else {
       tab.hidden = !allowed;
     }
@@ -401,12 +408,15 @@ function setupDashTabs(canWriteArticles) {
 
   if (articleBtn) articleBtn.hidden = !articleAllowed;
   if (codeBtn) codeBtn.hidden = !codeAllowed;
+  if (circuitsBtn) circuitsBtn.hidden = !circuitsAllowed;
 
   document.getElementById('dash-panel-home').hidden = activeDashTab !== 'home';
   document.getElementById('dash-panel-ctf').hidden = activeDashTab !== 'ctf';
   document.getElementById('dash-panel-tests').hidden = activeDashTab !== 'tests';
   document.getElementById('dash-panel-lab').hidden = activeDashTab !== 'lab';
   document.getElementById('dash-panel-code').hidden = activeDashTab !== 'code';
+  const circuitsPanel = document.getElementById('dash-panel-circuits');
+  if (circuitsPanel) circuitsPanel.hidden = activeDashTab !== 'circuits';
   document.getElementById('dash-panel-article').hidden = activeDashTab !== 'article';
   document.getElementById('dash-panel-manuals').hidden = activeDashTab !== 'manuals';
 }
@@ -428,6 +438,7 @@ if (!window.__dashTabsBound) {
     if (activeDashTab === 'tests') loadQuizzesPanel();
     if (activeDashTab === 'lab') loadLabPanel();
     if (activeDashTab === 'code') initCodeEditor();
+    if (activeDashTab === 'circuits') initCircuitsLab();
   });
 }
 
@@ -676,6 +687,9 @@ function renderTaskCard(task) {
   const duration = (task.status === 'completed' && task.duration_seconds != null)
     ? `<div class="task-card-meta">${t('Час виконання: {time}', { time: formatDurationLabel(task.duration_seconds) })}</div>`
     : '';
+  const circuit = task.circuit_project_id
+    ? `<div class="task-card-meta"><a href="/dashboard.html?tab=circuits&circuit=${task.circuit_project_id}">${t('Відкрити схему Circuits')}</a></div>`
+    : '';
 
   const filesList = (files) => (files || []).length ? `
     <div class="task-submission-files">
@@ -711,7 +725,7 @@ function renderTaskCard(task) {
     <article class="task-card" style="--group-color:${task.group_color || 'var(--accent)'}">
       <h4>${task.title}</h4>
       ${task.description ? `<p>${task.description}</p>` : ''}
-      ${group}${bounty}${due}${limit}${timer}${duration}
+      ${group}${bounty}${due}${limit}${timer}${duration}${circuit}
       <div class="task-card-actions">${actions}</div>
     </article>`;
 }
@@ -976,6 +990,7 @@ function renderBountyLog(log) {
 }
 
 let canUseCode = false;
+let canUseCircuits = false;
 
 async function loadDashboard() {
   await loadTabAccess();
@@ -989,6 +1004,9 @@ async function loadDashboard() {
   try {
     canUseCode = (await loadSandboxInfo()).canUse;
   } catch { canUseCode = false; }
+  try {
+    canUseCircuits = (await loadCircuitsInfo()).canUse;
+  } catch { canUseCircuits = false; }
   renderDashboard(data);
 }
 
@@ -1011,8 +1029,9 @@ function renderRestrictedDashboard(data) {
   document.getElementById('tier-progress-wrap').hidden = true;
   document.querySelector('#dash-panel-home .dash-grid').hidden = true;
   document.getElementById('dash-panel-home').hidden = false;
-  ['dash-panel-ctf', 'dash-panel-tests', 'dash-panel-lab', 'dash-panel-code', 'dash-panel-article'].forEach(id => {
-    document.getElementById(id).hidden = true;
+  ['dash-panel-ctf', 'dash-panel-tests', 'dash-panel-lab', 'dash-panel-code', 'dash-panel-circuits', 'dash-panel-article'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = true;
   });
   document.getElementById('dash-restricted-view').hidden = false;
   loadSupportCenter();

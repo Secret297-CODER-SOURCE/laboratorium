@@ -22,6 +22,9 @@ import * as settingsService from '../services/settings.service.js';
 import { addBounty, getBountyLog, getUserRank } from '../services/bounty.service.js';
 import * as notificationService from '../services/notification.service.js';
 import * as errorLogService from '../services/error-log.service.js';
+import * as searchService from '../services/search.service.js';
+import * as followService from '../services/follow.service.js';
+import * as chatService from '../services/chat.service.js';
 import { getTier, getNextTier } from '../utils/tier.js';
 import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../utils/errors.js';
 import QRCode from 'qrcode';
@@ -114,8 +117,11 @@ export async function getPublicProgramPage(req, res) {
   res.json({ program, direction, page });
 }
 
-export async function getLeaderboard(_req, res) {
-  const users = applicationService.getLeaderboard();
+export async function getLeaderboard(req, res) {
+  const users = applicationService.getLeaderboard(20, {
+    viewerId: req.user?.id || null,
+    viewerRole: req.user?.role || null,
+  });
   res.json({
     leaderboard: users.map((u, i) => ({
       rank: i + 1,
@@ -125,6 +131,7 @@ export async function getLeaderboard(_req, res) {
       bounty_points: u.bounty_points,
       tier: getTier(u.bounty_points).name,
     })),
+    scoped: !!(req.user && req.user.role === 'student'),
   });
 }
 
@@ -167,6 +174,10 @@ export async function getSiteInfo(_req, res) {
     appUrl: config.appUrl,
     staticVersion: config.staticVersion,
   });
+}
+
+export async function searchSite(req, res) {
+  res.json(searchService.searchPublic(req.query.q, { limit: req.query.limit }));
 }
 
 export async function recordAnalyticsEvent(req, res) {
@@ -294,7 +305,10 @@ export async function getDashboard(req, res) {
 export async function getStudentPublicProfile(req, res) {
   const user = userService.findByHandle(req.params.handle);
   if (!user || user.role !== 'student') throw new NotFoundError('Профіль не знайдено');
-  if (user.id !== req.user.id && !user.profile_public) throw new NotFoundError('Профіль не знайдено');
+  const isStaff = ['teacher', 'owner', 'developer'].includes(req.user.role);
+  if (user.id !== req.user.id && !user.profile_public && !isStaff) {
+    throw new NotFoundError('Профіль не знайдено');
+  }
 
   const isOwnProfile = user.id === req.user.id;
   const challenges = challengeService.getAllForUser(user.id);
@@ -320,9 +334,13 @@ export async function getStudentPublicProfile(req, res) {
   const sharedSolutions = user.profile_share_solutions
     ? studentProfileService.listSharedCompletedTasks(user.id)
     : [];
+  const followCounts = followService.getFollowCounts(user.id);
+  const viewerFollows = !isOwnProfile && followService.isFollowing(req.user.id, user.id);
+  const canMessage = !isOwnProfile && chatService.canStartDm(req.user.id, user.id, req.user.role);
 
   res.json({
     profile: {
+      id: user.id,
       name: user.name,
       handle: user.handle,
       bio: user.profile_bio || '',
@@ -331,6 +349,10 @@ export async function getStudentPublicProfile(req, res) {
       rank: getUserRank(points),
       joinedAt: user.created_at,
       isOwnProfile,
+      isFollowing: viewerFollows,
+      followerCount: followCounts.followers,
+      followingCount: followCounts.following,
+      canMessage,
       hiddenAwards: isOwnProfile ? hiddenAwards : [],
       stats: {
         completedTasks,
@@ -343,6 +365,24 @@ export async function getStudentPublicProfile(req, res) {
       sharedSolutions,
     },
   });
+}
+
+export async function followStudent(req, res) {
+  const result = followService.follow(req.user.id, req.params.handle);
+  if (result.userId) {
+    notificationService.notifyUser(result.userId, {
+      type: 'profile_follow',
+      title: 'Нова підписка',
+      body: `@${req.user.handle} підписався на ваш профіль`,
+      link: `/student-profile.html?handle=${encodeURIComponent(req.user.handle)}`,
+    });
+  }
+  res.json({ ok: true, ...result, message: 'Підписку оформлено' });
+}
+
+export async function unfollowStudent(req, res) {
+  const result = followService.unfollow(req.user.id, req.params.handle);
+  res.json({ ok: true, ...result, message: 'Підписку скасовано' });
 }
 
 export async function enroll(req, res) {

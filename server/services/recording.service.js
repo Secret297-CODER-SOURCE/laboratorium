@@ -6,6 +6,7 @@ import db from '../db/index.js';
 import * as storageService from './storage.service.js';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors.js';
 import { userHasGroupAccess } from './chat.service.js';
+import { getPolicy } from './access-policy.service.js';
 
 if (!existsSync(config.uploads.recordingsDir)) {
   mkdirSync(config.uploads.recordingsDir, { recursive: true });
@@ -37,7 +38,10 @@ function canAccessRecording(rec, userId, userRole) {
   const conf = db.prepare('SELECT host_user_id, group_id FROM conferences WHERE id = ?').get(rec.conference_id);
   if (!conf) return false;
   if (conf.host_user_id === userId) return true;
-  if (conf.group_id && userHasGroupAccess(conf.group_id, userId, userRole)) return true;
+  if (conf.group_id && getPolicy().recordings.groupMembersCanView
+    && userHasGroupAccess(conf.group_id, userId, userRole)) {
+    return true;
+  }
   return false;
 }
 
@@ -62,6 +66,7 @@ export function list({ userId, userRole, conferenceId } = {}) {
   const params = [];
   if (conferenceId) { sql += ' AND r.conference_id = ?'; params.push(conferenceId); }
   if (userId && !['owner', 'developer'].includes(userRole)) {
+    const groupView = getPolicy().recordings.groupMembersCanView;
     sql += ` AND (
       r.uploaded_by = ?
       OR EXISTS (
@@ -74,16 +79,17 @@ export function list({ userId, userRole, conferenceId } = {}) {
       )
       OR EXISTS (
         SELECT 1 FROM conferences c2
-        JOIN study_group_members gm ON gm.group_id = c2.group_id
-        WHERE c2.id = r.conference_id AND gm.user_id = ?
-      )
-      OR EXISTS (
-        SELECT 1 FROM conferences c2
         JOIN study_groups g ON g.id = c2.group_id
         WHERE c2.id = r.conference_id AND g.teacher_id = ?
       )
+      ${groupView ? `OR EXISTS (
+        SELECT 1 FROM conferences c2
+        JOIN study_group_members gm ON gm.group_id = c2.group_id
+        WHERE c2.id = r.conference_id AND gm.user_id = ?
+      )` : ''}
     )`;
-    params.push(userId, userId, userId, userId, userId);
+    params.push(userId, userId, userId, userId);
+    if (groupView) params.push(userId);
   }
   sql += ' ORDER BY r.created_at DESC';
   return db.prepare(sql).all(...params).map(enrichRecording);

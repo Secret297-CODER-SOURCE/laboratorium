@@ -5,6 +5,9 @@ import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, pageAllowed } from '/tab-access.js';
 import { initNumberInputs } from '/number-inputs.js';
 import { mountUnifiedCalendar } from '/unified-calendar.js';
+import {
+  formatInSiteTz, localInTzToUtcIso, utcIsoToLocalInput, timezoneLabel, getSiteTimeZone,
+} from '/timezone.js';
 
 initTheme();
 initNumberInputs();
@@ -52,11 +55,34 @@ async function loadGroups() {
     const { groups } = await api(user.role === 'teacher' ? '/admin/groups' : '/admin/groups?all=1');
     const sel = document.getElementById('group-select');
     const quickSel = document.getElementById('quick-group-select');
-    (groups || []).forEach(g => {
-      const opt = `<option value="${g.id}">${g.name}</option>`;
-      sel.insertAdjacentHTML('beforeend', opt);
-      quickSel.insertAdjacentHTML('beforeend', opt);
-    });
+    const cohorts = (groups || []).filter((g) => g.kind !== 'individual');
+    const pods = (groups || []).filter((g) => g.kind === 'individual');
+    const fill = (target) => {
+      if (cohorts.length) {
+        const og = document.createElement('optgroup');
+        og.label = 'Групи';
+        cohorts.forEach((g) => {
+          const o = document.createElement('option');
+          o.value = g.id;
+          o.textContent = g.name;
+          og.appendChild(o);
+        });
+        target.appendChild(og);
+      }
+      if (pods.length) {
+        const og = document.createElement('optgroup');
+        og.label = 'Індивідуальні';
+        pods.forEach((g) => {
+          const o = document.createElement('option');
+          o.value = g.id;
+          o.textContent = g.name;
+          og.appendChild(o);
+        });
+        target.appendChild(og);
+      }
+    };
+    fill(sel);
+    fill(quickSel);
     if (!teacherRequiresGroup) {
       document.getElementById('quick-group-label').hidden = true;
       quickSel.removeAttribute('required');
@@ -69,8 +95,7 @@ async function loadGroups() {
 }
 
 function formatDateRu(iso) {
-  const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return formatInSiteTz(iso);
 }
 
 function statusLabel(s) {
@@ -80,22 +105,23 @@ function statusLabel(s) {
 }
 
 function confCardHTML(c) {
-  const d = new Date(c.scheduled_at);
-  const day = d.getDate();
-  const month = MONTHS[d.getMonth()].slice(0,3).toUpperCase();
-  const time = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const local = utcIsoToLocalInput(c.scheduled_at);
+  const [datePart, timePart = '00:00'] = (local || '').split('T');
+  const [, m = '1', day = '1'] = (datePart || '').split('-');
+  const month = MONTHS[Math.max(0, Number(m) - 1)]?.slice(0, 3).toUpperCase() || '';
+  const time = timePart.slice(0, 5);
   const canJoin = c.status === 'scheduled' || c.status === 'live';
 
   return `
   <article class="conf-card" data-id="${c.id}">
     <div class="conf-date-block">
-      <span class="conf-date-day">${day}</span>
+      <span class="conf-date-day">${Number(day) || '—'}</span>
       <span class="conf-date-month">${month}</span>
     </div>
     <div>
       <h3>${c.title}</h3>
       <div class="conf-meta">
-        <span class="meta-icon">${icon('clock', 'ico ico--sm')}${time} · ${c.duration_minutes} хв</span>
+        <span class="meta-icon">${icon('clock', 'ico ico--sm')}${time} (${timezoneLabel()}) · ${c.duration_minutes} хв</span>
         <span class="meta-icon">${icon('user', 'ico ico--sm')}${c.host_handle || c.host_name}</span>
         ${c.program_name ? `<span class="meta-icon">${icon('book', 'ico ico--sm')}${c.program_name}</span>` : ''}
         ${c.group_name ? `<span class="meta-icon">${icon('users', 'ico ico--sm')}${c.group_name}</span>` : ''}
@@ -164,10 +190,11 @@ function closeCreateModal() {
 document.getElementById('create-conf-btn').addEventListener('click', openCreateModal);
 
 document.getElementById('choose-planned').addEventListener('click', () => {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() + 30);
+  const soon = new Date(Date.now() + 30 * 60 * 1000);
   document.querySelector('#create-form [name="scheduledAt"]').value =
-    now.toISOString().slice(0, 16);
+    utcIsoToLocalInput(soon.toISOString());
+  const hint = document.getElementById('conf-tz-hint');
+  if (hint) hint.textContent = `Час у зоні ${timezoneLabel()} (${getSiteTimeZone()})`;
   showCreateStep('planned');
 });
 
@@ -197,7 +224,7 @@ document.getElementById('create-form').addEventListener('submit', async (e) => {
     const body = {
       title: fd.get('title'),
       description: fd.get('description') || undefined,
-      scheduledAt: new Date(fd.get('scheduledAt')).toISOString(),
+      scheduledAt: localInTzToUtcIso(fd.get('scheduledAt')),
       durationMinutes: parseInt(fd.get('durationMinutes'), 10),
       maxParticipants: parseInt(fd.get('maxParticipants'), 10),
       programId: fd.get('programId') ? parseInt(fd.get('programId'), 10) : null,

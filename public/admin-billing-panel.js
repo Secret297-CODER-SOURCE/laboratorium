@@ -1,6 +1,7 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
 import { showConfirm, showPrompt } from '/dialog.js';
+import { handleLink } from '/user-handle.js';
 
 const MONTHS = [
   'Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
@@ -59,7 +60,7 @@ export function renderBillingPanel(data = {}) {
       </div>
     </div>
     <p class="billing-hint">
-      Щомісячна оплата. День платежу налаштовується для кожного учня (1–28).
+      Щомісячна оплата. День платежу (1–28) і окрема дата наступної оплати — для кожного учня.
       Після прострочки — <strong>${data.graceDays ?? 4} дні</strong> доступу, потім платформа блокується.
     </p>
     <div class="billing-summary">
@@ -72,6 +73,7 @@ export function renderBillingPanel(data = {}) {
         <tr>
           <th>Учень</th>
           <th>День оплати</th>
+          <th>Наступна оплата</th>
           <th>Статус</th>
           <th>Оплата за ${esc(MONTHS[month - 1])} ${year}</th>
           <th>Дедлайн / грейс</th>
@@ -79,7 +81,7 @@ export function renderBillingPanel(data = {}) {
         </tr>
       </thead>
       <tbody>
-        ${students.length ? students.map(s => renderBillingRow(s, year, month)).join('') : '<tr><td colspan="6" class="empty-state">Немає учнів</td></tr>'}
+        ${students.length ? students.map(s => renderBillingRow(s, year, month)).join('') : '<tr><td colspan="7" class="empty-state">Немає учнів</td></tr>'}
       </tbody>
     </table>
   </section>`;
@@ -99,12 +101,17 @@ function renderBillingRow(student, year, month) {
 
   return `<tr data-user-id="${student.id}">
     <td>
-      <strong>@${esc(student.handle)}</strong>
+      <strong>${handleLink(student.handle)}</strong>
       <div class="billing-user-sub">${esc(student.name)}</div>
       ${student.availableCredit > 0 ? `<div class="billing-user-sub">Доступний кредит: ${Number(student.availableCredit).toLocaleString('uk-UA')}</div>` : ''}
     </td>
     <td>
       <input class="admin-inp admin-inp--xs billing-day-inp" type="number" min="1" max="28" value="${student.billing_day || 1}" data-user-id="${student.id}">
+    </td>
+    <td>
+      <input class="admin-inp admin-inp--sm billing-next-due-inp" type="date"
+        value="${esc((student.nextDueOverride || student.next_due_override || '').toString().slice(0, 10))}"
+        data-user-id="${student.id}" title="Разова дата наступної оплати (скидається після фіксації оплати)">
     </td>
     <td><span class="billing-status ${statusClass}">${statusLabel}</span></td>
     <td>${paidCell}</td>
@@ -187,6 +194,23 @@ export function bindBillingPanelEvents(showToast, reload) {
           body: JSON.stringify({ billing_day: parseInt(inp.value, 10) }),
         });
         showToast('День оплати оновлено');
+        reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+        reload();
+      }
+    });
+  });
+
+  document.querySelectorAll('.billing-next-due-inp').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const userId = parseInt(inp.dataset.userId, 10);
+      try {
+        await api(`/admin/billing/users/${userId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ next_due_override: inp.value || null }),
+        });
+        showToast(inp.value ? 'Дату наступної оплати змінено' : 'Скинуто на день місяця');
         reload();
       } catch (err) {
         showToast(err.message, 'error');

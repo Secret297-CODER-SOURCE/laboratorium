@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import db from '../db/index.js';
 import * as storageService from './storage.service.js';
 import * as groupService from './group.service.js';
+import { getPolicy } from './access-policy.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import config from '../config/index.js';
 
@@ -63,7 +64,7 @@ function assertChannelAccess(channelId, userId, userRole) {
   return channel;
 }
 
-function usersShareGroup(userA, userB) {
+export function usersShareGroup(userA, userB) {
   const row = db.prepare(`
     SELECT 1 FROM study_group_members gm1
     JOIN study_group_members gm2 ON gm2.group_id = gm1.group_id
@@ -81,6 +82,28 @@ function usersShareGroup(userA, userB) {
     )
     LIMIT 1
   `).get(userA, userB, userB, userA);
+}
+
+export function canStartDm(userId, targetUserId, userRole) {
+  if (!userId || !targetUserId || userId === targetUserId) return false;
+  if (['owner', 'developer', 'teacher'].includes(userRole)) return true;
+
+  const mode = getPolicy().dm.studentMode || 'shared_group_or_follow';
+  if (mode === 'disabled') return false;
+  if (mode === 'anyone') return true;
+  if (usersShareGroup(userId, targetUserId)) return true;
+  if (mode === 'shared_group_only') return false;
+
+  try {
+    return !!db.prepare(`
+      SELECT 1 FROM user_follows
+      WHERE (follower_id = ? AND following_id = ?)
+         OR (follower_id = ? AND following_id = ?)
+      LIMIT 1
+    `).get(userId, targetUserId, targetUserId, userId);
+  } catch {
+    return false;
+  }
 }
 
 function syncGroupChannelMembers(channelId, groupId) {
@@ -293,8 +316,8 @@ export function getOrCreateDm(userId, targetUserId, userRole) {
   const target = db.prepare('SELECT id, name, handle FROM users WHERE id = ?').get(targetId);
   if (!target) throw new NotFoundError('Користувача не знайдено');
 
-  if (!usersShareGroup(userId, targetId) && !['owner', 'developer'].includes(userRole)) {
-    throw new ForbiddenError('Особисті повідомлення лише між учасниками однієї групи');
+  if (!canStartDm(userId, targetId, userRole)) {
+    throw new ForbiddenError('Написати можна учасникам спільної групи або після підписки');
   }
 
   const [userA, userB] = normalizePair(userId, targetId);

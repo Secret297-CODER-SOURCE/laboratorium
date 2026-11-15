@@ -530,6 +530,22 @@ export async function saveTabAccessSettings(req, res) {
   res.json({ ...data, message: 'Правила доступу збережено' });
 }
 
+export async function getAccessPolicy(_req, res) {
+  const { getPolicyMeta } = await import('../services/access-policy.service.js');
+  res.json(getPolicyMeta());
+}
+
+export async function saveAccessPolicy(req, res) {
+  const { savePolicy } = await import('../services/access-policy.service.js');
+  const data = savePolicy(req.body?.policy || req.body);
+  res.json({ ...data, message: 'Політику доступу збережено' });
+}
+
+export async function resetAccessPolicy(_req, res) {
+  const { resetPolicy } = await import('../services/access-policy.service.js');
+  res.json({ ...resetPolicy(), message: 'Політику скинуто до стандартної' });
+}
+
 export async function getBillingOverview(req, res) {
   const now = new Date();
   const year = parseInt(req.query.year, 10) || now.getFullYear();

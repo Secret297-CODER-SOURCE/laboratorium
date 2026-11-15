@@ -35,6 +35,8 @@ nano .env
 
 Повний список — у `.env.example`.
 
+Опційно для шкільної IDE (GitHub/GitLab Clone/Push, Circuits): див. [docs/school-ide.md](docs/school-ide.md) і змінні `GITHUB_*` / `GITLAB_*` / `GIT_TOKEN_ENCRYPTION_KEY` у `.env.example`.
+
 ## 2. Запуск (одна команда)
 
 ```bash

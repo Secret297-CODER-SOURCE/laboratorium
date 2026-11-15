@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 import db from '../db/index.js';
 import * as groupService from './group.service.js';
 import { userHasGroupAccess } from './chat.service.js';
+import { getPolicy } from './access-policy.service.js';
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../utils/errors.js';
 
 function generateRoomCode() {
@@ -26,7 +27,7 @@ export function create({ hostId, hostRole, title, description, programId, groupI
     if (hostRole === 'teacher' && group.teacher_id !== hostId) {
       throw new ForbiddenError('Можна створювати конференції лише для своїх груп');
     }
-  } else if (hostRole === 'teacher') {
+  } else if (hostRole === 'teacher' && getPolicy().conferences.teacherRequiresGroup) {
     throw new ValidationError('Оберіть групу для конференції');
   }
 
@@ -81,16 +82,56 @@ function conferenceVisibilitySql(userId, userRole, params) {
   if (['owner', 'developer'].includes(userRole)) return '';
   if (userRole === 'teacher') {
     params.push(userId, userId);
-    return ` AND (c.group_id IS NULL OR c.group_id IN (
+    return ` AND (c.host_user_id = ? OR c.group_id IN (
       SELECT id FROM study_groups WHERE teacher_id = ? AND is_active = 1
-    ) OR c.host_user_id = ?)`;
+    ) OR c.group_id IS NULL)`;
   }
+
+  const policy = getPolicy().conferences;
+  const scope = policy.studentScope || 'group_only';
+  if (scope === 'all') return '';
+
+  const allowUngrouped = scope === 'group_and_ungrouped' || policy.ungroupedVisibleToStudents;
   params.push(userId, userId);
-  return ` AND (c.group_id IS NULL OR c.group_id IN (
+  if (allowUngrouped) {
+    return ` AND (c.host_user_id = ? OR c.group_id IS NULL OR c.group_id IN (
+      SELECT gm.group_id FROM study_group_members gm
+      JOIN study_groups g ON g.id = gm.group_id AND g.is_active = 1
+      WHERE gm.user_id = ?
+    ))`;
+  }
+  return ` AND (c.host_user_id = ? OR c.group_id IN (
     SELECT gm.group_id FROM study_group_members gm
     JOIN study_groups g ON g.id = gm.group_id AND g.is_active = 1
     WHERE gm.user_id = ?
-  ) OR c.host_user_id = ?)`;
+  ))`;
+}
+
+/** Can this user see conference metadata / join / read chat? */
+export function canAccessConference(conf, userId, userRole) {
+  if (!conf) return false;
+  if (['owner', 'developer'].includes(userRole)) return true;
+  if (conf.host_user_id === userId) return true;
+
+  const policy = getPolicy().conferences;
+  const scope = policy.studentScope || 'group_only';
+
+  if (!conf.group_id) {
+    if (userRole === 'teacher') return true;
+    if (scope === 'all') return true;
+    return !!(scope === 'group_and_ungrouped' || policy.ungroupedVisibleToStudents);
+  }
+
+  if (scope === 'all') return true;
+  return userHasGroupAccess(conf.group_id, userId, userRole);
+}
+
+export function assertCanAccessConference(conf, userId, userRole) {
+  if (!conf) throw new NotFoundError('Конференцію не знайдено');
+  if (!canAccessConference(conf, userId, userRole)) {
+    throw new ForbiddenError('Немає доступу до цієї конференції');
+  }
+  return conf;
 }
 
 export function list({ userId, userRole, status, from, to } = {}) {
@@ -118,8 +159,8 @@ export function list({ userId, userRole, status, from, to } = {}) {
   return db.prepare(sql).all(...params);
 }
 
-export function getSchedule(from, to) {
-  return list({ from, to });
+export function getSchedule(from, to, userId, userRole) {
+  return list({ from, to, userId, userRole });
 }
 
 export function getUpcoming(userId, userRole, limit = 10) {
@@ -147,11 +188,7 @@ export function join(conferenceId, userId, userRole = 'student') {
   if (conf.status === 'cancelled') throw new ConflictError('Конференцію скасовано');
   if (conf.status === 'ended') throw new ConflictError('Конференцію завершено');
 
-  if (conf.group_id && conf.host_user_id !== userId) {
-    if (!userHasGroupAccess(conf.group_id, userId, userRole)) {
-      throw new ForbiddenError('Конференція лише для учасників групи');
-    }
-  }
+  assertCanAccessConference(conf, userId, userRole);
 
   const count = db.prepare('SELECT COUNT(*) as c FROM conference_participants WHERE conference_id = ?').get(conferenceId).c;
   const existing = db.prepare('SELECT id FROM conference_participants WHERE conference_id = ? AND user_id = ?').get(conferenceId, userId);

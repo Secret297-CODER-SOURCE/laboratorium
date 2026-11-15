@@ -107,6 +107,27 @@ export const config = {
     redirectUri: env('GOOGLE_OAUTH_REDIRECT_URI', `${env('APP_URL', 'https://laboratorium.club').replace(/\/+$/, '')}/api/auth/google/callback`),
   },
 
+  gitOAuth: {
+    encryptionKey: env('GIT_TOKEN_ENCRYPTION_KEY', ''),
+    github: {
+      clientId: env('GITHUB_CLIENT_ID', ''),
+      clientSecret: env('GITHUB_CLIENT_SECRET', ''),
+      redirectUri: env(
+        'GITHUB_OAUTH_REDIRECT_URI',
+        `${env('APP_URL', 'https://laboratorium.club').replace(/\/+$/, '')}/api/git-oauth/github/callback`,
+      ),
+    },
+    gitlab: {
+      clientId: env('GITLAB_CLIENT_ID', ''),
+      clientSecret: env('GITLAB_CLIENT_SECRET', ''),
+      redirectUri: env(
+        'GITLAB_OAUTH_REDIRECT_URI',
+        `${env('APP_URL', 'https://laboratorium.club').replace(/\/+$/, '')}/api/git-oauth/gitlab/callback`,
+      ),
+      baseUrl: env('GITLAB_BASE_URL', 'https://gitlab.com'),
+    },
+  },
+
   smtp: {
     host: env('SMTP_HOST', ''),
     port: envInt('SMTP_PORT', 587),

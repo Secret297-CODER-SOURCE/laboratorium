@@ -82,6 +82,8 @@ router.get('/tab-access', asyncHandler(apiCtrl.getTabAccess));
 router.get('/applications/mine', asyncHandler(apiCtrl.listMyApplications));
 router.get('/referrals/me', asyncHandler(apiCtrl.getMyReferralSummary));
 router.get('/students/:handle/profile', asyncHandler(apiCtrl.getStudentPublicProfile));
+router.post('/students/:handle/follow', asyncHandler(apiCtrl.followStudent));
+router.delete('/students/:handle/follow', asyncHandler(apiCtrl.unfollowStudent));
 
 router.use(requireUnrestricted);
 

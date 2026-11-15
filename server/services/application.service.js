@@ -5,6 +5,7 @@ import * as referralService from './referral.service.js';
 import * as crmService from './crm.service.js';
 import * as notificationService from './notification.service.js';
 import * as mailService from './mail.service.js';
+import { getPolicy } from './access-policy.service.js';
 import config from '../config/index.js';
 
 function notifyOwnersAboutLead(application) {
@@ -128,9 +129,53 @@ export function listForUser(userId) {
   `).all(userId);
 }
 
-export function getLeaderboard(limit = 20) {
-  return db.prepare(`
+export function getLeaderboard(limit = 20, { viewerId = null, viewerRole = null } = {}) {
+  const policy = getPolicy().leaderboard;
+
+  const globalBoard = () => db.prepare(`
     SELECT id, handle, name, bounty_points, profile_public FROM users
+    WHERE role = 'student'
     ORDER BY bounty_points DESC LIMIT ?
   `).all(limit);
+
+  if (!viewerId) {
+    return policy.guestMode === 'global' ? globalBoard() : [];
+  }
+
+  if (['owner', 'developer'].includes(viewerRole)
+    || (viewerRole === 'teacher' && policy.teacherSeesGlobal)) {
+    return globalBoard();
+  }
+
+  if (viewerRole === 'teacher') {
+    return db.prepare(`
+      SELECT DISTINCT u.id, u.handle, u.name, u.bounty_points, u.profile_public
+      FROM users u
+      JOIN study_group_members gm ON gm.user_id = u.id
+      JOIN study_groups g ON g.id = gm.group_id AND g.is_active = 1 AND g.teacher_id = ?
+      WHERE u.role = 'student'
+      ORDER BY u.bounty_points DESC LIMIT ?
+    `).all(viewerId, limit);
+  }
+
+  const mode = policy.studentMode || 'classmates';
+  if (mode === 'hidden') return [];
+  if (mode === 'global') return globalBoard();
+
+  return db.prepare(`
+    SELECT DISTINCT u.id, u.handle, u.name, u.bounty_points, u.profile_public
+    FROM users u
+    WHERE u.role = 'student'
+      AND (
+        u.id = ?
+        OR u.id IN (
+          SELECT gm2.user_id FROM study_group_members gm1
+          JOIN study_group_members gm2 ON gm2.group_id = gm1.group_id
+          JOIN study_groups g ON g.id = gm1.group_id AND g.is_active = 1
+          WHERE gm1.user_id = ?
+        )
+      )
+    ORDER BY u.bounty_points DESC
+    LIMIT ?
+  `).all(viewerId, viewerId, limit);
 }

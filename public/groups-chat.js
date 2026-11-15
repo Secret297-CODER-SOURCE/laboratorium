@@ -4,6 +4,7 @@ import { initSiteHeader, refreshAppNav } from '/site-header.js';
 import { loadTabAccess, pageAllowed } from '/tab-access.js';
 import { showAlert } from '/dialog.js';
 import { NFT_STICKERS, STICKER_THEMES, renderNftSticker } from '/chat-stickers.js';
+import { handleLink } from '/user-handle.js';
 
 if (!(await requireUnrestrictedAsync())) throw new Error('auth');
 initTheme();
@@ -17,7 +18,7 @@ initNavIcons();
     window.location.replace('/portal.html');
     return;
   }
-  loadInbox();
+  await loadInbox();
 })().catch(() => {
   document.getElementById('gc-groups').innerHTML = '<p class="empty-state">Помилка завантаження</p>';
 });
@@ -57,6 +58,7 @@ let dmMode = false;
 const params = new URLSearchParams(location.search);
 const initialGroupId = params.get('group');
 const initialTab = params.get('tab');
+const initialDmUserId = parseInt(params.get('dm'), 10) || null;
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -83,11 +85,25 @@ async function loadInbox() {
     document.getElementById('gc-sidebar-hint').textContent = 'Усі групи (режим перегляду)';
   }
   renderSidebar();
+  if (initialDmUserId) {
+    await openDmFromProfile(initialDmUserId);
+    return;
+  }
   if (initialGroupId && !activeGroupId) {
     const gid = parseInt(initialGroupId, 10);
     if (inbox.groups.find(g => g.id === gid)) {
       await openGroup(gid, initialTab || 'chat');
     }
+  }
+}
+
+async function openDmFromProfile(userId) {
+  try {
+    const data = await api('/chat/dm', { method: 'POST', body: JSON.stringify({ userId }) });
+    await openDm(data.channel_id, userId, data.messages, data.peer);
+    history.replaceState(null, '', `?dm=${userId}`);
+  } catch (err) {
+    await showAlert(err.message || 'Не вдалося відкрити особисті повідомлення');
   }
 }
 
@@ -139,7 +155,7 @@ function renderMessage(m) {
   return `
     <div class="gc-msg${own ? ' own' : ''}" data-id="${m.id}">
       <div class="gc-msg-header">
-        <span class="gc-msg-handle">@${esc(m.handle || 'system')}</span>
+        <span class="gc-msg-handle">${m.handle ? handleLink(m.handle, { className: 'user-handle-link gc-handle' }) : '@system'}</span>
         <span class="gc-msg-time">${formatTime(m.created_at)}</span>
       </div>
       ${content}
@@ -365,7 +381,7 @@ function renderRankingTable(data) {
             <tr class="gc-rank-row${s.id === USER.id ? ' gc-rank-row--me' : ''}">
               <td class="gc-rank-num">${rankBadge(s.rank)}</td>
               <td>
-                <strong>@${esc(s.handle)}</strong>
+                <strong>${handleLink(s.handle, { className: 'user-handle-link gc-handle' })}</strong>
                 <div class="gc-rank-name">${esc(s.name)}</div>
               </td>
               <td class="gc-rank-pts">${s.bounty_points.toLocaleString('uk-UA')}</td>
@@ -380,7 +396,7 @@ function renderRankingTable(data) {
       ${data.teacher ? `
         <div class="gc-teacher-card">
           <span class="gc-teacher-label">Викладач</span>
-          <strong>@${esc(data.teacher.handle)}</strong> · ${esc(data.teacher.name)}
+          <strong>${handleLink(data.teacher.handle, { className: 'user-handle-link gc-handle' })}</strong> · ${esc(data.teacher.name)}
         </div>` : ''}
     </div>`;
 }
@@ -391,23 +407,27 @@ function renderMembersPanel(members) {
     <div class="gc-members-wrap">
       <div class="gc-members-grid">
         ${others.map(m => `
-          <button type="button" class="gc-member-card" data-uid="${m.id}">
-            <span class="gc-member-avatar">${esc(m.name?.charAt(0) || '?')}</span>
-            <div>
-              <strong>@${esc(m.handle)}</strong>
-              <div class="gc-member-role">${m.member_role === 'author' ? 'Автор' : m.member_role === 'teacher' ? 'Викладач' : 'Учень'}</div>
-            </div>
-            <span class="gc-member-dm">${icon('chat', 'ico ico--sm')}</span>
-          </button>`).join('') || '<p class="empty-state">Немає інших учасників</p>'}
+          <div class="gc-member-card">
+            <a class="gc-member-profile" href="/student-profile.html?handle=${encodeURIComponent(m.handle)}" title="Відкрити профіль @${esc(m.handle)}">
+              <span class="gc-member-avatar">${esc(m.name?.charAt(0) || '?')}</span>
+              <div>
+                <strong class="user-handle-link">@${esc(m.handle)}</strong>
+                <div class="gc-member-role">${m.member_role === 'author' ? 'Автор' : m.member_role === 'teacher' ? 'Викладач' : 'Учень'}</div>
+              </div>
+            </a>
+            <button type="button" class="gc-member-dm" data-uid="${m.id}" title="Написати" aria-label="Написати @${esc(m.handle)}">${icon('chat', 'ico ico--sm')}</button>
+          </div>`).join('') || '<p class="empty-state">Немає інших учасників</p>'}
       </div>
       ${groupDms.length ? `
         <h3 class="gc-dms-title">Особисті в групі</h3>
         <div class="gc-dms-list">
           ${groupDms.map(d => `
-            <button type="button" class="gc-dm-item" data-channel="${d.channel_id}" data-peer="${d.peer.id}">
-              <strong>@${esc(d.peer.handle)}</strong>
-              <span>${esc(previewText(d.last_message))}</span>
-            </button>`).join('')}
+            <div class="gc-dm-item-row">
+              ${handleLink(d.peer.handle, { className: 'user-handle-link gc-handle' })}
+              <button type="button" class="gc-dm-item" data-channel="${d.channel_id}" data-peer="${d.peer.id}">
+                <span>${esc(previewText(d.last_message))}</span>
+              </button>
+            </div>`).join('')}
         </div>` : ''}
     </div>`;
 }
@@ -423,7 +443,7 @@ function renderGroupShell() {
     : '';
 
   const headTitle = dmMode && activeMeta?.type === 'dm'
-    ? `@${esc(activeMeta.peerHandle)}`
+    ? handleLink(activeMeta.peerHandle, { className: 'user-handle-link gc-handle' })
     : esc(g?.name || '');
 
   const headSub = dmMode && activeMeta?.type === 'dm'
@@ -477,8 +497,12 @@ function renderPanelContent(messages = []) {
 }
 
 function bindMembersEvents() {
-  document.querySelectorAll('.gc-member-card').forEach(btn => {
-    btn.addEventListener('click', () => startDm(parseInt(btn.dataset.uid, 10)));
+  document.querySelectorAll('.gc-member-dm').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startDm(parseInt(btn.dataset.uid, 10));
+    });
   });
   document.querySelectorAll('.gc-dm-item').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -576,17 +600,21 @@ async function openGroup(groupId, tab = 'chat') {
 async function startDm(userId) {
   try {
     const data = await api('/chat/dm', { method: 'POST', body: JSON.stringify({ userId }) });
-    await openDm(data.channel_id, userId, data.messages);
-    const { dms } = await api(`/chat/groups/${activeGroupId}/dms`);
-    groupDms = dms;
+    await openDm(data.channel_id, userId, data.messages, data.peer);
+    if (activeGroupId) {
+      const { dms } = await api(`/chat/groups/${activeGroupId}/dms`);
+      groupDms = dms;
+    }
   } catch (err) {
     await showAlert(err.message);
   }
 }
 
-async function openDm(channelId, peerId, messages = null) {
-  let peer = groupDms.find(d => d.channel_id === channelId)?.peer;
-  if (!peer) {
+async function openDm(channelId, peerId, messages = null, peerHint = null) {
+  let peer = peerHint
+    || groupDms.find(d => d.channel_id === channelId)?.peer
+    || inbox.dms?.find(d => d.channel_id === channelId)?.peer;
+  if (!peer && activeGroupId) {
     const { users } = await api(`/chat/dm/candidates?groupId=${activeGroupId}`);
     peer = users.find(u => u.id === peerId);
   }

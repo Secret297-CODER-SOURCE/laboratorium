@@ -62,6 +62,11 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  transition: grid-template-columns 0.25s ease;
+}
+
+.room-body.sidebar-collapsed {
+  grid-template-columns: minmax(0, 1fr) 0fr;
 }
 
 .room-main {
@@ -70,6 +75,24 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  background: var(--bg);
+}
+
+.room-main:fullscreen,
+.room-main:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+}
+
+.room-main:fullscreen .video-grid,
+.room-main:-webkit-full-screen .video-grid {
+  flex: 1 1 auto;
+}
+
+.room-main:fullscreen .room-controls,
+.room-main:-webkit-full-screen .room-controls {
+  z-index: 5;
 }
 
 .video-grid {
@@ -137,23 +160,45 @@
 .video-tile.screen-share video { object-fit: contain; }
 
 .video-grid.has-screen {
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 24%);
-  grid-template-rows: repeat(var(--screen-participant-count), minmax(0, 1fr));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 220px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 8px;
   overflow: hidden;
+  align-content: stretch;
 }
 
-.video-grid.has-screen .video-tile {
-  grid-column: 2;
-  min-height: 0;
-  aspect-ratio: auto;
-}
-
-.video-grid.has-screen .video-tile.screen-share {
+.video-grid.has-screen > .video-tile.screen-share {
   grid-column: 1;
-  grid-row: 1 / span var(--screen-participant-count);
+  grid-row: 1;
   width: 100%;
   max-width: none;
   height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  align-self: stretch;
+}
+
+.video-side-rail {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 2px;
+  overscroll-behavior: contain;
+}
+
+.video-side-rail .video-tile {
+  flex: 0 0 auto;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 96px;
+  max-height: 160px;
 }
 
 .tile-avatar {
@@ -253,6 +298,13 @@
   overflow: hidden;
   background: var(--bg-card);
   border-left: 1px solid var(--border);
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.room-body.sidebar-collapsed .room-sidebar {
+  opacity: 0;
+  border-left-color: transparent;
+  pointer-events: none;
 }
 
 .sidebar-tabs { display: flex; flex: 0 0 auto; border-bottom: 1px solid var(--border); }
@@ -346,7 +398,14 @@
 .participant-status { flex: 0 0 auto; font-size: 0.7rem; }
 
 @media (max-width: 900px) {
-  .room-body { grid-template-columns: minmax(0, 1fr); }
+  .room-body,
+  .room-body.sidebar-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .room-body.sidebar-collapsed .room-sidebar {
+    opacity: 1;
+    pointer-events: auto;
+  }
   .room-sidebar {
     position: fixed;
     top: max(56px, env(safe-area-inset-top));
@@ -357,6 +416,9 @@
     transition: transform 0.3s;
     z-index: 20;
     box-shadow: -12px 0 32px rgba(0, 0, 0, 0.25);
+    opacity: 1;
+    border-left: 1px solid var(--border);
+    pointer-events: auto;
   }
   .room-sidebar.open { transform: translateX(0); }
 }
@@ -372,14 +434,27 @@
   .video-grid { gap: 6px; padding: 8px; }
   .video-grid.grid-many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .video-grid.has-screen {
-    grid-template-columns: repeat(var(--screen-participant-count), minmax(120px, 1fr));
-    grid-template-rows: minmax(0, 1fr) 92px;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(120px, 1fr);
-    overflow-x: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 110px;
   }
-  .video-grid.has-screen .video-tile { grid-column: auto; grid-row: 2; }
-  .video-grid.has-screen .video-tile.screen-share { grid-column: 1 / -1; grid-row: 1; }
+  .video-grid.has-screen > .video-tile.screen-share {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .video-side-rail {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: none;
+  }
+  .video-side-rail .video-tile {
+    flex: 0 0 min(42vw, 160px);
+    width: min(42vw, 160px);
+    max-height: 100%;
+    min-height: 0;
+  }
 }
 
 @media (max-width: 380px) {

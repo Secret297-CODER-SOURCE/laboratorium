@@ -12,9 +12,10 @@ const ROLES = [
 ];
 
 export function renderAccessPanel(data = {}) {
-  const { rules = [], tabs = [], directions = [] } = data;
+  const { rules = [], tabs = [], directions = [], policyMeta = null } = data;
 
-  return `<section class="admin-panel admin-panel--wide">
+  return `${renderPolicyPanel(policyMeta)}
+  <section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
       <h2>${icon('shield', 'ico ico--md')}Доступ до вкладок</h2>
       <button type="button" class="btn btn--outline btn--sm" id="access-add-rule">${icon('plus', 'ico ico--sm')}Додати правило</button>
@@ -31,6 +32,106 @@ export function renderAccessPanel(data = {}) {
       <button type="button" class="btn btn--primary btn--sm" id="access-save-btn">${icon('check', 'ico ico--sm')}Зберегти правила</button>
     </div>
   </section>`;
+}
+
+function selectOptions(enums, labels, value) {
+  return (enums || []).map((id) =>
+    `<option value="${esc(id)}" ${id === value ? 'selected' : ''}>${esc(labels?.[id] || id)}</option>`).join('');
+}
+
+function renderPolicyPanel(meta) {
+  if (!meta?.policy) {
+    return `<section class="admin-panel admin-panel--wide"><p class="empty-state">Не вдалося завантажити політику ізоляції</p></section>`;
+  }
+  const p = meta.policy;
+  const L = meta.labels || {};
+  const E = meta.enums || {};
+
+  return `<section class="admin-panel admin-panel--wide" id="access-policy-panel">
+    <div class="admin-panel-head">
+      <h2>${icon('shield', 'ico ico--md')}Політика ізоляції та форматів доступу</h2>
+      <button type="button" class="btn btn--ghost btn--sm" id="access-policy-reset">Скинути</button>
+    </div>
+    <p class="empty-state" style="padding:0 0 16px;text-align:left">
+      Гнучкі правила: хто бачить конференції, рейтинг, DM, записи та індивідуальні pods.
+      Зміни діють одразу для учнів / викладачів. Owner і developer завжди мають повний доступ.
+    </p>
+    <div class="admin-grid" style="gap:16px">
+      <div class="admin-panel" style="margin:0">
+        <h3>Конференції</h3>
+        <label class="access-label">Видимість для учнів
+          <select class="admin-inp" data-policy="conferences.studentScope">
+            ${selectOptions(E.conferences?.studentScope, L.conferences?.studentScope, p.conferences.studentScope)}
+          </select>
+        </label>
+        <label class="admin-check"><input type="checkbox" data-policy="conferences.ungroupedVisibleToStudents" ${p.conferences.ungroupedVisibleToStudents ? 'checked' : ''}> ${esc(L.conferences?.ungroupedVisibleToStudents)}</label>
+        <label class="admin-check"><input type="checkbox" data-policy="conferences.teacherRequiresGroup" ${p.conferences.teacherRequiresGroup ? 'checked' : ''}> ${esc(L.conferences?.teacherRequiresGroup)}</label>
+        <label class="admin-check"><input type="checkbox" data-policy="conferences.roomCodeRequiresMembership" ${p.conferences.roomCodeRequiresMembership ? 'checked' : ''}> ${esc(L.conferences?.roomCodeRequiresMembership)}</label>
+      </div>
+      <div class="admin-panel" style="margin:0">
+        <h3>Рейтинг / leaderboard</h3>
+        <label class="access-label">Учні
+          <select class="admin-inp" data-policy="leaderboard.studentMode">
+            ${selectOptions(E.leaderboard?.studentMode, L.leaderboard?.studentMode, p.leaderboard.studentMode)}
+          </select>
+        </label>
+        <label class="access-label">Гості (публічна сторінка)
+          <select class="admin-inp" data-policy="leaderboard.guestMode">
+            ${selectOptions(E.leaderboard?.guestMode, L.leaderboard?.guestMode, p.leaderboard.guestMode)}
+          </select>
+        </label>
+        <label class="admin-check"><input type="checkbox" data-policy="leaderboard.teacherSeesGlobal" ${p.leaderboard.teacherSeesGlobal ? 'checked' : ''}> ${esc(L.leaderboard?.teacherSeesGlobal)}</label>
+        <label class="admin-check"><input type="checkbox" data-policy="ranking.showGlobalPointsInGroup" ${p.ranking.showGlobalPointsInGroup ? 'checked' : ''}> ${esc(L.ranking?.showGlobalPointsInGroup)}</label>
+      </div>
+      <div class="admin-panel" style="margin:0">
+        <h3>Особисті повідомлення (DM)</h3>
+        <label class="access-label">Учні між собою
+          <select class="admin-inp" data-policy="dm.studentMode">
+            ${selectOptions(E.dm?.studentMode, L.dm?.studentMode, p.dm.studentMode)}
+          </select>
+        </label>
+      </div>
+      <div class="admin-panel" style="margin:0">
+        <h3>Індивідуальні pods</h3>
+        <label class="admin-check"><input type="checkbox" data-policy="individualPods.enabled" ${p.individualPods.enabled ? 'checked' : ''}> ${esc(L.individualPods?.enabled)}</label>
+        <label class="admin-check"><input type="checkbox" data-policy="individualPods.allowTeacherCreate" ${p.individualPods.allowTeacherCreate ? 'checked' : ''}> ${esc(L.individualPods?.allowTeacherCreate)}</label>
+        <label class="access-label">${esc(L.individualPods?.maxMembers)}
+          <input class="admin-inp" type="number" min="1" max="5" data-policy="individualPods.maxMembers" value="${p.individualPods.maxMembers}">
+        </label>
+      </div>
+      <div class="admin-panel" style="margin:0">
+        <h3>Записи конференцій</h3>
+        <label class="admin-check"><input type="checkbox" data-policy="recordings.groupMembersCanView" ${p.recordings.groupMembersCanView ? 'checked' : ''}> ${esc(L.recordings?.groupMembersCanView)}</label>
+      </div>
+    </div>
+    <div class="admin-form-actions" style="margin-top:16px">
+      <button type="button" class="btn btn--primary btn--sm" id="access-policy-save">${icon('check', 'ico ico--sm')}Зберегти політику</button>
+    </div>
+  </section>`;
+}
+
+function collectPolicy() {
+  const policy = {
+    conferences: {},
+    leaderboard: {},
+    ranking: {},
+    dm: {},
+    individualPods: {},
+    recordings: {},
+  };
+  document.querySelectorAll('[data-policy]').forEach((el) => {
+    const path = el.dataset.policy.split('.');
+    let cur = policy;
+    for (let i = 0; i < path.length - 1; i++) {
+      if (!cur[path[i]]) cur[path[i]] = {};
+      cur = cur[path[i]];
+    }
+    const key = path[path.length - 1];
+    if (el.type === 'checkbox') cur[key] = el.checked;
+    else if (el.type === 'number') cur[key] = parseInt(el.value, 10);
+    else cur[key] = el.value;
+  });
+  return policy;
 }
 
 function renderRuleCard(rule, tabs, directions, idx) {
@@ -92,7 +193,11 @@ function collectRules() {
 }
 
 export async function loadAccessAdminData() {
-  return api('/admin/settings/tab-access');
+  const [tabs, policyMeta] = await Promise.all([
+    api('/admin/settings/tab-access'),
+    api('/admin/settings/access-policy'),
+  ]);
+  return { ...tabs, policyMeta };
 }
 
 export function bindAccessPanelEvents(showToast, reload) {
@@ -103,6 +208,25 @@ export function bindAccessPanelEvents(showToast, reload) {
         body: JSON.stringify({ rules: collectRules() }),
       });
       showToast('Правила доступу збережено');
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('access-policy-save')?.addEventListener('click', async () => {
+    try {
+      await api('/admin/settings/access-policy', {
+        method: 'PATCH',
+        body: JSON.stringify({ policy: collectPolicy() }),
+      });
+      showToast('Політику ізоляції збережено');
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('access-policy-reset')?.addEventListener('click', async () => {
+    try {
+      await api('/admin/settings/access-policy/reset', { method: 'POST' });
+      showToast('Політику скинуто');
       reload();
     } catch (err) { showToast(err.message, 'error'); }
   });

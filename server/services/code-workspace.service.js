@@ -13,17 +13,42 @@ const MAX_WORKSPACES_PER_USER = 20;
 const MIN_RUN_INTERVAL_MS = 3000;
 const GIT_ROOT = resolve(dirname(config.db.path), 'code-workspaces');
 
+const WEB_TEMPLATES = {
+  starter: [
+    { path: 'index.html', content: '<!DOCTYPE html>\n<html lang="uk">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>laboratorium</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <main class="hero">\n    <h1>Hello, laboratorium!</h1>\n    <p>Live preview оновлюється під час редагування.</p>\n    <button id="btn" type="button">Клацни</button>\n  </main>\n  <script src="script.js"></script>\n</body>\n</html>\n' },
+    { path: 'style.css', content: ':root { color-scheme: dark; }\nbody { margin: 0; font-family: system-ui, sans-serif; background: #0f1218; color: #e8ecf4; }\n.hero { min-height: 100vh; display: grid; place-content: center; gap: 12px; text-align: center; }\nbutton { padding: 10px 16px; border: 0; border-radius: 10px; background: #6ea8fe; color: #0b1020; font-weight: 600; cursor: pointer; }\n' },
+    { path: 'script.js', content: 'document.getElementById("btn")?.addEventListener("click", () => {\n  console.log("clicked");\n});\n' },
+    { path: 'README.md', content: '# Web-проєкт\n\nРедагуйте файли — превʼю оновлюється миттєво.\n' },
+  ],
+  landing: [
+    { path: 'index.html', content: '<!DOCTYPE html>\n<html lang="uk"><head><meta charset="UTF-8"><title>Landing</title><link rel="stylesheet" href="style.css"></head>\n<body><header class="nav"><strong>laboratorium.</strong></header><section class="hero"><h1>IT школа на практиці</h1><a class="cta" href="#">Записатися</a></section><script src="script.js"></script></body></html>\n' },
+    { path: 'style.css', content: 'body{margin:0;font-family:Georgia,serif;background:#0c111a;color:#f4f1ea}.nav{padding:20px 6vw}.hero{padding:12vh 6vw}h1{font-size:clamp(2rem,5vw,3rem)}.cta{display:inline-block;margin-top:16px;padding:12px 18px;background:#d97757;color:#111;text-decoration:none;border-radius:999px}\n' },
+    { path: 'script.js', content: 'console.log("landing ready");\n' },
+    { path: 'README.md', content: '# Лендінг\n' },
+  ],
+  multipage: [
+    { path: 'index.html', content: '<!DOCTYPE html>\n<html lang="uk"><head><meta charset="UTF-8"><title>Home</title><link rel="stylesheet" href="style.css"></head><body><nav><a href="index.html">Home</a> <a href="about.html">About</a></nav><h1>Home</h1></body></html>\n' },
+    { path: 'about.html', content: '<!DOCTYPE html>\n<html lang="uk"><head><meta charset="UTF-8"><title>About</title><link rel="stylesheet" href="style.css"></head><body><nav><a href="index.html">Home</a> <a href="about.html">About</a></nav><h1>About</h1></body></html>\n' },
+    { path: 'style.css', content: 'body{font-family:system-ui,sans-serif;background:#111827;color:#e5e7eb;padding:24px}a{color:#93c5fd}\n' },
+    { path: 'script.js', content: 'console.log("multipage");\n' },
+    { path: 'README.md', content: '# Мультисторінка\n' },
+  ],
+};
+
 const DEFAULT_FILES = {
   python: [{ path: 'main.py', content: 'print("Hello, laboratorium!")\n' }],
   node: [{ path: 'main.js', content: 'console.log("Hello, laboratorium!");\n' }],
   cpp: [{ path: 'main.cpp', content: '#include <iostream>\n\nint main() {\n  std::cout << "Hello, laboratorium!" << std::endl;\n  return 0;\n}\n' }],
   bash: [{ path: 'main.sh', content: 'echo "Hello, laboratorium!"\n' }],
-  web: [
-    { path: 'index.html', content: '<!DOCTYPE html>\n<html>\n<head><link rel="stylesheet" href="style.css"></head>\n<body>\n  <h1>Hello, laboratorium!</h1>\n  <script src="script.js"></script>\n</body>\n</html>\n' },
-    { path: 'style.css', content: 'body { font-family: sans-serif; background: #111; color: #eee; }\n' },
-    { path: 'script.js', content: 'console.log("web workspace ready");\n' },
-  ],
+  web: WEB_TEMPLATES.starter,
 };
+
+function filesForCreate(language, template) {
+  if (language === 'web') {
+    return WEB_TEMPLATES[template] || WEB_TEMPLATES.starter;
+  }
+  return DEFAULT_FILES[language] || DEFAULT_FILES.python;
+}
 
 /** Учні мають доступ, якщо є в групі напрямку з is_programming=1; персонал — завжди. */
 export function canUseSandbox(userId, role) {
@@ -53,6 +78,8 @@ function mapWorkspace(row) {
     group_id: row.group_id,
     name: row.name,
     language: row.language,
+    remote_url: row.remote_url || null,
+    remote_provider: row.remote_provider || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -217,7 +244,7 @@ export function getWithFiles(userId, workspaceId) {
   return { ...mapWorkspace(ws), files, activeWebRun: mapRun(activeRun) };
 }
 
-export function create(userId, role, { name, language, group_id }) {
+export function create(userId, role, { name, language, group_id, template }) {
   assertCanUse(userId, role);
   const lang = ['python', 'node', 'cpp', 'bash', 'web'].includes(language) ? language : 'python';
   const trimmedName = name?.trim() || `Проєкт ${lang}`;
@@ -233,13 +260,14 @@ export function create(userId, role, { name, language, group_id }) {
     if (!member) groupId = null;
   }
 
+  const seedFiles = filesForCreate(lang, template);
   const createAll = db.transaction(() => {
     const result = db.prepare(`
       INSERT INTO code_workspaces (user_id, group_id, name, language)
       VALUES (?, ?, ?, ?)
     `).run(userId, groupId, trimmedName, lang);
     const workspaceId = result.lastInsertRowid;
-    for (const f of DEFAULT_FILES[lang]) {
+    for (const f of seedFiles) {
       db.prepare(`INSERT INTO code_files (workspace_id, path, content) VALUES (?, ?, ?)`).run(workspaceId, f.path, f.content);
     }
     return workspaceId;
@@ -290,7 +318,8 @@ export async function getGitStatus(userId, workspaceId) {
   const ws = getOwned(userId, workspaceId);
   const files = getWorkspaceFiles(ws.id);
   const root = await ensureGitRepository(ws.id, files);
-  return readGitSnapshot(root);
+  const { readRemoteSnapshot } = await import('./git-remote.service.js');
+  return readRemoteSnapshot(root, ws);
 }
 
 export async function createGitCommit(userId, workspaceId, rawMessage) {

@@ -64,7 +64,7 @@ document.head.appendChild(style);
 
 const soundBanner = document.createElement('button');
 soundBanner.id = 'sound-banner';
-soundBanner.textContent = '🔊 Натисніть, щоб увімкнути звук';
+soundBanner.textContent = 'Натисніть, щоб увімкнути звук';
 document.body.appendChild(soundBanner);
 soundBanner.addEventListener('click', () => {
   soundBanner.style.display = 'none';
@@ -159,16 +159,38 @@ function updateLocalVideo() {
 }
 
 function updateGridClass() {
+  const hasScreen = !!videoGrid.querySelector(':scope > .video-tile.screen-share, .video-tile.screen-share');
+  syncStageRail(hasScreen);
   const tiles = videoGrid.querySelectorAll('.video-tile');
-  const hasScreen = !!videoGrid.querySelector('.video-tile.screen-share');
   const count = tiles.length;
   videoGrid.className = `video-grid ${
     count <= 1 ? 'grid-1' : count === 2 ? 'grid-2' : count <= 4 ? 'grid-3' : 'grid-many'
   }${hasScreen ? ' has-screen' : ''}`;
+  videoGrid.style.removeProperty('--screen-participant-count');
+}
+
+/** Keep screen-share as fixed left stage; other tiles in a scrollable right rail. */
+function syncStageRail(hasScreen) {
+  let rail = videoGrid.querySelector(':scope > .video-side-rail');
   if (hasScreen) {
-    videoGrid.style.setProperty('--screen-participant-count', Math.max(1, count - 1));
-  } else {
-    videoGrid.style.removeProperty('--screen-participant-count');
+    if (!rail) {
+      rail = document.createElement('div');
+      rail.className = 'video-side-rail';
+      videoGrid.appendChild(rail);
+    }
+    const screen = videoGrid.querySelector('.video-tile.screen-share');
+    if (screen && screen.parentElement !== videoGrid) {
+      videoGrid.insertBefore(screen, rail);
+    } else if (screen && screen.nextElementSibling !== rail) {
+      videoGrid.insertBefore(screen, rail);
+    }
+    videoGrid.querySelectorAll('.video-tile').forEach((tile) => {
+      if (tile.classList.contains('screen-share')) return;
+      if (tile.parentElement !== rail) rail.appendChild(tile);
+    });
+  } else if (rail) {
+    while (rail.firstChild) videoGrid.appendChild(rail.firstChild);
+    rail.remove();
   }
 }
 
@@ -331,9 +353,16 @@ function makeTile({ id, handle, name, screen = false, muted = false }) {
   return tile;
 }
 
-function toggleFullscreen(el) {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el).catch?.(() => {});
+function toggleFullscreen(_tile) {
+  // Fullscreen the stage (video + bottom controls), not the tile alone —
+  // otherwise mic/cam/chat controls disappear in browser fullscreen.
+  const stage = document.querySelector('.room-main');
+  if (!stage) return;
+  if (document.fullscreenElement) {
+    document.exitFullscreen?.().catch?.(() => {});
+    return;
+  }
+  (stage.requestFullscreen || stage.webkitRequestFullscreen)?.call(stage).catch?.(() => {});
 }
 
 function safePlay(video) {
@@ -937,13 +966,51 @@ document.getElementById('copy-link-btn').addEventListener('click', async () => {
   }
 });
 
+function isMobileSidebar() {
+  return window.matchMedia('(max-width: 900px)').matches;
+}
+
+function isSidebarOpen() {
+  const sidebar = document.getElementById('sidebar');
+  const body = document.querySelector('.room-body');
+  if (isMobileSidebar()) return sidebar.classList.contains('open');
+  return !body.classList.contains('sidebar-collapsed');
+}
+
+function setSidebarOpen(open) {
+  const sidebar = document.getElementById('sidebar');
+  const body = document.querySelector('.room-body');
+  const chatBtn = document.getElementById('chat-btn');
+  if (isMobileSidebar()) {
+    sidebar.classList.toggle('open', open);
+    body.classList.remove('sidebar-collapsed');
+  } else {
+    body.classList.toggle('sidebar-collapsed', !open);
+    sidebar.classList.remove('open');
+  }
+  chatBtn?.classList.toggle('active', open);
+}
+
+function showChatPanel() {
+  document.querySelectorAll('.sidebar-tab').forEach((t) => t.classList.toggle('active', t.dataset.panel === 'chat'));
+  document.querySelectorAll('.sidebar-panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-chat'));
+}
+
 document.getElementById('sidebar-toggle').addEventListener('click', () => {
-  document.getElementById('sidebar').classList.toggle('open');
+  setSidebarOpen(!isSidebarOpen());
 });
 document.getElementById('chat-btn').addEventListener('click', () => {
-  document.getElementById('sidebar').classList.add('open');
-  document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === 'chat'));
-  document.querySelectorAll('.sidebar-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-chat'));
+  const chatActive = document.querySelector('.sidebar-tab.active')?.dataset.panel === 'chat';
+  if (isSidebarOpen() && chatActive) {
+    setSidebarOpen(false);
+    return;
+  }
+  showChatPanel();
+  setSidebarOpen(true);
+});
+document.getElementById('chat-btn')?.classList.toggle('active', isSidebarOpen());
+window.addEventListener('resize', () => {
+  document.getElementById('chat-btn')?.classList.toggle('active', isSidebarOpen());
 });
 
 /* ───────────────────────── Выход ───────────────────────── */

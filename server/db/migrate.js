@@ -1293,6 +1293,181 @@ export function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_crm_opportunities_application ON crm_opportunities(application_id);
     CREATE INDEX IF NOT EXISTS idx_crm_activities_opp ON crm_activities(opportunity_id, created_at);
   `);
+
+  const userTzCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  if (!userTzCols.includes('timezone')) {
+    db.exec("ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'Europe/Kyiv'");
+  }
+  if (!userTzCols.includes('next_due_override')) {
+    db.exec('ALTER TABLE users ADD COLUMN next_due_override TEXT');
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_planner_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      due_at TEXT,
+      status TEXT DEFAULT 'todo' NOT NULL,
+      priority TEXT DEFAULT 'normal' NOT NULL,
+      related_type TEXT,
+      related_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_planner_owner_status
+      ON admin_planner_items(owner_user_id, status, due_at);
+
+    CREATE TABLE IF NOT EXISTS homework_reminder_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      enabled INTEGER DEFAULT 1 NOT NULL,
+      interval_hours INTEGER DEFAULT 48 NOT NULL,
+      channel_site INTEGER DEFAULT 1 NOT NULL,
+      channel_telegram INTEGER DEFAULT 1 NOT NULL,
+      message_template TEXT DEFAULT 'Нагадування: будь ласка, здайте незавершені домашні завдання.',
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+    INSERT OR IGNORE INTO homework_reminder_settings (id) VALUES (1);
+
+    CREATE TABLE IF NOT EXISTS homework_reminder_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      task_assignment_id INTEGER,
+      channel TEXT NOT NULL,
+      sent_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_hw_reminder_user_sent
+      ON homework_reminder_log(user_id, sent_at);
+
+    CREATE TABLE IF NOT EXISTS telegram_chats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chat_id TEXT UNIQUE NOT NULL,
+      chat_type TEXT NOT NULL,
+      title TEXT,
+      username TEXT,
+      linked_user_id INTEGER,
+      is_admin INTEGER DEFAULT 0 NOT NULL,
+      is_group_homework INTEGER DEFAULT 0 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (linked_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS telegram_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS telegram_auto_replies (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trigger_text TEXT NOT NULL,
+      reply_text TEXT NOT NULL,
+      match_mode TEXT DEFAULT 'contains' NOT NULL,
+      is_active INTEGER DEFAULT 1 NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS telegram_pending (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      admin_chat_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      payload TEXT,
+      status TEXT DEFAULT 'open' NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      resolved_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS telegram_message_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chat_id TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      body TEXT,
+      tg_message_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+  `);
+
+  const defaultTemplates = [
+    ['lead_interest', 'Зацікавлення курсом',
+      'Доброго дня! Зацікавив ваш курс — можете розповісти детальніше про програму, формат і старт?'],
+    ['homework_group', 'Нагадування ДЗ (група)',
+      'Очікую ваші домашні завдання. Якщо вже здали — дякую; якщо ще ні — будь ласка, здайте найближчим часом.'],
+    ['payment_reminder', 'Нагадування про оплату',
+      'Доброго дня! Нагадуємо про оплату навчання. Якщо вже оплатили — підтвердіть, будь ласка. Дякуємо!'],
+  ];
+  const insertTpl = db.prepare(`
+    INSERT OR IGNORE INTO telegram_templates (key, title, body) VALUES (?, ?, ?)
+  `);
+  for (const row of defaultTemplates) insertTpl.run(...row);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_follows (
+      follower_id INTEGER NOT NULL,
+      following_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      PRIMARY KEY (follower_id, following_id),
+      FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE,
+      CHECK (follower_id != following_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_follows_following
+      ON user_follows(following_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS user_git_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      provider TEXT NOT NULL,
+      external_user_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      access_token_enc TEXT NOT NULL,
+      refresh_token_enc TEXT,
+      scopes TEXT,
+      linked_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      UNIQUE(user_id, provider),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS circuit_projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      external_id TEXT,
+      embed_url TEXT,
+      workspace_id INTEGER,
+      metadata TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (workspace_id) REFERENCES code_workspaces(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_circuit_projects_user
+      ON circuit_projects(user_id, updated_at);
+  `);
+
+  const wsCols = db.prepare('PRAGMA table_info(code_workspaces)').all().map((c) => c.name);
+  if (!wsCols.includes('remote_url')) {
+    db.exec('ALTER TABLE code_workspaces ADD COLUMN remote_url TEXT');
+  }
+  if (!wsCols.includes('remote_provider')) {
+    db.exec('ALTER TABLE code_workspaces ADD COLUMN remote_provider TEXT');
+  }
+
+  const taskCircuitCols = db.prepare('PRAGMA table_info(tasks)').all().map((c) => c.name);
+  if (!taskCircuitCols.includes('circuit_project_id')) {
+    db.exec('ALTER TABLE tasks ADD COLUMN circuit_project_id INTEGER REFERENCES circuit_projects(id) ON DELETE SET NULL');
+  }
+
+  const studyGroupKindCols = db.prepare('PRAGMA table_info(study_groups)').all().map((c) => c.name);
+  if (!studyGroupKindCols.includes('kind')) {
+    db.exec(`ALTER TABLE study_groups ADD COLUMN kind TEXT NOT NULL DEFAULT 'group'`);
+  }
 }
 
 function bootstrapCurrentMonthPayments(db) {

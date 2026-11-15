@@ -1,6 +1,7 @@
 import { api } from '/auth.js';
 import { icon, ROLE_LABELS, STUDENT_MEMBER_ROLE_LABELS } from '/icons.js';
 import { showConfirm } from '/dialog.js';
+import { handleLink, profileUrl } from '/user-handle.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -24,14 +25,19 @@ const BILLING_STATUS_PILL = {
 };
 
 function renderHeader(u) {
+  const publicLink = u.role === 'student'
+    ? `<a class="btn btn--outline btn--sm" href="${profileUrl(u.handle)}" target="_blank" rel="noopener">Публічний профіль</a>
+       <a class="btn btn--ghost btn--sm" href="/groups-chat.html?dm=${u.id}">${icon('chat', 'ico ico--sm')}Написати</a>`
+    : '';
   return `<div class="group-modal-section">
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
       <strong style="font-size:1rem">${esc(u.name)}</strong>
-      <span style="color:var(--text-dim)">@${esc(u.handle)}</span>
+      <span style="color:var(--text-dim)">${handleLink(u.handle)}</span>
       <span class="status-pill">${esc(ROLE_LABELS[u.role] || u.role)}</span>
       ${u.is_frozen ? `<span class="status-pill error">заморожено</span>` : ''}
       ${u.is_restricted ? `<span class="status-pill pending">очікує групи</span>` : ''}
       ${u.billing_exempt ? `<span class="status-pill running">без оплати</span>` : ''}
+      ${publicLink}
     </div>
     <div style="margin-top:6px;color:var(--text-dim);font-size:0.85rem">${esc(u.email)}</div>
   </div>`;

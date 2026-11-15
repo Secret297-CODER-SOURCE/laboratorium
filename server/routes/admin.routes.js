@@ -11,6 +11,9 @@ import * as attendanceCtrl from '../controllers/attendance.controller.js';
 import * as calendarCtrl from '../controllers/calendar.controller.js';
 import { uploadCtfAttachment } from '../middleware/upload.js';
 import * as crmCtrl from '../controllers/crm.controller.js';
+import * as plannerCtrl from '../controllers/planner.controller.js';
+import * as telegramCtrl from '../controllers/telegram.controller.js';
+import * as homeworkReminderCtrl from '../controllers/homework-reminder.controller.js';
 
 const router = Router();
 
@@ -166,6 +169,9 @@ router.delete('/labs/:userId/docker/backups/:backupId', requireRole('owner', 'de
 
 router.get('/settings/tab-access', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getTabAccessSettings));
 router.patch('/settings/tab-access', requireRole('owner', 'developer'), asyncHandler(adminCtrl.saveTabAccessSettings));
+router.get('/settings/access-policy', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getAccessPolicy));
+router.patch('/settings/access-policy', requireRole('owner', 'developer'), asyncHandler(adminCtrl.saveAccessPolicy));
+router.post('/settings/access-policy/reset', requireRole('owner', 'developer'), asyncHandler(adminCtrl.resetAccessPolicy));
 
 router.get('/billing', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getBillingOverview));
 router.post('/billing/users/:userId/payments', requireRole('owner', 'developer'), asyncHandler(adminCtrl.recordBillingPayment));
@@ -188,5 +194,24 @@ router.delete('/errors', requireRole('owner', 'developer'), asyncHandler(adminCt
 router.get('/people/:userId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.getPersonProfile));
 router.post('/people/:userId/notes', requireRole('owner', 'developer'), asyncHandler(adminCtrl.addPersonNote));
 router.delete('/people/:userId/notes/:noteId', requireRole('owner', 'developer'), asyncHandler(adminCtrl.removePersonNote));
+
+router.get('/planner', requireRole('owner', 'developer', 'teacher'), asyncHandler(plannerCtrl.list));
+router.post('/planner', requireRole('owner', 'developer', 'teacher'), asyncHandler(plannerCtrl.create));
+router.patch('/planner/:id', requireRole('owner', 'developer', 'teacher'), asyncHandler(plannerCtrl.update));
+router.delete('/planner/:id', requireRole('owner', 'developer', 'teacher'), asyncHandler(plannerCtrl.remove));
+
+router.get('/homework-reminders', requireRole('owner', 'developer', 'teacher'), asyncHandler(homeworkReminderCtrl.getSettings));
+router.patch('/homework-reminders', requireRole('owner', 'developer', 'teacher'), asyncHandler(homeworkReminderCtrl.saveSettings));
+
+router.get('/telegram', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.getOverview));
+router.patch('/telegram/settings', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.updateSettings));
+router.patch('/telegram/templates/:key', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.updateTemplate));
+router.post('/telegram/auto-replies', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.addAutoReply));
+router.post('/telegram/auto-replies/:id/disable', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.disableAutoReply));
+router.post('/telegram/link-chat', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.linkChatUser));
+router.post('/telegram/send-lead', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.sendLead));
+router.post('/telegram/hw-group', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.sendHomeworkGroup));
+router.post('/telegram/pay-ask', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.askPaymentReminders));
+router.post('/telegram/reply', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.sendReply));
 
 export default router;

@@ -36,7 +36,9 @@ export async function list(req, res) {
 export async function schedule(req, res) {
   const from = req.query.from || new Date().toISOString();
   const to = req.query.to || new Date(Date.now() + 30 * 86400000).toISOString();
-  res.json({ conferences: conferenceService.getSchedule(from, to) });
+  res.json({
+    conferences: conferenceService.getSchedule(from, to, req.user.id, req.user.role),
+  });
 }
 
 export async function upcoming(req, res) {
@@ -47,7 +49,7 @@ export async function upcoming(req, res) {
 
 export async function getById(req, res) {
   const conf = conferenceService.getById(parseInt(req.params.id, 10));
-  if (!conf) return res.status(404).json({ error: 'Конференцію не знайдено' });
+  conferenceService.assertCanAccessConference(conf, req.user.id, req.user.role);
   res.json({
     conference: conf,
     participants: conferenceService.getParticipants(conf.id),
@@ -58,7 +60,22 @@ export async function getById(req, res) {
 export async function getByCode(req, res) {
   const conf = conferenceService.getByRoomCode(req.params.code);
   if (!conf) return res.status(404).json({ error: 'Кімнату не знайдено' });
-  res.json({ conference: conf });
+  const { getPolicy } = await import('../services/access-policy.service.js');
+  if (getPolicy().conferences.roomCodeRequiresMembership) {
+    conferenceService.assertCanAccessConference(conf, req.user.id, req.user.role);
+  }
+  res.json({
+    conference: {
+      id: conf.id,
+      title: conf.title,
+      room_code: conf.room_code,
+      status: conf.status,
+      scheduled_at: conf.scheduled_at,
+      group_id: conf.group_id,
+      group_name: conf.group_name,
+      host_handle: conf.host_handle,
+    },
+  });
 }
 
 export async function join(req, res) {
@@ -86,6 +103,7 @@ export async function cancel(req, res) {
 }
 
 export async function getMessages(req, res) {
-  const messages = conferenceService.getMessages(parseInt(req.params.id, 10));
-  res.json({ messages });
+  const conf = conferenceService.getById(parseInt(req.params.id, 10));
+  conferenceService.assertCanAccessConference(conf, req.user.id, req.user.role);
+  res.json({ messages: conferenceService.getMessages(conf.id) });
 }

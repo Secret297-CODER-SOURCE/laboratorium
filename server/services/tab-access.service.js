@@ -9,6 +9,8 @@ export const TAB_DEFINITIONS = [
   { key: 'dash.ctf', label: 'Кабінет — CTF', group: 'Кабінет' },
   { key: 'dash.tests', label: 'Кабінет — Тести', group: 'Кабінет' },
   { key: 'dash.lab', label: 'Кабінет — Лабораторія', group: 'Кабінет' },
+  { key: 'dash.code', label: 'Кабінет — Редактор коду', group: 'Кабінет' },
+  { key: 'dash.circuits', label: 'Кабінет — Circuits', group: 'Кабінет' },
   { key: 'dash.article', label: 'Кабінет — Статті', group: 'Кабінет' },
   { key: 'dash.manuals', label: 'Кабінет — Мануали', group: 'Кабінет' },
   { key: 'portal.cabinet', label: 'Портал — Кабінет', group: 'Портал' },

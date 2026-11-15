@@ -317,3 +317,66 @@ export function saveSmtpSettings(data) {
 
   return getSmtpSettingsPublic();
 }
+
+const TELEGRAM_KEY = 'telegram';
+
+function loadTelegramRaw() {
+  const row = db.prepare('SELECT value FROM platform_settings WHERE key = ?').get(TELEGRAM_KEY);
+  if (!row?.value) return {};
+  try {
+    return JSON.parse(row.value);
+  } catch {
+    return {};
+  }
+}
+
+export function getTelegramConfig() {
+  const stored = loadTelegramRaw();
+  return {
+    enabled: !!stored.enabled,
+    botToken: stored.botToken || '',
+    adminUsername: (stored.adminUsername || '').replace(/^@/, ''),
+    adminChatId: stored.adminChatId ? String(stored.adminChatId) : '',
+    homeworkGroupChatId: stored.homeworkGroupChatId ? String(stored.homeworkGroupChatId) : '',
+  };
+}
+
+export function getTelegramSettingsPublic() {
+  const cfg = getTelegramConfig();
+  return {
+    enabled: cfg.enabled,
+    hasToken: !!cfg.botToken,
+    adminUsername: cfg.adminUsername,
+    adminChatId: cfg.adminChatId,
+    homeworkGroupChatId: cfg.homeworkGroupChatId,
+    configured: !!(cfg.enabled && cfg.botToken),
+  };
+}
+
+export function saveTelegramSettings(data = {}) {
+  const merged = getTelegramConfig();
+  const payload = {
+    enabled: data.enabled !== undefined ? !!data.enabled : merged.enabled,
+    botToken: data.botToken !== undefined
+      ? (String(data.botToken || '').trim() || merged.botToken)
+      : merged.botToken,
+    adminUsername: data.adminUsername !== undefined
+      ? String(data.adminUsername || '').replace(/^@/, '').trim()
+      : merged.adminUsername,
+    adminChatId: data.adminChatId !== undefined
+      ? String(data.adminChatId || '').trim()
+      : merged.adminChatId,
+    homeworkGroupChatId: data.homeworkGroupChatId !== undefined
+      ? String(data.homeworkGroupChatId || '').trim()
+      : merged.homeworkGroupChatId,
+  };
+  if (payload.enabled && !payload.botToken) {
+    throw new ValidationError('Вкажіть токен Telegram-бота');
+  }
+  db.prepare(`
+    INSERT INTO platform_settings (key, value, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+  `).run(TELEGRAM_KEY, JSON.stringify(payload));
+  return getTelegramSettingsPublic();
+}

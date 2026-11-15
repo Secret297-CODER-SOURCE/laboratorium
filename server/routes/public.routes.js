@@ -19,8 +19,9 @@ const clientErrorLimiter = rateLimit({
 });
 
 router.get('/health', asyncHandler(apiCtrl.health));
-router.get('/leaderboard', asyncHandler(apiCtrl.getLeaderboard));
+router.get('/leaderboard', optionalAuth, asyncHandler(apiCtrl.getLeaderboard));
 router.get('/site-info', asyncHandler(apiCtrl.getSiteInfo));
+router.get('/search', asyncHandler(apiCtrl.searchSite));
 router.get('/qr', asyncHandler(apiCtrl.getSiteQr));
 router.get('/directions', asyncHandler(apiCtrl.getDirections));
 router.get('/programs/:id/page', asyncHandler(apiCtrl.getPublicProgramPage));

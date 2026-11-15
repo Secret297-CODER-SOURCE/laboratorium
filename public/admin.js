@@ -53,6 +53,12 @@ import {
 import {
   loadCrmData, renderCrmPanel, bindCrmPanelEvents,
 } from '/admin-crm-panel.js';
+import {
+  loadPlannerData, renderPlannerPanel, bindPlannerPanelEvents,
+} from '/admin-planner-panel.js';
+import {
+  loadTelegramData, renderTelegramPanel, bindTelegramPanelEvents,
+} from '/admin-telegram-panel.js';
 
 if (!(await requireAuthAsync())) throw new Error('auth');
 initTheme();
@@ -91,6 +97,9 @@ const initialOwnerTab = new URLSearchParams(location.search).get('tab') || 'over
 let ownerTab = initialOwnerTab === 'contact' ? 'messages' : initialOwnerTab;
 let teacherTab = new URLSearchParams(location.search).get('tab') || 'overview';
 let teacherTasksData = { tasks: [], reviewQueue: [] };
+let homeworkReminderSettings = null;
+let plannerData = { items: [] };
+let telegramData = null;
 let scheduleData = { lessons: [], absences: [], stats: {} };
 let ctfAdminData = { challenges: [], programs: [] };
 let quizzesAdminData = { quizzes: [] };
@@ -231,13 +240,36 @@ async function load() {
     adminNavBadges.messages = overviewData.messagesUnread || 0;
     adminNavBadges.crm = overviewData.crmOpen || 0;
   }
-  if (role === 'teacher') {
+  if (role === 'teacher' || (role === 'owner' && (ownerTab === 'tasks' || ownerTab === 'homework'))) {
     try {
       teacherTasksData = await api('/admin/tasks');
       adminNavBadges.homework = teacherTasksData.reviewQueue?.length || 0;
+      adminNavBadges.tasks = teacherTasksData.reviewQueue?.length || 0;
     } catch {
       teacherTasksData = { tasks: [], reviewQueue: [] };
       adminNavBadges.homework = 0;
+    }
+  }
+  if ((role === 'owner' && ownerTab === 'homework')
+    || (role === 'teacher' && teacherTab === 'homework')) {
+    try {
+      ({ settings: homeworkReminderSettings } = await api('/admin/homework-reminders'));
+    } catch {
+      homeworkReminderSettings = null;
+    }
+  }
+  if ((role === 'owner' || role === 'teacher') && (ownerTab === 'planner' || teacherTab === 'planner')) {
+    try {
+      plannerData = await loadPlannerData();
+    } catch {
+      plannerData = { items: [] };
+    }
+  }
+  if (role === 'owner' && ownerTab === 'telegram') {
+    try {
+      telegramData = await loadTelegramData();
+    } catch {
+      telegramData = null;
     }
   }
   if (role && isScheduleTab(role)) {
@@ -391,10 +423,12 @@ async function load() {
       </div>`;
     } else if (teacherTab === 'groups') {
       html += renderGroupsPanel(groups, panelPrograms, teacherDirections);
+    } else if (teacherTab === 'planner') {
+      html += renderPlannerPanel(plannerData);
     } else if (teacherTab === 'tasks') {
-      html += renderTasksPanel(groups, teacherTasksData);
+      html += renderTasksPanel(groups, teacherTasksData, students);
     } else if (teacherTab === 'homework') {
-      html += renderHomeworkReviewPanel(teacherTasksData);
+      html += renderHomeworkReviewPanel(teacherTasksData, homeworkReminderSettings);
     } else if (teacherTab === 'schedule') {
       const gf = new URLSearchParams(location.search).get('groupId') || '';
       html += renderSchedulePanel(groups, scheduleData, gf, false);
@@ -484,6 +518,19 @@ async function load() {
       } catch (err) {
         html += `<p class="empty-state">${err.message}</p>`;
       }
+    } else if (ownerTab === 'planner') {
+      html += renderPlannerPanel(plannerData);
+    } else if (ownerTab === 'tasks') {
+      const taskGroups = ownerGroupsData.groups?.length
+        ? ownerGroupsData.groups
+        : (await api('/admin/groups?all=1').catch(() => ({ groups: [] }))).groups;
+      html += renderTasksPanel(taskGroups, teacherTasksData, students);
+    } else if (ownerTab === 'homework') {
+      html += renderHomeworkReviewPanel(teacherTasksData, homeworkReminderSettings);
+    } else if (ownerTab === 'telegram') {
+      html += telegramData
+        ? renderTelegramPanel(telegramData)
+        : '<p class="empty-state">Не вдалося завантажити Telegram</p>';
     } else if (ownerTab === 'crm') {
       try {
         html += renderCrmPanel(await loadCrmData());
@@ -559,7 +606,7 @@ function renderConferences(list) {
     <div class="admin-list-item">
       <div>
         <strong>${c.title}</strong>
-        <div style="font-size:0.75rem;color:var(--text-muted)">${new Date(c.scheduled_at).toLocaleString('uk-UA')}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted)">${new Date(c.scheduled_at).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv' })}</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span class="status-pill ${c.status}">${c.status}</span>
@@ -573,7 +620,7 @@ function renderStudents(list) {
   return list.map(s => `
     <div class="admin-list-item">
       <div>
-        <strong>@${s.handle}</strong> · ${s.name}
+        <strong><a class="user-handle-link" href="/student-profile.html?handle=${encodeURIComponent(s.handle)}">@${s.handle}</a></strong> · ${s.name}
         <div style="font-size:0.75rem;color:var(--text-muted)">${s.email || ''}</div>
       </div>
       <span style="color:var(--text-muted);font-size:0.75rem">${s.group_names || s.program_name || ''} · ${s.bounty_points || 0} pts</span>
@@ -669,11 +716,15 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
       teachers: ownerGroupsData.teachers,
     });
   }
-  if (role === 'teacher' && teacherTab === 'tasks') {
+  if ((role === 'teacher' && (teacherTab === 'tasks' || teacherTab === 'homework'))
+    || (role === 'owner' && (ownerTab === 'tasks' || ownerTab === 'homework'))) {
     bindTasksPanelEvents(showToast, load);
   }
-  if (role === 'teacher' && teacherTab === 'homework') {
-    bindTasksPanelEvents(showToast, load);
+  if ((role === 'owner' && ownerTab === 'planner') || (role === 'teacher' && teacherTab === 'planner')) {
+    bindPlannerPanelEvents(showToast, load);
+  }
+  if (role === 'owner' && ownerTab === 'telegram') {
+    bindTelegramPanelEvents(showToast, load);
   }
   if (role === 'teacher' && teacherTab === 'quizzes') {
     bindQuizzesPanelEvents(showToast, load);

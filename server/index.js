@@ -7,6 +7,8 @@ import { ensureCtfImageBuilt, isAgentEnabled } from './services/lab-agent.servic
 import { startBackupScheduler } from './services/backup-scheduler.service.js';
 import { setIo as setNotificationIo } from './services/notification.service.js';
 import { startBillingReminderScheduler } from './services/billing-reminder.service.js';
+import { startHomeworkReminderScheduler } from './services/homework-reminder.service.js';
+import { startTelegramBotPolling } from './services/telegram-bot.service.js';
 import { startCtfCalendarScheduler } from './services/calendar.service.js';
 import * as errorLogService from './services/error-log.service.js';
 
@@ -42,6 +44,8 @@ server.listen(config.port, config.host, () => {
 
   startBackupScheduler();
   startBillingReminderScheduler();
+  startHomeworkReminderScheduler();
+  startTelegramBotPolling();
   startCtfCalendarScheduler();
 });
 

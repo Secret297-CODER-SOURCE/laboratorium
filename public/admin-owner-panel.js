@@ -7,7 +7,8 @@ export function renderOwnerTabs(active = 'overview', badges = {}) {
   const sections = [
     { label: 'Керування', tabs: [
       { id: 'overview', label: 'Огляд', icon: 'grid' },
-      { id: 'crm', label: 'CRM', icon: 'target', badge: badges.crm },
+      { id: 'planner', label: 'Планер', icon: 'notes' },
+      { id: 'crm', label: 'CRM школи', icon: 'target', badge: badges.crm },
       { id: 'applications', label: 'Заявки', icon: 'calendar', badge: badges.applications },
       { id: 'messages', label: 'Повідомлення', icon: 'chat', badge: badges.messages },
       { id: 'stats', label: 'Статистика', icon: 'chart' },
@@ -18,6 +19,8 @@ export function renderOwnerTabs(active = 'overview', badges = {}) {
       { id: 'programs', label: 'Програми', icon: 'notes' },
       { id: 'manuals', label: 'Мануали', icon: 'list' },
       { id: 'groups', label: 'Групи', icon: 'users' },
+      { id: 'tasks', label: 'Домашні', icon: 'notes', badge: badges.tasks },
+      { id: 'homework', label: 'Перевірка ДЗ', icon: 'check', badge: badges.homework },
       { id: 'schedule', label: 'Розклад', icon: 'calendar' },
       { id: 'attendance', label: 'Відвідуваність', icon: 'video' },
       { id: 'ctf', label: 'CTF', icon: 'shield' },
@@ -26,6 +29,7 @@ export function renderOwnerTabs(active = 'overview', badges = {}) {
       { id: 'users', label: 'Користувачі та пошта', icon: 'users' },
       { id: 'access', label: 'Доступ', icon: 'shield' },
       { id: 'billing', label: 'Оплата', icon: 'chart' },
+      { id: 'telegram', label: 'Telegram', icon: 'chat' },
       { id: 'proxmox', label: 'Proxmox', icon: 'server' },
       { id: 'labs', label: 'Машини', icon: 'database' },
       { id: 'storage', label: 'Сховище', icon: 'upload' },

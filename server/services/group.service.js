@@ -2,6 +2,7 @@ import db from '../db/index.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { STUDENT_MEMBER_ROLES } from '../utils/roles.js';
 import * as userService from './user.service.js';
+import { getPolicy } from './access-policy.service.js';
 
 /** Which groups a student belongs to — shared by anything that scopes
  * content (quizzes, manuals, ...) to a student's own groups. */
@@ -12,7 +13,12 @@ export function getStudentGroupIds(userId) {
 
 function mapGroup(row) {
   if (!row) return null;
-  return { ...row, is_active: !!row.is_active, member_count: row.member_count ?? 0 };
+  return {
+    ...row,
+    is_active: !!row.is_active,
+    member_count: row.member_count ?? 0,
+    kind: row.kind === 'individual' ? 'individual' : 'group',
+  };
 }
 
 function assertTeacherAccess(group, actorId, actorRole) {
@@ -52,7 +58,7 @@ export function getUserGroups(userId) {
   `).all(userId).map((row) => ({ ...mapGroup(row), member_role: row.member_role || 'student' }));
 }
 
-export function listGroups(actorId, actorRole, { all = false } = {}) {
+export function listGroups(actorId, actorRole, { all = false, kind = null } = {}) {
   let sql = `${GROUP_SELECT} WHERE g.is_active = 1`;
   const params = [];
 
@@ -60,8 +66,12 @@ export function listGroups(actorId, actorRole, { all = false } = {}) {
     sql += ' AND g.teacher_id = ?';
     params.push(actorId);
   }
+  if (kind === 'group' || kind === 'individual') {
+    sql += ' AND g.kind = ?';
+    params.push(kind);
+  }
 
-  sql += ' ORDER BY g.sort_order, g.name';
+  sql += ' ORDER BY CASE g.kind WHEN \'individual\' THEN 1 ELSE 0 END, g.sort_order, g.name';
   return db.prepare(sql).all(...params).map(mapGroup);
 }
 
@@ -74,27 +84,57 @@ export function createGroup(actorId, actorRole, data) {
   if (!['teacher', 'owner', 'developer'].includes(actorRole)) {
     throw new ForbiddenError();
   }
-  const name = data.name?.trim();
-  if (!name) throw new ValidationError('Вкажіть назву групи');
+
+  const kind = data.kind === 'individual' ? 'individual' : 'group';
+  const pods = getPolicy().individualPods;
+  if (kind === 'individual') {
+    if (!pods.enabled) throw new ValidationError('Індивідуальні pods вимкнено адміністратором');
+    if (actorRole === 'teacher' && !pods.allowTeacherCreate) {
+      throw new ForbiddenError('Лише власник може створювати індивідуальні pods');
+    }
+  }
 
   const teacherId = actorRole === 'teacher' ? actorId : (parseInt(data.teacher_id, 10) || actorId);
   const teacher = db.prepare("SELECT id FROM users WHERE id = ? AND role IN ('teacher','owner')").get(teacherId);
   if (!teacher && actorRole === 'teacher') throw new ValidationError('Невірний викладач');
 
-  const result = db.prepare(`
-    INSERT INTO study_groups (name, description, teacher_id, program_id, direction_id, color, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    name,
-    data.description?.trim() || null,
-    teacherId,
-    data.program_id ? parseInt(data.program_id, 10) : null,
-    data.direction_id ? parseInt(data.direction_id, 10) : null,
-    data.color?.trim() || null,
-    parseInt(data.sort_order, 10) || 0,
-  );
+  let name = data.name?.trim();
+  let studentId = data.student_id ? parseInt(data.student_id, 10) : null;
 
-  return getGroupById(result.lastInsertRowid);
+  if (kind === 'individual') {
+    if (!studentId) throw new ValidationError('Оберіть учня для індивідуального навчання');
+    const student = db.prepare("SELECT id, name, handle FROM users WHERE id = ? AND role = 'student'").get(studentId);
+    if (!student) throw new ValidationError('Учня не знайдено');
+    if (!name) name = `Індивідуально: ${student.name || `@${student.handle}`}`;
+  } else if (!name) {
+    throw new ValidationError('Вкажіть назву групи');
+  }
+
+  const createTx = db.transaction(() => {
+    const result = db.prepare(`
+      INSERT INTO study_groups (name, description, teacher_id, program_id, direction_id, color, sort_order, kind)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      name,
+      data.description?.trim() || null,
+      teacherId,
+      data.program_id ? parseInt(data.program_id, 10) : null,
+      data.direction_id ? parseInt(data.direction_id, 10) : null,
+      data.color?.trim() || null,
+      parseInt(data.sort_order, 10) || 0,
+      kind,
+    );
+    const groupId = Number(result.lastInsertRowid);
+    if (kind === 'individual' && studentId) {
+      db.prepare(`
+        INSERT OR IGNORE INTO study_group_members (group_id, user_id, added_by) VALUES (?, ?, ?)
+      `).run(groupId, studentId, actorId);
+      userService.liftRestriction(studentId);
+    }
+    return groupId;
+  });
+
+  return getGroupById(createTx());
 }
 
 export function updateGroup(id, actorId, actorRole, data) {
@@ -177,6 +217,14 @@ export function addGroupMembers(groupId, actorId, actorRole, userIds) {
 
   const ids = [...new Set((Array.isArray(userIds) ? userIds : [userIds]).map(id => parseInt(id, 10)).filter(Boolean))];
   if (!ids.length) throw new ValidationError('Оберіть учнів');
+
+  if (group.kind === 'individual') {
+    const maxMembers = getPolicy().individualPods.maxMembers || 1;
+    const current = db.prepare('SELECT COUNT(*) as c FROM study_group_members WHERE group_id = ?').get(groupId).c;
+    if (current + ids.length > maxMembers) {
+      throw new ValidationError(`Індивідуальний pod: максимум ${maxMembers} учн. Видаліть поточного, щоб замінити.`);
+    }
+  }
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO study_group_members (group_id, user_id, added_by) VALUES (?, ?, ?)

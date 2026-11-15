@@ -42,7 +42,7 @@ function periodLabel(year, month) {
 
 function getUserBillingRow(userId) {
   return db.prepare(`
-    SELECT id, role, billing_day, billing_exempt
+    SELECT id, role, billing_day, billing_exempt, next_due_override, timezone
     FROM users WHERE id = ?
   `).get(userId);
 }
@@ -82,7 +82,11 @@ export function getAccessStatus(userId, at = new Date()) {
   const year = at.getFullYear();
   const month = at.getMonth() + 1;
   const billingDay = user.billing_day || config.billing.defaultBillingDay;
-  const due = dueDate(year, month, billingDay);
+  let due = dueDate(year, month, billingDay);
+  if (user.next_due_override) {
+    const override = startOfDay(new Date(user.next_due_override));
+    if (!Number.isNaN(override.getTime())) due = override;
+  }
   const graceUntil = endOfDay(addDays(due, graceDays));
   const today = startOfDay(at);
   const payment = getPaymentRecord(userId, year, month);
@@ -96,6 +100,7 @@ export function getAccessStatus(userId, at = new Date()) {
     periodLabel: periodLabel(year, month),
     dueDate: due.toISOString(),
     graceUntil: graceUntil.toISOString(),
+    nextDueOverride: user.next_due_override || null,
     payment,
   };
 
@@ -138,7 +143,7 @@ export function listBillingOverview({ year, month }) {
   }
 
   const students = db.prepare(`
-    SELECT id, email, name, handle, role, billing_day, billing_exempt, created_at
+    SELECT id, email, name, handle, role, billing_day, billing_exempt, next_due_override, created_at
     FROM users
     WHERE role = 'student'
     ORDER BY name COLLATE NOCASE
@@ -167,6 +172,7 @@ export function listBillingOverview({ year, month }) {
         accessStatus: status.status,
         dueDate: status.dueDate,
         graceUntil: status.graceUntil,
+        nextDueOverride: status.nextDueOverride || s.next_due_override || null,
       };
     }),
   };
@@ -199,6 +205,9 @@ export function recordPayment({ userId, year, month, note, amount, creditApplied
       VALUES (?, ?, ?, datetime('now'), ?, ?, ?)
     `).run(userId, y, m, cashAmount, note?.trim() || null, recordedBy || null);
     if (creditAmount > 0) referralService.consumeCredits(userId, creditAmount, inserted.lastInsertRowid);
+    // Після фіксації оплати скидуємо разове зміщення наступної дати.
+    db.prepare('UPDATE users SET next_due_override = NULL, updated_at = datetime(\'now\') WHERE id = ?')
+      .run(userId);
     return inserted;
   })();
 
@@ -219,7 +228,7 @@ export function removePayment(paymentId) {
   return { ok: true };
 }
 
-export function updateBillingSettings(userId, { billing_day, billing_exempt }) {
+export function updateBillingSettings(userId, { billing_day, billing_exempt, next_due_override }) {
   const user = getUserBillingRow(userId);
   if (!user) throw new NotFoundError('Користувача не знайдено');
 
@@ -238,6 +247,17 @@ export function updateBillingSettings(userId, { billing_day, billing_exempt }) {
   if (billing_exempt !== undefined) {
     updates.push('billing_exempt = ?');
     params.push(billing_exempt ? 1 : 0);
+  }
+
+  if (next_due_override !== undefined) {
+    if (next_due_override === null || next_due_override === '') {
+      updates.push('next_due_override = NULL');
+    } else {
+      const d = startOfDay(new Date(next_due_override));
+      if (Number.isNaN(d.getTime())) throw new ValidationError('Некоректна дата наступної оплати');
+      updates.push('next_due_override = ?');
+      params.push(d.toISOString().slice(0, 10));
+    }
   }
 
   if (!updates.length) return user;

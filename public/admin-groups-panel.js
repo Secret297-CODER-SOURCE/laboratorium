@@ -1,6 +1,7 @@
 import { api } from '/auth.js';
 import { icon, STUDENT_MEMBER_ROLE_LABELS } from '/icons.js';
 import { showConfirm, showPrompt, showForm } from '/dialog.js';
+import { handleLink } from '/user-handle.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -10,11 +11,12 @@ export function renderTeacherTabs(active = 'overview', badges = {}) {
   const sections = [
     { label: 'Панель', tabs: [
       { id: 'overview', label: 'Огляд', icon: 'grid' },
+      { id: 'planner', label: 'Планер', icon: 'notes' },
       { id: 'stats', label: 'Статистика', icon: 'chart' },
     ] },
     { label: 'Навчання', tabs: [
       { id: 'groups', label: 'Групи', icon: 'users' },
-      { id: 'tasks', label: 'Задачі', icon: 'notes', badge: badges.tasks },
+      { id: 'tasks', label: 'Домашні', icon: 'notes', badge: badges.tasks },
       { id: 'homework', label: 'Перевірка ДЗ', icon: 'check', badge: badges.homework },
       { id: 'quizzes', label: 'Тести', icon: 'book' },
       { id: 'ctf', label: 'CTF', icon: 'shield' },
@@ -39,7 +41,10 @@ export function renderGroupsPanel(groups, programs = [], directions = [], { allG
   return `<section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
       <h2>${icon('users', 'ico ico--md')}${allGroups ? 'Групи' : 'Мої групи'}</h2>
-      <button type="button" class="btn btn--outline btn--sm" id="add-group-btn">${icon('plus', 'ico ico--sm')}Нова група</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn--outline btn--sm" id="add-group-btn">${icon('plus', 'ico ico--sm')}Нова група</button>
+        <button type="button" class="btn btn--outline btn--sm" id="add-individual-btn">${icon('user', 'ico ico--sm')}Індивідуальний учень</button>
+      </div>
     </div>
     <div id="create-group-form" class="admin-inline-form" hidden>
       <input class="admin-inp" id="new-group-name" placeholder="Назва групи">
@@ -47,6 +52,14 @@ export function renderGroupsPanel(groups, programs = [], directions = [], { allG
       <select class="admin-inp" id="new-group-direction"><option value="">Без напрямку</option>${dirOpts}</select>
       <select class="admin-inp" id="new-group-program"><option value="">Без програми</option>${progOpts}</select>
       <button type="button" class="btn btn--primary btn--sm" id="create-group-submit">Створити</button>
+    </div>
+    <div id="create-individual-form" class="admin-inline-form" hidden>
+      <select class="admin-inp" id="new-individual-student"><option value="">Оберіть учня…</option></select>
+      <input class="admin-inp" id="new-individual-name" placeholder="Назва (авто з імені учня)">
+      <select class="admin-inp" id="new-individual-direction"><option value="">Без напрямку</option>${dirOpts}</select>
+      <select class="admin-inp" id="new-individual-program"><option value="">Без програми</option>${progOpts}</select>
+      <button type="button" class="btn btn--primary btn--sm" id="create-individual-submit">Створити pod</button>
+      <p class="billing-hint" style="grid-column:1/-1">Індивідуальний pod = група з 1 учнем: окремі конференції, ДЗ, чат і рейтинг.</p>
     </div>
     <div class="groups-grid" id="groups-grid">
       ${(groups || []).length ? groups.map(g => renderGroupCard(g, allGroups)).join('') : '<p class="empty-state">Ще немає груп. Створіть першу!</p>'}
@@ -62,13 +75,15 @@ export function renderGroupsPanel(groups, programs = [], directions = [], { allG
 }
 
 function renderGroupCard(g, showTeacher) {
+  const isIndividual = g.kind === 'individual';
   return `<article class="group-card" data-group-id="${g.id}" style="--group-color:${g.color || 'var(--accent)'}">
     <div class="group-card-head">
       <h3>${esc(g.name)}</h3>
-      <span class="group-card-count">${g.member_count || 0} учн.</span>
+      <span class="group-card-count">${isIndividual ? '1:1' : `${g.member_count || 0} учн.`}</span>
     </div>
     ${g.description ? `<p class="group-card-desc">${esc(g.description)}</p>` : ''}
     <div class="group-card-tags">
+      ${isIndividual ? '<span class="group-card-prog">Індивідуальний</span>' : ''}
       ${g.direction_name ? `<span class="group-card-prog">${esc(g.direction_name)}</span>` : ''}
       ${g.program_name ? `<span class="group-card-prog">${esc(g.program_name)}</span>` : ''}
       ${showTeacher && g.teacher_name ? `<span class="group-card-prog">@${esc(g.teacher_handle)}</span>` : ''}
@@ -101,7 +116,7 @@ async function openGroupModal(groupId, title, showToast) {
       <div class="admin-list">${members.length ? members.map(m => `
         <div class="admin-list-item">
           <div>
-            <strong>@${esc(m.handle)}</strong> · ${esc(m.name)}
+            <strong>${handleLink(m.handle)}</strong> · ${esc(m.name)}
             <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px">Роль в групі</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
@@ -172,7 +187,24 @@ export function bindGroupsPanelEvents(showToast, reload, programs = [], directio
 
   document.getElementById('add-group-btn')?.addEventListener('click', () => {
     const form = document.getElementById('create-group-form');
+    const ind = document.getElementById('create-individual-form');
+    if (ind) ind.hidden = true;
     form.hidden = !form.hidden;
+  });
+
+  document.getElementById('add-individual-btn')?.addEventListener('click', async () => {
+    const form = document.getElementById('create-individual-form');
+    const grp = document.getElementById('create-group-form');
+    if (grp) grp.hidden = true;
+    form.hidden = !form.hidden;
+    if (!form.hidden) {
+      try {
+        const { students } = await api('/admin/students/available');
+        const sel = document.getElementById('new-individual-student');
+        sel.innerHTML = `<option value="">Оберіть учня…</option>${(students || []).map((s) =>
+          `<option value="${s.id}">@${esc(s.handle)} · ${esc(s.name)}${s.is_restricted ? ' (очікує)' : ''}</option>`).join('')}`;
+      } catch (err) { showToast(err.message, 'error'); }
+    }
   });
 
   document.getElementById('create-group-submit')?.addEventListener('click', async () => {
@@ -184,9 +216,31 @@ export function bindGroupsPanelEvents(showToast, reload, programs = [], directio
     try {
       await api('/admin/groups', {
         method: 'POST',
-        body: JSON.stringify({ name, description, program_id: program_id || null, direction_id: direction_id || null }),
+        body: JSON.stringify({ name, description, program_id: program_id || null, direction_id: direction_id || null, kind: 'group' }),
       });
       showToast('Групу створено');
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('create-individual-submit')?.addEventListener('click', async () => {
+    const student_id = document.getElementById('new-individual-student').value;
+    const name = document.getElementById('new-individual-name').value;
+    const program_id = document.getElementById('new-individual-program').value;
+    const direction_id = document.getElementById('new-individual-direction').value;
+    if (!student_id) return showToast('Оберіть учня', 'error');
+    try {
+      await api('/admin/groups', {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'individual',
+          student_id: parseInt(student_id, 10),
+          name: name?.trim() || undefined,
+          program_id: program_id || null,
+          direction_id: direction_id || null,
+        }),
+      });
+      showToast('Індивідуальний pod створено');
       reload();
     } catch (err) { showToast(err.message, 'error'); }
   });
@@ -280,7 +334,7 @@ function renderReviewQueue(reviewQueue) {
           <div>
             <strong>${esc(a.title)}</strong>
             <div style="font-size:0.75rem;color:var(--text-muted)">
-              @${esc(a.student_handle)} · ${esc(a.group_name)}
+              ${handleLink(a.student_handle)} · ${esc(a.group_name)}
               ${a.submitted_at ? ` · здано ${esc(a.submitted_at)}` : ''}
               ${a.work_duration_seconds != null ? ` · ${Math.ceil(a.work_duration_seconds / 60)} хв` : ''}
               ${a.submission_note ? ` · «${esc(a.submission_note)}»` : ''}
@@ -303,10 +357,36 @@ function renderReviewQueue(reviewQueue) {
   </section>`;
 }
 
-export function renderHomeworkReviewPanel(tasksData = {}) {
+function renderHomeworkReminderSettings(settings = null) {
+  if (!settings) return '';
+  return `<section class="admin-panel admin-panel--wide" style="margin-bottom:16px">
+    <div class="admin-panel-head">
+      <h3>Нагадування про ДЗ</h3>
+    </div>
+    <form class="admin-inline-form" id="hw-reminder-form">
+      <label class="admin-check"><input type="checkbox" name="enabled" ${settings.enabled ? 'checked' : ''}> Увімкнено</label>
+      <label>Інтервал (год)
+        <input class="admin-inp admin-inp--xs" type="number" name="interval_hours" min="6" max="168" value="${settings.interval_hours || 48}">
+      </label>
+      <label class="admin-check"><input type="checkbox" name="channel_site" ${settings.channel_site ? 'checked' : ''}> Сайт</label>
+      <label class="admin-check"><input type="checkbox" name="channel_telegram" ${settings.channel_telegram ? 'checked' : ''}> Telegram</label>
+      <input class="admin-inp" name="message_template" value="${esc(settings.message_template || '')}" maxlength="1000" style="min-width:280px">
+      <button type="submit" class="btn btn--primary btn--sm">Зберегти</button>
+    </form>
+  </section>`;
+}
+
+export function renderHomeworkReviewPanel(tasksData = {}, reminderSettings = null) {
   const reviewQueue = tasksData.reviewQueue || [];
   const completedWork = (tasksData.submissionHistory || []).filter((item) => item.status === 'completed');
   const pastLessons = tasksData.pastLessons || [];
+  const byStudent = new Map();
+  for (const item of reviewQueue) {
+    const key = item.user_id || item.student_handle;
+    const list = byStudent.get(key) || [];
+    list.push(item);
+    byStudent.set(key, list);
+  }
   const renderFiles = (files) => (files || []).length ? `<div class="task-submission-files">
     ${files.map((file) => `<a href="${esc(file.url)}" target="_blank" rel="noopener noreferrer" class="task-submission-file">
       ${icon(file.mime_type?.startsWith('image/') ? 'image' : 'notes', 'ico ico--xs')}${esc(file.original_name)}
@@ -317,7 +397,15 @@ export function renderHomeworkReviewPanel(tasksData = {}) {
       <h2>${icon('check', 'ico ico--md')}Перевірка домашніх завдань</h2>
       <span class="sched-badge">${reviewQueue.length} на перевірці</span>
     </div>
-    <p class="program-transfer-hint">Перегляньте відповіді та вкладення учнів. Підтверджене завдання позначається виконаним; повернуте знову стає доступним учню для редагування.</p>
+    <p class="program-transfer-hint">Перегляньте відповіді по кожному учню. Зарахуйте або поверніть на доопрацювання.</p>
+    ${renderHomeworkReminderSettings(reminderSettings)}
+    ${byStudent.size ? `<div class="hw-student-filter" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <button type="button" class="btn btn--ghost btn--sm hw-filter active" data-student="">Усі (${reviewQueue.length})</button>
+      ${[...byStudent.entries()].map(([key, list]) => {
+    const sample = list[0];
+    return `<button type="button" class="btn btn--ghost btn--sm hw-filter" data-student="${esc(String(sample.student_handle || key))}">@${esc(sample.student_handle || key)} (${list.length})</button>`;
+  }).join('')}
+    </div>` : ''}
     ${renderReviewQueue(reviewQueue)}
     <section class="admin-panel admin-panel--wide homework-history">
       <h3>Зараховані домашні роботи (${completedWork.length})</h3>
@@ -326,7 +414,7 @@ export function renderHomeworkReviewPanel(tasksData = {}) {
           <article class="admin-list-item homework-history-item">
             <div>
               <strong>${esc(item.title)}</strong>
-              <div class="homework-history-meta">@${esc(item.student_handle)} · ${esc(item.group_name)}
+              <div class="homework-history-meta">${handleLink(item.student_handle)} · ${esc(item.group_name)}
                 ${item.completed_at ? ` · зараховано ${esc(item.completed_at)}` : ''}
                 ${item.work_duration_seconds != null ? ` · ${Math.ceil(item.work_duration_seconds / 60)} хв` : ''}
               </div>
@@ -354,27 +442,35 @@ export function renderHomeworkReviewPanel(tasksData = {}) {
   </section>`;
 }
 
-export function renderTasksPanel(groups, tasksData = {}) {
+export function renderTasksPanel(groups, tasksData = {}, students = []) {
   const { tasks = [], reviewQueue = [] } = tasksData;
   const groupOpts = (groups || []).map(g =>
     `<option value="${g.id}">${esc(g.name)}</option>`
   ).join('');
+  const studentOpts = (students || []).map((s) =>
+    `<option value="${s.id}">@${esc(s.handle)} · ${esc(s.name)}</option>`
+  ).join('');
 
   return `<section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
-      <h2>${icon('notes', 'ico ico--md')}Задачі для учнів</h2>
-      <button type="button" class="btn btn--outline btn--sm" id="add-task-btn">${icon('plus', 'ico ico--sm')}Нова задача</button>
+      <h2>${icon('notes', 'ico ico--md')}Домашні завдання</h2>
+      <button type="button" class="btn btn--outline btn--sm" id="add-task-btn">${icon('plus', 'ico ico--sm')}Призначити ДЗ</button>
     </div>
     <div id="create-task-form" class="admin-inline-form" hidden>
       <select class="admin-inp" id="new-task-group" required>
         <option value="">Група</option>${groupOpts}
       </select>
-      <input class="admin-inp" id="new-task-title" placeholder="Назва задачі" required>
-      <input class="admin-inp" id="new-task-desc" placeholder="Опис">
+      <input class="admin-inp" id="new-task-title" placeholder="Назва завдання" required>
+      <input class="admin-inp" id="new-task-desc" placeholder="Опис / критерії">
       <input class="admin-inp" id="new-task-bounty" type="number" min="0" placeholder="Bounty" value="0">
-      <input class="admin-inp" id="new-task-time" type="number" min="1" placeholder="Ліміт хв (необов'язково)">
+      <input class="admin-inp" id="new-task-time" type="number" min="1" placeholder="Ліміт хв">
       <input class="admin-inp" id="new-task-due" type="date">
-      <button type="button" class="btn btn--primary btn--sm" id="create-task-submit">Створити</button>
+      <input class="admin-inp" id="new-task-circuit" type="number" min="1" placeholder="ID схеми (Circuits)">
+      <select class="admin-inp" id="new-task-students" multiple size="4" title="Порожньо = уся група">
+        ${studentOpts}
+      </select>
+      <button type="button" class="btn btn--primary btn--sm" id="create-task-submit">Призначити</button>
+      <p class="billing-hint" style="grid-column:1/-1">Учні (Ctrl/⌘): якщо нікого не обрано — завдання піде всій групі. ID схеми — посилання на Circuits у кабінеті учня.</p>
     </div>
     <div class="admin-grid" style="margin-top:16px">
       ${renderReviewQueue(reviewQueue)}
@@ -412,6 +508,11 @@ export function bindTasksPanelEvents(showToast, reload) {
     const bounty_reward = document.getElementById('new-task-bounty').value;
     const time_limit_minutes = document.getElementById('new-task-time').value;
     const due_at = document.getElementById('new-task-due').value;
+    const circuit_project_id = document.getElementById('new-task-circuit')?.value;
+    const studentSelect = document.getElementById('new-task-students');
+    const student_ids = studentSelect
+      ? [...studentSelect.selectedOptions].map((o) => parseInt(o.value, 10))
+      : [];
     if (!group_id || !title?.trim()) return showToast('Вкажіть групу та назву', 'error');
     try {
       await api('/admin/tasks', {
@@ -419,11 +520,47 @@ export function bindTasksPanelEvents(showToast, reload) {
         body: JSON.stringify({
           group_id, title, description, bounty_reward, due_at: due_at || null,
           time_limit_minutes: time_limit_minutes || null,
+          circuit_project_id: circuit_project_id || null,
+          student_ids: student_ids.length ? student_ids : undefined,
         }),
       });
-      showToast('Задачу створено');
+      showToast('Домашнє завдання призначено');
       reload();
     } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('hw-reminder-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await api('/admin/homework-reminders', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          enabled: fd.get('enabled') === 'on',
+          interval_hours: parseInt(fd.get('interval_hours'), 10),
+          channel_site: fd.get('channel_site') === 'on',
+          channel_telegram: fd.get('channel_telegram') === 'on',
+          message_template: fd.get('message_template'),
+        }),
+      });
+      showToast('Нагадування збережено');
+      reload();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.querySelectorAll('.hw-filter').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const handle = btn.dataset.student || '';
+      document.querySelectorAll('.hw-filter').forEach((b) => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.task-review-item').forEach((row) => {
+        if (!handle) {
+          row.hidden = false;
+          return;
+        }
+        const meta = row.textContent || '';
+        row.hidden = !meta.includes(`@${handle}`);
+      });
+    });
   });
 
   document.querySelectorAll('.task-approve').forEach(btn => {

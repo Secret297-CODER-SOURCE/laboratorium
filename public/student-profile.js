@@ -1,7 +1,8 @@
-import { api, getUser, requireAuthAsync, handleSessionError, initTheme } from '/auth.js';
+import { api, getUser, requireAuthAsync, initTheme } from '/auth.js';
 import { icon } from '/icons.js';
 import { initSiteHeader } from '/site-header.js';
 import { renderAchievementCard } from '/achievement-cards.js';
+import { showAlert } from '/dialog.js';
 
 if (!(await requireAuthAsync())) throw new Error('auth');
 initTheme();
@@ -13,16 +14,47 @@ const loading = document.getElementById('profile-loading');
 const error = document.getElementById('profile-error');
 const article = document.getElementById('student-profile');
 
+let profileCache = null;
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   })[char]);
 }
 
+function renderActions(profile) {
+  if (profile.isOwnProfile) {
+    return `<div class="student-profile-actions">
+      <a class="btn btn--primary btn--sm" href="/dashboard.html#student-referral-panel">${icon('users', 'ico ico--sm')}Запросити друга</a>
+      <a class="btn btn--outline btn--sm" href="/dashboard.html">${icon('edit', 'ico ico--sm')}Редагувати профіль</a>
+      <span class="student-profile-follow-meta">${Number(profile.followerCount || 0)} підписників · ${Number(profile.followingCount || 0)} підписок</span>
+    </div>`;
+  }
+
+  const followLabel = profile.isFollowing ? 'Відписатися' : 'Підписатися';
+  const followClass = profile.isFollowing ? 'btn btn--outline btn--sm' : 'btn btn--primary btn--sm';
+  const followIcon = profile.isFollowing ? 'check' : 'plus';
+  const msgDisabled = !profile.canMessage;
+  const msgTitle = msgDisabled
+    ? 'Написати можна після підписки або якщо ви в одній групі'
+    : `Написати @${profile.handle}`;
+
+  return `<div class="student-profile-actions">
+    <button type="button" class="${followClass}" id="profile-follow-btn" aria-pressed="${profile.isFollowing ? 'true' : 'false'}">
+      ${icon(followIcon, 'ico ico--sm')}${followLabel}
+    </button>
+    <button type="button" class="btn btn--outline btn--sm" id="profile-dm-btn"
+      ${msgDisabled ? 'disabled' : ''} title="${escapeHtml(msgTitle)}">
+      ${icon('chat', 'ico ico--sm')}Написати
+    </button>
+    <span class="student-profile-follow-meta" id="profile-follow-meta">
+      ${Number(profile.followerCount || 0)} підписників · ${Number(profile.followingCount || 0)} підписок
+    </span>
+  </div>`;
+}
+
 function renderProfile(profile) {
-  const currentUser = getUser();
-  const isOwnProfile = profile.isOwnProfile === true
-    || (currentUser?.role === 'student' && currentUser.handle === profile.handle);
+  profileCache = profile;
   const joined = profile.joinedAt
     ? new Date(`${profile.joinedAt.replace(' ', 'T')}Z`).toLocaleDateString('uk-UA', { month: 'long', year: 'numeric' })
     : '';
@@ -32,12 +64,13 @@ function renderProfile(profile) {
     crypto: 'Crypto', forensics: 'Forensics', reverse: 'Reverse', misc: 'Інше',
   };
   const awardsHtml = profile.awards.length
-    ? `<div class="student-profile-award-grid">${profile.awards.map(award => `
+    ? `<div class="student-profile-award-grid">${profile.awards.map((award) => `
         <div class="student-profile-award-wrap">
           ${renderAchievementCard(award)}
-          ${isOwnProfile && profile.hiddenAwards?.includes(award.id) ? '<span class="student-profile-hidden-label">Не показується іншим</span>' : ''}
+          ${profile.isOwnProfile && profile.hiddenAwards?.includes(award.id) ? '<span class="student-profile-hidden-label">Не показується іншим</span>' : ''}
         </div>`).join('')}</div>`
     : '<p class="empty-state">Нагороди з’являться тут у міру навчального прогресу.</p>';
+
   article.innerHTML = `
     <section class="student-profile-hero">
       <div class="student-profile-identity">
@@ -54,7 +87,7 @@ function renderProfile(profile) {
         <span>bounty points</span>
         <span class="student-profile-rank">#${Number(profile.rank)} у рейтингу</span>
       </div>
-      ${isOwnProfile ? '<a class="btn btn--primary btn--sm student-profile-invite" href="/dashboard.html#student-referral-panel">Запросити друга</a>' : ''}
+      ${renderActions(profile)}
       ${profile.bio ? `<p class="student-profile-bio">${escapeHtml(profile.bio)}</p>` : ''}
       ${joined ? `<p class="student-profile-joined">У спільноті з ${escapeHtml(joined)}</p>` : ''}
     </section>
@@ -70,6 +103,7 @@ function renderProfile(profile) {
       </div>
       ${awardsHtml}
     </section>`;
+
   article.insertAdjacentHTML('beforeend', `
     <section class="student-profile-section">
       <div class="student-profile-section-head">
@@ -116,13 +150,45 @@ function renderProfile(profile) {
         </article>`).join('')}</div>
     </section>` : ''}
   `);
+
+  bindProfileActions();
   loading.hidden = true;
   article.hidden = false;
+}
+
+function bindProfileActions() {
+  const followBtn = document.getElementById('profile-follow-btn');
+  followBtn?.addEventListener('click', async () => {
+    if (!profileCache) return;
+    followBtn.disabled = true;
+    try {
+      const method = profileCache.isFollowing ? 'DELETE' : 'POST';
+      await api(`/students/${encodeURIComponent(profileCache.handle)}/follow`, { method });
+      const { profile } = await api(`/students/${encodeURIComponent(profileCache.handle)}/profile`);
+      renderProfile(profile);
+    } catch (err) {
+      await showAlert(err.message || 'Не вдалося змінити підписку');
+      followBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('profile-dm-btn')?.addEventListener('click', async () => {
+    if (!profileCache?.id) return;
+    if (!profileCache.canMessage) {
+      await showAlert('Спочатку підпишіться або переконайтесь, що ви в одній навчальній групі.');
+      return;
+    }
+    window.location.href = `/groups-chat.html?dm=${profileCache.id}`;
+  });
 }
 
 async function loadProfile() {
   if (!handle || !/^[a-zA-Z0-9_]{3,20}$/.test(handle)) {
     throw new Error('Профіль не знайдено або він прихований власником.');
+  }
+  const me = getUser();
+  if (me?.handle && me.handle.toLowerCase() === handle.toLowerCase() && me.role !== 'student') {
+    // teachers/owners may not have student profile — still try API
   }
   const { profile } = await api(`/students/${encodeURIComponent(handle)}/profile`);
   renderProfile(profile);

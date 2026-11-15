@@ -17,6 +17,8 @@ import adminRoutes from './routes/admin.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import labRoutes from './routes/lab.routes.js';
 import codeRoutes from './routes/code.routes.js';
+import gitOAuthRoutes from './routes/git-oauth.routes.js';
+import circuitsRoutes from './routes/circuits.routes.js';
 import ctfDemoRoutes from './routes/ctf-demo.routes.js';
 import tunnelRoutes from './routes/tunnel.routes.js';
 import sitemapRoutes from './routes/sitemap.routes.js';
@@ -276,6 +278,8 @@ export function createApp() {
   app.use('/api/chat', chatRoutes);
   app.use('/api/lab', labRoutes);
   app.use('/api/code', codeRoutes);
+  app.use('/api/git-oauth', gitOAuthRoutes);
+  app.use('/api/circuits', circuitsRoutes);
   app.use(sitemapRoutes);
 
   app.use(trySslipHostTunnel);

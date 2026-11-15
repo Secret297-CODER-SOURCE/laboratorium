@@ -1,5 +1,6 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
+import { handleLink } from '/user-handle.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -51,7 +52,7 @@ export function renderStatsPanel(data = {}) {
               ${leaderboard.length ? leaderboard.map(s => `
                 <tr>
                   <td>${s.rank}</td>
-                  <td><strong>@${esc(s.handle)}</strong><br><span class="stats-muted">${esc(s.name)}</span></td>
+                  <td><strong>${handleLink(s.handle)}</strong><br><span class="stats-muted">${esc(s.name)}</span></td>
                   <td>${s.tasks_completed}</td>
                   <td>${s.quizzes_passed}</td>
                   <td>${s.challenges_completed}</td>
@@ -101,7 +102,7 @@ export function renderStatsPanel(data = {}) {
 function renderStudentDetail(data) {
   const { student, summary, tasks, quizzes, challenges } = data;
   return `
-    <h3>@${esc(student.handle)} — ${esc(student.name)}</h3>
+    <h3>${handleLink(student.handle)} — ${esc(student.name)}</h3>
     <div class="stats-detail-summary">
       <span>Задачі: <strong>${summary.tasks_completed}</strong></span>
       <span>Тести: <strong>${summary.quizzes_passed}</strong></span>
@@ -135,7 +136,7 @@ function renderTaskDetail(data) {
     </div>
     <table class="stats-table stats-table--compact"><thead><tr><th>Учень</th><th>Статус</th><th>Взято</th><th>Здано</th><th>Час роботи</th><th>Загалом</th></tr></thead><tbody>
       ${assignments.map(a => `<tr>
-        <td>@${esc(a.student_handle)}</td>
+        <td>${handleLink(a.student_handle)}</td>
         <td>${statusLabel(a.status)}</td>
         <td>${esc(a.taken_at || '—')}</td>
         <td>${esc(a.submitted_at || '—')}</td>
@@ -159,7 +160,7 @@ function renderQuizDetail(data) {
     </div>
     <table class="stats-table stats-table--compact"><thead><tr><th>Учень</th><th>Бал</th><th>Час</th><th>Результат</th></tr></thead><tbody>
       ${attempts.length ? attempts.map(a => `<tr>
-        <td>@${esc(a.student_handle)}</td>
+        <td>${handleLink(a.student_handle)}</td>
         <td>${a.score_percent}%</td>
         <td>${esc(a.duration_label || '—')}</td>
         <td>${icon(a.passed ? 'check' : 'x', `ico ico--sm ${a.passed ? 'ico--ok' : 'ico--err'}`)}</td>

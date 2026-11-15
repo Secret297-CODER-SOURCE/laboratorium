@@ -3,12 +3,12 @@ import { NotFoundError, ValidationError } from '../utils/errors.js';
 
 export const STAGES = ['lead', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
 export const STAGE_LABELS = {
-  lead: 'Лід',
-  qualified: 'Кваліфіковано',
-  proposal: 'Пропозиція',
-  negotiation: 'Переговори',
-  won: 'Виграно',
-  lost: 'Втрачено',
+  lead: 'Заявка',
+  qualified: 'Звʼязок',
+  proposal: 'Умови',
+  negotiation: 'Очікує оплату',
+  won: 'Учень',
+  lost: 'Відмова',
 };
 
 const ACTIVITY_TYPES = ['note', 'call', 'email', 'meeting', 'task'];
