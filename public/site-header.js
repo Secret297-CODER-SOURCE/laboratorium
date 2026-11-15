@@ -10,13 +10,14 @@ const MAIN_LINKS = [
   { anchor: 'about', label: 'Про школу' },
   { anchor: 'programs', label: 'Програми' },
   { anchor: 'bounty', label: 'Bounty' },
+  { anchor: 'faq', label: 'FAQ' },
   { anchor: 'contact', label: 'Контакти' },
 ];
 
 export function renderMainNavLinks({ hashAnchors = false } = {}) {
   const prefix = hashAnchors ? '#' : '/#';
   return `<ul class="nav-links">
-    ${MAIN_LINKS.map(l => `<li><a href="${prefix}${l.anchor}">${t(l.label)}</a></li>`).join('')}
+    ${MAIN_LINKS.map((l) => `<li><a href="${prefix}${l.anchor}">${t(l.label)}</a></li>`).join('')}
   </ul>`;
 }
 

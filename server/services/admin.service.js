@@ -9,6 +9,7 @@ import * as groupService from './group.service.js';
 import * as applicationService from './application.service.js';
 import * as paymentService from './payment.service.js';
 import * as userNoteService from './user-note.service.js';
+import * as crmService from './crm.service.js';
 
 export function getPlatformStats() {
   const dbStats = getStats();
@@ -58,7 +59,15 @@ export function getOwnerDashboard() {
     ORDER BY u.created_at DESC LIMIT 100
   `).all();
 
-  return { stats, users, applications, conferences, recordings, students };
+  let crmOpen = 0;
+  try {
+    crmOpen = db.prepare(`
+      SELECT COUNT(*) AS c FROM crm_opportunities
+      WHERE stage NOT IN ('won', 'lost')
+    `).get()?.c || 0;
+  } catch { crmOpen = 0; }
+
+  return { stats, users, applications, conferences, recordings, students, crmOpen };
 }
 
 export function updateUserRole(actorId, actorRole, userId, newRole) {
@@ -166,6 +175,10 @@ export async function updateApplicationStatus(id, status, createAccount = false,
   const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(id);
   if (!app) throw new NotFoundError('Заявку не знайдено');
   db.prepare(`UPDATE applications SET status = ? WHERE id = ?`).run(status, id);
+
+  try {
+    crmService.syncApplicationStage(id, status);
+  } catch { /* CRM optional */ }
 
   // Approving an application is informational only — it does not by itself
   // open access. The only thing that lifts a restricted account is being

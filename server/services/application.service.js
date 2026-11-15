@@ -2,9 +2,47 @@ import db from '../db/index.js';
 import { ValidationError } from '../utils/errors.js';
 import { isValidEmail } from '../utils/validators.js';
 import * as referralService from './referral.service.js';
+import * as crmService from './crm.service.js';
+import * as notificationService from './notification.service.js';
+import * as mailService from './mail.service.js';
+import config from '../config/index.js';
 
-export function create({
+function notifyOwnersAboutLead(application) {
+  const owners = db.prepare(`
+    SELECT id, email FROM users WHERE role IN ('owner', 'developer') AND IFNULL(is_frozen, 0) = 0
+  `).all();
+  if (!owners.length) return;
+
+  const title = `Нова заявка: ${application.name}`;
+  const body = [
+    application.name,
+    application.email,
+    application.program,
+  ].filter(Boolean).join(' · ');
+
+  notificationService.notifyUsers(owners.map((o) => o.id), {
+    type: 'crm_lead',
+    title,
+    body,
+    link: '/admin.html?tab=applications',
+    data: { applicationId: application.id },
+  });
+
+  const emails = [...new Set([
+    ...owners.map((o) => o.email).filter(Boolean),
+    config.contactEmail,
+  ].filter(Boolean))];
+
+  for (const to of emails) {
+    mailService.sendNewLeadEmail(to, application).catch((err) => {
+      console.error('[applications] lead mail failed:', err.message);
+    });
+  }
+}
+
+export async function create({
   name, email, program, message, phone, userId = null, direction_id = null, referral_code = '',
+  company_name = '', job_title = '', team_size = '', intent = 'individual',
 }) {
   if (!name?.trim() || !email?.trim()) {
     throw new ValidationError('Заповніть обов\'язкові поля');
@@ -21,6 +59,10 @@ export function create({
   if (!isValidEmail(email)) {
     throw new ValidationError('Некоректний email');
   }
+
+  const intentValue = ['individual', 'corporate', 'team'].includes(String(intent))
+    ? String(intent)
+    : 'individual';
 
   let programLabel = program?.trim() || '';
   if (direction_id) {
@@ -41,13 +83,41 @@ export function create({
       referrer = { userId: referrerUser.id, programId: linkedUser?.referred_by_program_id || null };
     }
   }
-  db.prepare(`
+
+  const insert = db.prepare(`
     INSERT INTO applications (
       name, email, callback_phone, program, message, user_id, status, direction_id, referrer_id,
-      referral_program_id, analytics_campaign_code
-    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
-  `).run(name.trim(), email.toLowerCase(), callbackPhone, programLabel, message?.trim() || '', userId,
-    direction_id || null, referrer?.userId || null, referrer?.programId || null, null);
+      referral_program_id, analytics_campaign_code, company_name, job_title, team_size, intent
+    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    name.trim(),
+    email.toLowerCase(),
+    callbackPhone,
+    programLabel,
+    message?.trim() || '',
+    userId,
+    direction_id || null,
+    referrer?.userId || null,
+    referrer?.programId || null,
+    null,
+    String(company_name || '').trim().slice(0, 160) || null,
+    String(job_title || '').trim().slice(0, 120) || null,
+    String(team_size || '').trim().slice(0, 40) || null,
+    intentValue,
+  );
+
+  const application = db.prepare('SELECT * FROM applications WHERE id = ?').get(insert.lastInsertRowid);
+  try {
+    crmService.ingestApplication(application);
+  } catch (err) {
+    console.error('[applications] CRM ingest failed:', err.message);
+  }
+
+  try {
+    notifyOwnersAboutLead(application);
+  } catch (err) {
+    console.error('[applications] owner notify failed:', err.message);
+  }
 
   return true;
 }

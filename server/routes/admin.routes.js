@@ -10,6 +10,7 @@ import * as statsCtrl from '../controllers/stats.controller.js';
 import * as attendanceCtrl from '../controllers/attendance.controller.js';
 import * as calendarCtrl from '../controllers/calendar.controller.js';
 import { uploadCtfAttachment } from '../middleware/upload.js';
+import * as crmCtrl from '../controllers/crm.controller.js';
 
 const router = Router();
 
@@ -28,6 +29,19 @@ router.post('/users/:id/send-password', requireRole('owner', 'developer'), async
 
 router.get('/applications', requireRole('owner', 'developer'), asyncHandler(adminCtrl.listApplications));
 router.patch('/applications/:id', requireRole('owner', 'developer'), asyncHandler(adminCtrl.updateApplication));
+
+router.get('/crm/board', requireRole('owner', 'developer'), asyncHandler(crmCtrl.getBoard));
+router.get('/crm/companies', requireRole('owner', 'developer'), asyncHandler(crmCtrl.listCompanies));
+router.post('/crm/companies', requireRole('owner', 'developer'), asyncHandler(crmCtrl.createCompany));
+router.patch('/crm/companies/:id', requireRole('owner', 'developer'), asyncHandler(crmCtrl.updateCompany));
+router.get('/crm/contacts', requireRole('owner', 'developer'), asyncHandler(crmCtrl.listContacts));
+router.post('/crm/contacts', requireRole('owner', 'developer'), asyncHandler(crmCtrl.createContact));
+router.patch('/crm/contacts/:id', requireRole('owner', 'developer'), asyncHandler(crmCtrl.updateContact));
+router.post('/crm/opportunities', requireRole('owner', 'developer'), asyncHandler(crmCtrl.createOpportunity));
+router.get('/crm/opportunities/:id', requireRole('owner', 'developer'), asyncHandler(crmCtrl.getOpportunity));
+router.patch('/crm/opportunities/:id', requireRole('owner', 'developer'), asyncHandler(crmCtrl.updateOpportunity));
+router.get('/crm/activities', requireRole('owner', 'developer'), asyncHandler(crmCtrl.listActivities));
+router.post('/crm/activities', requireRole('owner', 'developer'), asyncHandler(crmCtrl.addActivity));
 
 router.get('/messages', requireRole('owner'), asyncHandler(adminCtrl.listSupportThreads));
 router.get('/messages/summary', requireRole('owner'), asyncHandler(adminCtrl.getSupportInboxSummary));

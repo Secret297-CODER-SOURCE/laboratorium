@@ -50,6 +50,9 @@ import { renderMarketingPanel, loadMarketingData, bindMarketingPanelEvents } fro
 import {
   loadMessagesPanel, renderMessagesPanel, bindMessagesPanelEvents,
 } from '/admin-messages-panel.js';
+import {
+  loadCrmData, renderCrmPanel, bindCrmPanelEvents,
+} from '/admin-crm-panel.js';
 
 if (!(await requireAuthAsync())) throw new Error('auth');
 initTheme();
@@ -98,7 +101,7 @@ let manualsAdminData = { manuals: [], directions: [], groups: [] };
 let ownerGroupsData = { groups: [], programs: [], directions: [], teachers: [] };
 let teacherDirections = [];
 let adminLoadSeq = 0;
-let adminNavBadges = { applications: 0, tasks: 0, homework: 0 };
+let adminNavBadges = { applications: 0, tasks: 0, homework: 0, crm: 0, messages: 0 };
 
 function renderAdminShell(role, content) {
   if (role !== 'owner' && role !== 'teacher') return content;
@@ -226,6 +229,7 @@ async function load() {
   if (role === 'owner') {
     adminNavBadges.applications = overviewData.applications?.filter((app) => app.status === 'pending').length || 0;
     adminNavBadges.messages = overviewData.messagesUnread || 0;
+    adminNavBadges.crm = overviewData.crmOpen || 0;
   }
   if (role === 'teacher') {
     try {
@@ -480,6 +484,12 @@ async function load() {
       } catch (err) {
         html += `<p class="empty-state">${err.message}</p>`;
       }
+    } else if (ownerTab === 'crm') {
+      try {
+        html += renderCrmPanel(await loadCrmData());
+      } catch (err) {
+        html += `<p class="empty-state">${err.message}</p>`;
+      }
     } else if (ownerTab === 'applications') {
       html += renderApplicationsPanel(applications);
     } else if (ownerTab === 'stats') {
@@ -612,12 +622,15 @@ function renderApplicationsPanel(apps) {
     return `<section class="admin-panel"><h2>${icon('notes', 'ico ico--md')}Заявки</h2><p class="empty-state">Немає нових заявок</p></section>`;
   }
   return `<section class="admin-panel admin-panel--wide">
-    <h2>${icon('notes', 'ico ico--md')}Заявки</h2>
-    <table class="admin-table">
+    <div class="admin-panel-head">
+      <h2>${icon('notes', 'ico ico--md')}Заявки</h2>
+      <p class="crm-panel-sub">Заявки з сайту також з’являються у CRM → Воронка.</p>
+    </div>
+    <div class="admin-table-wrap"><table class="admin-table">
       <thead><tr><th>Ім'я</th><th>Email</th><th>Телефон</th><th>Програма</th><th>Акаунт</th><th>Статус</th><th></th></tr></thead>
       <tbody>${apps.map(a => `
         <tr>
-          <td>${a.name}</td>
+          <td><strong>${a.name}</strong></td>
           <td>${a.email}</td>
           <td>${a.callback_phone
             ? `<a href="tel:${String(a.callback_phone).replace(/[^\d+]/g, '')}">${String(a.callback_phone).replace(/[&<>"']/g, '')}</a>`
@@ -633,7 +646,7 @@ function renderApplicationsPanel(apps) {
           ` : ''}</td>
         </tr>`).join('')}
       </tbody>
-    </table>
+    </table></div>
   </section>`;
 }
 
@@ -688,6 +701,9 @@ function bindEvents(role, panelPrograms = [], teacherGroups = []) {
   }
   if (role === 'owner' && ownerTab === 'messages') {
     bindMessagesPanelEvents(showToast, load);
+  }
+  if (role === 'owner' && ownerTab === 'crm') {
+    bindCrmPanelEvents(showToast, load);
   }
 
   document.querySelectorAll('.role-select').forEach(sel => {

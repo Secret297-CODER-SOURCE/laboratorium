@@ -165,15 +165,33 @@ function sendCoursePage(req, res) {
     : sourceDescription;
   const title = `${program.name} — laboratorium.`;
   const canonical = `${config.siteUrl.replace(/\/+$/, '')}/course.html?id=${program.id}`;
+  const siteBase = config.siteUrl.replace(/\/+$/, '');
   const schema = JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'Course',
     name: program.name,
     description,
+    url: canonical,
+    inLanguage: 'uk',
+    educationalLevel: program.level || undefined,
+    timeRequired: program.duration || undefined,
     provider: {
       '@type': 'EducationalOrganization',
       name: 'laboratorium.',
-      url: `${config.siteUrl.replace(/\/+$/, '')}/`,
+      url: `${siteBase}/`,
+    },
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'laboratorium.',
+      url: `${siteBase}/`,
+    },
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Головна', item: `${siteBase}/` },
+        { '@type': 'ListItem', position: 2, name: direction?.name || 'Програми', item: `${siteBase}/#programs` },
+        { '@type': 'ListItem', position: 3, name: program.name, item: canonical },
+      ],
     },
   }).replace(/</g, '\\u003c');
   const page = contentService.getPublishedProgramPage(program.id);
@@ -272,6 +290,9 @@ export function createApp() {
   });
 
   app.get('/course.html', sendCoursePage);
+  app.get('/corporate.html', (_req, res) => {
+    res.redirect(301, '/');
+  });
 
   app.use('/uploads', express.static(config.uploads.dir, {
     etag: true,

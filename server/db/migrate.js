@@ -1202,6 +1202,97 @@ export function runMigrations(db) {
     db.exec('ALTER TABLE lessons ADD COLUMN is_exception INTEGER DEFAULT 0 NOT NULL');
   }
   db.exec('CREATE INDEX IF NOT EXISTS idx_lessons_series ON lessons(series_id, lesson_at)');
+
+  const applicationB2bCols = db.prepare('PRAGMA table_info(applications)').all().map((c) => c.name);
+  for (const [column, sql] of [
+    ['company_name', 'ALTER TABLE applications ADD COLUMN company_name TEXT'],
+    ['job_title', 'ALTER TABLE applications ADD COLUMN job_title TEXT'],
+    ['team_size', 'ALTER TABLE applications ADD COLUMN team_size TEXT'],
+    ['intent', "ALTER TABLE applications ADD COLUMN intent TEXT DEFAULT 'individual'"],
+  ]) {
+    if (!applicationB2bCols.includes(column)) db.exec(sql);
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS crm_companies (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      website TEXT,
+      industry TEXT,
+      size_band TEXT,
+      country TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      job_title TEXT,
+      linked_user_id INTEGER,
+      application_id INTEGER,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (company_id) REFERENCES crm_companies(id) ON DELETE SET NULL,
+      FOREIGN KEY (linked_user_id) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_opportunities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER,
+      contact_id INTEGER,
+      title TEXT NOT NULL,
+      stage TEXT DEFAULT 'lead' NOT NULL,
+      value REAL DEFAULT 0 NOT NULL,
+      currency TEXT DEFAULT 'UAH' NOT NULL,
+      direction_id INTEGER,
+      program TEXT,
+      source TEXT,
+      intent TEXT,
+      team_size TEXT,
+      application_id INTEGER,
+      owner_user_id INTEGER,
+      expected_close TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (company_id) REFERENCES crm_companies(id) ON DELETE SET NULL,
+      FOREIGN KEY (contact_id) REFERENCES crm_contacts(id) ON DELETE SET NULL,
+      FOREIGN KEY (direction_id) REFERENCES directions(id) ON DELETE SET NULL,
+      FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE SET NULL,
+      FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_activities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      opportunity_id INTEGER,
+      company_id INTEGER,
+      contact_id INTEGER,
+      type TEXT DEFAULT 'note' NOT NULL,
+      body TEXT NOT NULL,
+      due_at TEXT,
+      completed_at TEXT,
+      created_by INTEGER,
+      created_at TEXT DEFAULT (datetime('now')) NOT NULL,
+      FOREIGN KEY (opportunity_id) REFERENCES crm_opportunities(id) ON DELETE CASCADE,
+      FOREIGN KEY (company_id) REFERENCES crm_companies(id) ON DELETE SET NULL,
+      FOREIGN KEY (contact_id) REFERENCES crm_contacts(id) ON DELETE SET NULL,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_crm_companies_name ON crm_companies(name);
+    CREATE INDEX IF NOT EXISTS idx_crm_contacts_email ON crm_contacts(email);
+    CREATE INDEX IF NOT EXISTS idx_crm_contacts_company ON crm_contacts(company_id);
+    CREATE INDEX IF NOT EXISTS idx_crm_opportunities_stage ON crm_opportunities(stage, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_crm_opportunities_application ON crm_opportunities(application_id);
+    CREATE INDEX IF NOT EXISTS idx_crm_activities_opp ON crm_activities(opportunity_id, created_at);
+  `);
 }
 
 function bootstrapCurrentMonthPayments(db) {

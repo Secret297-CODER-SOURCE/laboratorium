@@ -41,12 +41,14 @@ export async function getOverview(req, res) {
   }
 
   if (role === 'owner') {
+    const dashboard = adminService.getOwnerDashboard();
     return res.json({
       role,
-      ...adminService.getOwnerDashboard(),
+      ...dashboard,
       directions: directionService.getAll(),
       programs: programService.getAllAdmin(),
       messagesUnread: supportService.getOwnerInboxSummary().unread_count || 0,
+      crmOpen: dashboard.crmOpen || 0,
     });
   }
 

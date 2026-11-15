@@ -7,10 +7,11 @@ export function renderOwnerTabs(active = 'overview', badges = {}) {
   const sections = [
     { label: 'Керування', tabs: [
       { id: 'overview', label: 'Огляд', icon: 'grid' },
+      { id: 'crm', label: 'CRM', icon: 'target', badge: badges.crm },
       { id: 'applications', label: 'Заявки', icon: 'calendar', badge: badges.applications },
       { id: 'messages', label: 'Повідомлення', icon: 'chat', badge: badges.messages },
       { id: 'stats', label: 'Статистика', icon: 'chart' },
-      { id: 'marketing', label: 'SEO та реклама', icon: 'chart' },
+      { id: 'marketing', label: 'SEO та реклама', icon: 'globe' },
     ] },
     { label: 'Навчання', tabs: [
       { id: 'directions', label: 'Напрямки', icon: 'book' },

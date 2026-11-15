@@ -105,7 +105,7 @@ function animateCounters() {
   });
 }
 
-document.querySelectorAll('.feature-card,.section-header,.about-text,.bounty-content,.leaderboard,.contact-info,.contact-form,.cta-inner').forEach(el => {
+document.querySelectorAll('.feature-card,.section-header,.about-text,.bounty-content,.leaderboard,.contact-info,.contact-form,.cta-inner,.metrics-strip,.faq-item').forEach(el => {
   el.classList.add('reveal');
   new IntersectionObserver(([e]) => { if (e.isIntersecting) e.target.classList.add('visible'); }, { threshold: 0.15 }).observe(el);
 });
@@ -137,9 +137,11 @@ loadLeaderboard();
 document.getElementById('contact-form')?.addEventListener('submit', async e => {
   e.preventDefault();
   const btn = e.target.querySelector('button[type="submit"]');
+  const statusEl = document.getElementById('contact-form-status');
   const original = btn.textContent;
   const fd = new FormData(e.target);
   btn.disabled = true; btn.textContent = 'Надсилання...';
+  if (statusEl) { statusEl.hidden = true; statusEl.textContent = ''; }
   try {
     await api('/applications', {
       method: 'POST',
@@ -152,10 +154,24 @@ document.getElementById('contact-form')?.addEventListener('submit', async e => {
       }),
     });
     trackEvent('application_submitted');
-    btn.innerHTML = `${icon('check', 'ico ico--sm')}Заявку прийнято`; e.target.reset();
+    btn.innerHTML = `${icon('check', 'ico ico--sm')}Заявку прийнято`;
+    e.target.reset();
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.className = 'form-status form-status--ok';
+      statusEl.textContent = 'Дякуємо. Заявку прийнято — відповімо протягом 1 робочого дня.';
+    }
     setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
   } catch (err) {
-    btn.textContent = err.message;
-    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
+    btn.textContent = original;
+    btn.disabled = false;
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.className = 'form-status form-status--error';
+      statusEl.textContent = err.message || 'Не вдалося надіслати. Спробуйте ще раз.';
+    } else {
+      btn.textContent = err.message;
+      setTimeout(() => { btn.textContent = original; }, 3000);
+    }
   }
 });

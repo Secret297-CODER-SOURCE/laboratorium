@@ -4,33 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0a0a0a">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" id="site-favicon">
   <link rel="alternate icon" type="image/png" href="/favicon.png">
   <link rel="alternate icon" href="/favicon.ico">
-  <title>Адмін-панель — laboratorium.</title>
+  <title>Operations — laboratorium.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"></noscript>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/icons.css">
   <link rel="stylesheet" href="/admin.css">
 </head>
-<body data-theme="flow">
+<body class="page-admin" data-theme="flow">
   <div class="noise" aria-hidden="true"></div>
-  <div class="aurora" aria-hidden="true"></div>
-  <div class="grid-bg" aria-hidden="true"></div>
+  <div class="grid-bg grid-bg--columns" aria-hidden="true"></div>
 
-  <header class="header" id="site-header"></header>
+  <header class="header header--admin" id="site-header"></header>
 
   <main class="admin-page">
-    <div class="container">
+    <div class="container admin-shell">
       <div id="toast" class="toast" hidden></div>
       <div class="admin-header">
         <div>
-          <span class="section-tag">// admin</span>
+          <span class="section-tag">operations console</span>
           <h1 id="admin-title">Панель керування</h1>
+          <p class="admin-header-sub">B2B-продажі, навчання, доступ і інфраструктура в одному робочому просторі.</p>
         </div>
       </div>
       <div id="admin-content"></div>

@@ -1898,3 +1898,239 @@ body.traffic-open { overflow: hidden; }
 .admin-table--users .role-select { width: 100%; max-width: 140px; }
 .admin-table--users .admin-actions { flex-wrap: nowrap; gap: 2px; }
 .admin-table--users .admin-actions .btn { padding: 6px; min-width: 32px; justify-content: center; }
+
+/* ===== Admin shell (B2B operations) ===== */
+.page-admin { --font: 'Space Grotesk', 'Segoe UI', sans-serif; --mono: 'IBM Plex Mono', monospace; }
+.page-admin .aurora { display: none; }
+.admin-header-sub {
+  margin-top: 8px;
+  max-width: 42rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.admin-shell { max-width: 1440px; }
+.page-admin .admin-sidebar {
+  background: color-mix(in srgb, #0d0d0d 92%, transparent);
+  border-radius: 2px;
+  border-color: rgba(255,255,255,0.08);
+}
+.page-admin .admin-sidebar .admin-tab.active {
+  box-shadow: inset 2px 0 var(--accent);
+  border-radius: 2px;
+}
+.muted-line {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+/* ===== CRM (Twenty-like) ===== */
+.crm-panel-head { align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.crm-panel-sub { margin: 6px 0 0; color: var(--text-muted); font-size: 0.85rem; max-width: 36rem; }
+.crm-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.crm-view-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.crm-view-btn {
+  padding: 8px 14px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
+}
+.crm-view-btn:last-child { border-right: 0; }
+.crm-view-btn.active { color: var(--text); background: var(--accent-subtle); }
+.crm-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 22px;
+}
+.crm-stat {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--bg-card) 80%, transparent);
+}
+.crm-stat-val {
+  display: block;
+  font: 600 1.15rem var(--mono);
+  letter-spacing: -0.02em;
+}
+.crm-stat-label {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.crm-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+.crm-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.crm-column {
+  min-width: 200px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: rgba(255,255,255,0.015);
+}
+.crm-column-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.crm-column-head h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.crm-count {
+  font: 500 0.72rem var(--mono);
+  color: var(--text-dim);
+}
+.crm-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 160px;
+  padding: 10px;
+}
+.crm-column-body.is-drop-target {
+  outline: 1px dashed var(--accent);
+  background: var(--accent-subtle);
+}
+.crm-card {
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg-card);
+  cursor: grab;
+}
+.crm-card.is-dragging { opacity: 0.5; }
+.crm-card-open {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+}
+.crm-card-open strong { font-size: 0.88rem; line-height: 1.35; }
+.crm-card-meta { color: var(--text-dim); font-size: 0.72rem; }
+.crm-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.crm-card-value { font: 500 0.72rem var(--mono); color: var(--accent); }
+.crm-pill {
+  display: inline-flex;
+  padding: 2px 7px;
+  border: 1px solid var(--border-accent);
+  border-radius: 2px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+}
+.crm-empty { color: var(--text-dim); font-size: 0.78rem; padding: 12px 4px; }
+.crm-drawer {
+  width: min(360px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--bg-card) 94%, transparent);
+  padding: 16px;
+  position: sticky;
+  top: 96px;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+}
+.crm-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.crm-drawer-head h3 { margin: 4px 0 0; font-size: 1.05rem; line-height: 1.3; }
+.crm-drawer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.crm-drawer-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.crm-drawer-meta {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.crm-activity-form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.crm-timeline { display: grid; gap: 10px; }
+.crm-timeline-item {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.crm-timeline-item p { margin: 6px 0; font-size: 0.85rem; }
+.crm-timeline-item time { color: var(--text-dim); font-size: 0.7rem; font-family: var(--mono); }
+
+@media (max-width: 1100px) {
+  .crm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .crm-body { grid-template-columns: 1fr; }
+  .crm-drawer { position: static; width: 100%; max-height: none; }
+  .crm-board { grid-template-columns: repeat(4, minmax(220px, 1fr)); }
+}
+
+.crm-card-stage {
+  display: block;
+  padding: 0 10px 10px;
+}
+.crm-card-stage-select {
+  width: 100%;
+  font-size: 0.72rem;
+  padding: 6px 8px;
+}
+.crm-empty-cta {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+.crm-undo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 2px;
+  background: var(--accent-subtle);
+  font-size: 0.85rem;
+}

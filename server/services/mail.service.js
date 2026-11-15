@@ -126,3 +126,30 @@ export async function sendWelcomeCredentialsEmail(user, password) {
     text: `Доступ до laboratorium.\nЛогін: @${user.handle}\nПароль: ${password}\nВхід: ${config.appUrl}/login.html`,
   });
 }
+
+/** Сповіщення власника про нову заявку з сайту. */
+export async function sendNewLeadEmail(to, application) {
+  const crmUrl = `${config.appUrl.replace(/\/+$/, '')}/admin.html?tab=crm`;
+  const appsUrl = `${config.appUrl.replace(/\/+$/, '')}/admin.html?tab=applications`;
+  const rows = [
+    ['Імʼя', application.name],
+    ['Email', application.email],
+    ['Телефон', application.callback_phone || '—'],
+    ['Напрямок / програма', application.program || '—'],
+    ['Повідомлення', application.message || '—'],
+  ];
+  const htmlRows = rows.map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#666">${k}</td><td style="padding:4px 0">${String(v).replace(/</g, '&lt;')}</td></tr>`).join('');
+  return sendMail({
+    to,
+    subject: `Нова заявка: ${application.name} — laboratorium.`,
+    html: `
+      <p>Нова заявка з сайту.</p>
+      <table>${htmlRows}</table>
+      <p>
+        <a href="${appsUrl}">Заявки</a> ·
+        <a href="${crmUrl}">CRM</a>
+      </p>
+    `,
+    text: `Нова заявка laboratorium.\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}\nЗаявки: ${appsUrl}`,
+  });
+}

@@ -74,13 +74,16 @@ export async function getSitemap(_req, res) {
     return directionService.getById(program.direction_id)?.is_active;
   });
 
+  const today = new Date().toISOString().slice(0, 10);
   const urls = [
-    { loc: `${base}/`, priority: '1.0' },
+    { loc: `${base}/`, priority: '1.0', changefreq: 'daily', lastmod: today },
+    { loc: `${base}/manuals.html`, priority: '0.6', changefreq: 'weekly', lastmod: today },
+    { loc: `${base}/login.html`, priority: '0.2', changefreq: 'monthly' },
     ...programs.map(p => ({
       loc: `${base}/course.html?id=${p.id}`,
-      priority: '0.7',
+      priority: '0.8',
       changefreq: 'weekly',
-      lastmod: toSitemapDate(p.updated_at),
+      lastmod: toSitemapDate(p.updated_at) || today,
     })),
   ];
 
