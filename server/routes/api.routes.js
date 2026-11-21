@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authRequired, requireUnrestricted } from '../middleware/auth.js';
@@ -9,51 +8,20 @@ import * as apiCtrl from '../controllers/api.controller.js';
 import * as notificationCtrl from '../controllers/notification.controller.js';
 import * as contentCtrl from '../controllers/content.controller.js';
 import * as calendarCtrl from '../controllers/calendar.controller.js';
+import { getIceServersForUser } from '../services/ice.service.js';
 
 const router = Router();
 
 router.use(authRequired);
 
-router.get('/ice-servers', (req, res) => {
-  const host = process.env.TURN_HOST;
-  const secret = process.env.TURN_SECRET;
-
-  if (!host || !secret) {
-    return res.status(503).json({ error: 'TURN not configured' });
-  }
-
-  const expiry = Math.floor(Date.now() / 1000) + 12 * 60 * 60;
-  const username = `${expiry}:${req.user.id}`;
-  const credential = crypto
-    .createHmac('sha1', secret)
-    .update(username)
-    .digest('base64');
-  // Keep the list short: browsers warn / slow down with 5+ STUN/TURN URLs.
-  const iceServers = [
-    { urls: `stun:${host}:3478` },
-    {
-      urls: `turn:${host}:3478?transport=udp`,
-      username,
-      credential,
-    },
-  ];
-  const tlsPort = Number.parseInt(process.env.TURN_TLS_PORT, 10);
-  if (Number.isInteger(tlsPort) && tlsPort > 0 && tlsPort <= 65535) {
-    iceServers.push({
-      urls: `turns:${host}:${tlsPort}?transport=tcp`,
-      username,
-      credential,
-    });
-  } else {
-    iceServers.push({
-      urls: `turn:${host}:3478?transport=tcp`,
-      username,
-      credential,
-    });
-  }
-
-  return res.json({ iceServers });
-});
+router.get('/ice-servers', asyncHandler(async (req, res) => {
+  const result = await getIceServersForUser(req.user.id);
+  res.json({
+    iceServers: result.iceServers,
+    source: result.source,
+    ...(result.warning ? { warning: result.warning } : {}),
+  });
+}));
 
 
 router.get('/billing/status', asyncHandler(apiCtrl.getBillingStatus));

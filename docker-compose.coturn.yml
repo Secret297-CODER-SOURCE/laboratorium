@@ -1,0 +1,33 @@
+# Standalone coturn for Coolify / VPS (host networking).
+#
+# docker compose -f docker-compose.coturn.yml up -d
+#
+# Firewall: 3478/udp 3478/tcp 5349/tcp 49152-49200/udp
+# DNS: turn.laboratorium.club → TURN_EXTERNAL_IP (Cloudflare DNS only / grey cloud)
+# Coolify app env must match:
+#   TURN_HOST=turn.laboratorium.club
+#   TURN_SECRET=<same>
+#   TURN_TLS_PORT=5349
+
+services:
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: laboratorium-coturn
+    restart: always
+    network_mode: host
+    environment:
+      TURN_SECRET: ${TURN_SECRET:?Set TURN_SECRET}
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:?Set public server IP}
+      TURN_REALM: ${TURN_REALM:-turn.laboratorium.club}
+    volumes:
+      - ./deploy/coturn/turnserver.conf:/etc/coturn/turnserver.conf.template:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        sed \
+          -e "s|__TURN_SECRET__|$${TURN_SECRET}|g" \
+          -e "s|__TURN_EXTERNAL_IP__|$${TURN_EXTERNAL_IP}|g" \
+          -e "s|__TURN_REALM__|$${TURN_REALM}|g" \
+          /etc/coturn/turnserver.conf.template > /tmp/turnserver.conf
+        exec turnserver -c /tmp/turnserver.conf --log-file=stdout --simple-log

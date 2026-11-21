@@ -70,7 +70,8 @@ async function loadIceServers() {
     // Server list is authoritative — do NOT stack Google STUNs on top (that caused 5+ URLs).
     ICE_SERVERS = pickIceServers(d.iceServers);
     ICE_HAS_TURN = ICE_SERVERS.some((s) => /^turns?:/i.test(s.urls));
-    console.info('[room] ICE servers:', ICE_SERVERS.map((s) => s.urls));
+    console.info('[room] ICE servers:', ICE_SERVERS.map((s) => s.urls), d.source || '', d.warning || '');
+    if (d.warning) addSystemMessage(d.warning);
   } catch (error) {
     console.error('[room] Could not load TURN/ICE servers:', error);
     ICE_SERVERS = [...STUN_ONLY];
