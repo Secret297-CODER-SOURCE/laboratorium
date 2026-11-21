@@ -28,13 +28,11 @@ router.get('/ice-servers', (req, res) => {
     .createHmac('sha1', secret)
     .update(username)
     .digest('base64');
+  // Keep the list short: browsers warn / slow down with 5+ STUN/TURN URLs.
   const iceServers = [
     { urls: `stun:${host}:3478` },
     {
-      urls: [
-        `turn:${host}:3478?transport=udp`,
-        `turn:${host}:3478?transport=tcp`,
-      ],
+      urls: `turn:${host}:3478?transport=udp`,
       username,
       credential,
     },
@@ -43,6 +41,12 @@ router.get('/ice-servers', (req, res) => {
   if (Number.isInteger(tlsPort) && tlsPort > 0 && tlsPort <= 65535) {
     iceServers.push({
       urls: `turns:${host}:${tlsPort}?transport=tcp`,
+      username,
+      credential,
+    });
+  } else {
+    iceServers.push({
+      urls: `turn:${host}:3478?transport=tcp`,
       username,
       credential,
     });

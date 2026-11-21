@@ -438,9 +438,9 @@
     "semantic_hash": ""
   },
   "public/room.js": {
-    "mtime": 1794776370.990023,
-    "seen": 1794776442.025739,
-    "ast_hash": "5af5b15484f7ff478275cdea873b9507",
+    "mtime": 1795253215.233334,
+    "seen": 1795253236.890273,
+    "ast_hash": "e436cafe14f158ec1730c12becbbdf1d",
     "semantic_hash": ""
   },
   "public/script.js": {
@@ -756,9 +756,9 @@
     "semantic_hash": ""
   },
   "server/routes/api.routes.js": {
-    "mtime": 1795247544.4542346,
-    "seen": 1795247644.213063,
-    "ast_hash": "a3f61a5213ecee1ef6c23fc01507fbe5",
+    "mtime": 1795253218.7107346,
+    "seen": 1795253236.890338,
+    "ast_hash": "4096bfe2df2faada158730e7f6a369c3",
     "semantic_hash": ""
   },
   "server/routes/auth.routes.js": {

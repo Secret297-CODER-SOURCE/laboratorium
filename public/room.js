@@ -12,23 +12,53 @@ const CONF_ID = parseInt(new URLSearchParams(location.search).get('id'), 10);
 if (!CONF_ID) location.href = '/conferences.html';
 
 /* ───────────────────────── ICE / TURN ─────────────────────────
- * Одного STUN недостаточно: через мобильный интернет / симметричный NAT
- * соединение между двумя устройствами часто просто не устанавливается —
- * тогда нет ни видео, ни демки, ни звука. Нужен TURN.
- *
- * Сервер может отдавать список на GET /api/ice-servers → { iceServers: [...] }
- * (например, из coturn / Metered / Cloudflare Calls). Если эндпоинта нет —
- * используется STUN и (опционально) TURN_FALLBACK ниже.
+ * Один-два STUN + максимум два TURN URL. Більше 4–5 серверів гальмує
+ * discovery і в Firefox дає «Using five or more STUN/TURN servers…».
+ * Якщо coturn з /api/ice-servers зламаний — ICE failed; тоді fallback на STUN.
  */
-const TURN_FALLBACK = [
-  // { urls: 'turn:turn.laboratorium.club:3478', username: 'USER', credential: 'PASS' },
-  // { urls: 'turns:turn.laboratorium.club:5349', username: 'USER', credential: 'PASS' },
-];
-let ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  ...TURN_FALLBACK,
-];
+const STUN_ONLY = [{ urls: 'stun:stun.l.google.com:19302' }];
+let ICE_SERVERS = [...STUN_ONLY];
+let ICE_HAS_TURN = false;
+
+function flattenIceServers(servers = []) {
+  const out = [];
+  for (const server of servers) {
+    if (!server) continue;
+    const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+    for (const url of urls) {
+      if (!url) continue;
+      const entry = { urls: String(url) };
+      if (server.username) entry.username = server.username;
+      if (server.credential) entry.credential = server.credential;
+      out.push(entry);
+    }
+  }
+  return out;
+}
+
+/** Pick a small reliable set: 1 STUN + prefer turn:udp + turns/tcp. */
+function pickIceServers(servers) {
+  const flat = flattenIceServers(servers);
+  const stun = flat.filter((s) => s.urls.startsWith('stun:'));
+  const turnUdp = flat.filter((s) => s.urls.startsWith('turn:') && /transport=udp/i.test(s.urls));
+  const turnTcp = flat.filter((s) => s.urls.startsWith('turn:') && /transport=tcp/i.test(s.urls));
+  const turns = flat.filter((s) => s.urls.startsWith('turns:'));
+  const turnAny = flat.filter((s) => /^turns?:/i.test(s.urls));
+
+  const picked = [];
+  const pushUnique = (item) => {
+    if (!item) return;
+    if (picked.some((p) => p.urls === item.urls)) return;
+    picked.push(item);
+  };
+
+  pushUnique(stun[0] || STUN_ONLY[0]);
+  pushUnique(turnUdp[0] || turnAny.find((s) => s.urls.startsWith('turn:')));
+  pushUnique(turns[0] || turnTcp[0]);
+
+  return picked.slice(0, 3);
+}
+
 async function loadIceServers() {
   try {
     const r = await fetch('/api/ice-servers', { headers: { Authorization: `Bearer ${TOKEN}` } });
@@ -37,10 +67,15 @@ async function loadIceServers() {
     if (!Array.isArray(d.iceServers) || !d.iceServers.length) {
       throw new Error('ICE server response did not contain any servers');
     }
-    ICE_SERVERS = [...ICE_SERVERS.filter(server => String(server.urls).startsWith('stun:')), ...d.iceServers];
+    // Server list is authoritative — do NOT stack Google STUNs on top (that caused 5+ URLs).
+    ICE_SERVERS = pickIceServers(d.iceServers);
+    ICE_HAS_TURN = ICE_SERVERS.some((s) => /^turns?:/i.test(s.urls));
+    console.info('[room] ICE servers:', ICE_SERVERS.map((s) => s.urls));
   } catch (error) {
     console.error('[room] Could not load TURN/ICE servers:', error);
-    addSystemMessage('Не вдалося завантажити TURN-сервери. Спробуємо з’єднатися через STUN; для деяких мереж це може не спрацювати.');
+    ICE_SERVERS = [...STUN_ONLY];
+    ICE_HAS_TURN = false;
+    addSystemMessage('TURN недоступний — з’єднання лише через STUN. У деяких мережах демка/відео можуть не пройти.');
   }
 }
 
@@ -387,13 +422,13 @@ function renderPeerState(peer) {
 
 function syncScreenTile(peer) {
   const track = peer.screenStream.getVideoTracks().find(
-    (item) => item.readyState === 'live'
+    (item) => item.readyState === 'live',
   );
 
-  // Входящий трек существует всегда (слот согласован заранее), поэтому плитку
-  // показываем, когда есть живой трек И собеседник сообщил о демонстрации
-  // (канал метаданных, сокет или реальный unmute трека).
-  if (track && peer.state.screen) {
+  // Show when peer says they're sharing OR the inbound screen track is unmuted
+  // (meta/DC can lag behind replaceTrack).
+  const wantsScreen = !!(peer.state.screen || peer.serverScreen || (track && !track.muted));
+  if (track && wantsScreen) {
     if (!peer.screenTile) {
       const tile = makeTile({
         id: `tile-screen-${peer.socketId}`,
@@ -415,6 +450,10 @@ function syncScreenTile(peer) {
       peer.screenTile = tile;
       safePlay(video);
       updateGridClass();
+    } else {
+      const video = peer.screenTile.querySelector('video');
+      if (video && video.srcObject !== peer.screenStream) video.srcObject = peer.screenStream;
+      safePlay(video);
     }
   } else if (peer.screenTile) {
     peer.screenTile.remove();
@@ -431,13 +470,13 @@ async function createPeer(socketId, isInitiator, userData) {
     return existing;
   }
 
-  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 4 });
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 0 });
   const peer = {
     socketId, pc, isInitiator, user: userData,
     camStream: new MediaStream(), screenStream: new MediaStream(),
     pendingIce: [], dc: null, polite: !isInitiator, makingOffer: false,
     ignoreOffer: false, restartTimer: null, restartTimeout: null,
-    restartAttempts: 0, restarting: false,
+    restartAttempts: 0, restarting: false, stunFallbackTried: false,
     state: { audio: !!userData?.audioEnabled, video: !!userData?.videoEnabled, screen: !!userData?.screenSharing },
     serverScreen: !!userData?.screenSharing,
     tile: null, screenTile: null, tx: {}, ready: null,
@@ -474,16 +513,20 @@ async function createPeer(socketId, isInitiator, userData) {
   pc.ontrack = (e) => {
     bindSlots(peer);
     const tr = e.transceiver;
-    if (tr === peer.tx.screen || tr === peer.tx.screenAudio) {
+    const idx = peer.pc.getTransceivers().indexOf(tr);
+    const isScreen = tr === peer.tx.screen || tr === peer.tx.screenAudio || idx === 2 || idx === 3;
+    if (isScreen) {
       if (!peer.screenStream.getTracks().includes(e.track)) peer.screenStream.addTrack(e.track);
       e.track.onunmute = () => {
-        if (tr === peer.tx.screen) peer.state.screen = true; // страховка, если канал метаданных не доехал
+        if (e.track.kind === 'video') peer.state.screen = true;
         syncScreenTile(peer);
       };
+      e.track.onmute = () => syncScreenTile(peer);
       e.track.onended = () => {
         peer.screenStream.removeTrack(e.track);
         syncScreenTile(peer);
       };
+      if (e.track.kind === 'video' && !e.track.muted) peer.state.screen = true;
       syncScreenTile(peer);
       peer.screenTile?.querySelector('video')?.play().catch(() => {});
     } else {
@@ -507,11 +550,19 @@ async function createPeer(socketId, isInitiator, userData) {
       peer.restartTimeout = null;
       peer.restarting = false;
       peer.restartAttempts = 0;
+      // Re-push screen if we started sharing before ICE finished.
+      if (screenSharing && screenStream) {
+        const sv = screenStream.getVideoTracks()[0] || null;
+        const sa = screenStream.getAudioTracks()[0] || null;
+        if (peer.tx.screen) peer.tx.screen.sender.replaceTrack(sv).catch(() => {});
+        if (peer.tx.screenAudio) peer.tx.screenAudio.sender.replaceTrack(sa).catch(() => {});
+        sendMeta();
+      }
     } else if (pc.iceConnectionState === 'disconnected') {
       clearTimeout(peer.restartTimer);
       peer.restartTimer = setTimeout(() => restartIce(peer), 5000);
     } else if (pc.iceConnectionState === 'failed') {
-      restartIce(peer);
+      fallbackOrRestartIce(peer);
     }
   };
   pc.onconnectionstatechange = () => {
@@ -545,6 +596,22 @@ async function sendOffer(peer, options) {
   } finally {
     peer.makingOffer = false;
   }
+}
+
+async function fallbackOrRestartIce(peer) {
+  // Broken TURN often yields "ICE failed, your TURN server appears to be broken".
+  // Drop TURN once and retry with STUN-only before giving up.
+  if (ICE_HAS_TURN && !peer.stunFallbackTried) {
+    peer.stunFallbackTried = true;
+    try {
+      peer.pc.setConfiguration({ iceServers: STUN_ONLY, iceCandidatePoolSize: 0 });
+      console.warn('[room] TURN failed — retrying ICE with STUN only for', peer.socketId);
+      addSystemMessage(`TURN не відповів — повторне з’єднання з @${peer.user?.handle || 'учасником'} через STUN`);
+    } catch (error) {
+      console.warn('[room] Could not switch to STUN-only ICE:', error);
+    }
+  }
+  await restartIce(peer);
 }
 
 async function restartIce(peer) {
@@ -822,24 +889,47 @@ document.getElementById('screen-btn').addEventListener('click', async () => {
   updateGridClass();
 
   // Демка — в ОТДЕЛЬНЫЙ слот, камера и микрофон продолжают работать.
-  const screenVideoSent = await setSlot('screen', vTrack);
-  const screenAudioSent = await setSlot('screenAudio', aTrack);
-  if (!screenVideoSent) {
-    addSystemMessage('Не вдалося передати демонстрацію учасникам. Спробуйте почати її ще раз.');
+  let screenVideoSent = false;
+  let screenAudioSent = false;
+  for (const peer of peers.values()) {
+    if (!peer.tx.screen) continue;
+    try {
+      await peer.tx.screen.sender.replaceTrack(vTrack);
+      screenVideoSent = true;
+      try {
+        const params = peer.tx.screen.sender.getParameters();
+        if (params.encodings?.length) {
+          params.encodings[0].maxBitrate = 3_000_000;
+          params.encodings[0].maxFramerate = 30;
+          await peer.tx.screen.sender.setParameters(params);
+        }
+      } catch {}
+    } catch (error) {
+      console.error('[room] Screen video replaceTrack failed:', error);
+    }
+    if (peer.tx.screenAudio) {
+      try {
+        await peer.tx.screenAudio.sender.replaceTrack(aTrack);
+        if (aTrack) screenAudioSent = true;
+      } catch (error) {
+        console.error('[room] Screen audio replaceTrack failed:', error);
+      }
+    }
+  }
+
+  if (peers.size > 0 && !screenVideoSent) {
+    addSystemMessage('Не вдалося передати демонстрацію учасникам (немає готового WebRTC-слота). Зачекайте підключення і спробуйте ще раз.');
     await stopScreenShare();
     return;
   }
-  if (aTrack && !screenAudioSent) addSystemMessage('Відео екрана передається, але системний звук недоступний для учасників');
-  // Поднимем битрейт для читаемого текста на экране
-  for (const peer of peers.values()) {
-    try {
-      const p = peer.tx.screen.sender.getParameters();
-      if (p.encodings?.length) { p.encodings[0].maxBitrate = 3_000_000; await peer.tx.screen.sender.setParameters(p); }
-    } catch {}
+  if (aTrack && peers.size > 0 && !screenAudioSent) {
+    addSystemMessage('Відео екрана передається, але системний звук недоступний для учасників');
   }
 
   socket.emit('media:toggle', { screenSharing: true });
   sendMeta();
+  // Meta can arrive before the track unmutes on the far side — send again shortly.
+  setTimeout(() => { if (screenSharing) sendMeta(); }, 400);
 });
 
 async function stopScreenShare() {
