@@ -415,18 +415,6 @@
   flex: 1;
 }
 
-.spy-soft-card__badge {
-  align-self: flex-start;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--accent);
-  background: var(--accent-subtle);
-  padding: 3px 8px;
-  border-radius: 999px;
-}
-
 .spy-soft-card__title {
   margin: 0;
   font-size: 1rem;
@@ -445,30 +433,17 @@
   overflow: hidden;
 }
 
-.spy-soft-card__cta {
-  margin-top: auto;
-  padding-top: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--accent);
-}
-
 .spy-soft-card__meta {
   margin: 0;
   font-size: 0.75rem;
   color: var(--text-dim);
 }
 
-.spy-soft-card--do .spy-soft-card__badge {
-  color: #0080ff;
-  background: color-mix(in srgb, #0080ff 16%, transparent);
-}
-
-.spy-soft-card--do:hover {
-  border-color: color-mix(in srgb, #0080ff 50%, var(--border));
+.panel-header .panel-sub {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  max-width: 36rem;
 }
 
 .enroll-form {

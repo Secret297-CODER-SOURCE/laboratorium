@@ -23,6 +23,7 @@ import { addBounty, getBountyLog, getUserRank } from '../services/bounty.service
 import * as notificationService from '../services/notification.service.js';
 import * as errorLogService from '../services/error-log.service.js';
 import * as searchService from '../services/search.service.js';
+import * as externalManualService from '../services/external-manual.service.js';
 import * as followService from '../services/follow.service.js';
 import * as chatService from '../services/chat.service.js';
 import { getTier, getNextTier } from '../utils/tier.js';
@@ -188,6 +189,11 @@ export async function searchManuals(req, res) {
     limit: req.query.limit,
     localManuals: manuals,
   }));
+}
+
+export async function getExternalManual(req, res) {
+  const article = await externalManualService.fetchExternalManual(req.query.url);
+  res.json({ article });
 }
 
 export async function recordAnalyticsEvent(req, res) {

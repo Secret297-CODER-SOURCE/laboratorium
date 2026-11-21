@@ -15,11 +15,46 @@ const MAIN_LINKS = [
   { anchor: 'contact', label: 'Контакти' },
 ];
 
+const TYPE_LABELS = {
+  program: 'Програма',
+  direction: 'Напрямок',
+  manual: 'Мануал',
+  'spy-soft': 'spy-soft',
+  digitalocean: 'DigitalOcean',
+};
+
 export function renderMainNavLinks({ hashAnchors = false } = {}) {
   const prefix = hashAnchors ? '#' : '/#';
   return `<ul class="nav-links">
     ${MAIN_LINKS.map((l) => `<li><a href="${prefix}${l.anchor}">${t(l.label)}</a></li>`).join('')}
   </ul>`;
+}
+
+function shortcutHint() {
+  const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || '');
+  return mac ? '⌘K' : 'Ctrl K';
+}
+
+function renderSearchBlock() {
+  return `<div class="site-search site-search--collapsible" id="site-search">
+      <button type="button" class="site-search-toggle" id="site-search-toggle"
+        aria-expanded="false" aria-controls="site-search-panel" title="${t('Пошук')} (${shortcutHint()})">
+        ${icon('search', 'ico ico--sm')}
+        <span class="site-search-toggle__label">${t('Пошук')}</span>
+        <kbd class="site-search-toggle__kbd" aria-hidden="true">${shortcutHint()}</kbd>
+      </button>
+      <div class="site-search-panel" id="site-search-panel" hidden>
+        <span class="site-search-panel__icon" aria-hidden="true">${icon('search', 'ico ico--sm')}</span>
+        <label class="visually-hidden" for="site-search-input">${t('Пошук')}</label>
+        <input type="search" id="site-search-input" class="site-search-input"
+          placeholder="${t('Шукати програми, мануали…')}" autocomplete="off" maxlength="80" enterkeyhint="search">
+        <button type="button" class="site-search-close" id="site-search-close"
+          title="${t('Згорнути')}" aria-label="${t('Згорнути')}">
+          ${icon('x', 'ico ico--sm')}
+        </button>
+        <div class="site-search-results" id="site-search-results" hidden role="listbox"></div>
+      </div>
+    </div>`;
 }
 
 /**
@@ -30,6 +65,7 @@ export function renderMainNavLinks({ hashAnchors = false } = {}) {
  * @param {string} [opts.extraActions]
  * @param {boolean} [opts.hashAnchors]
  * @param {'marketing'|'app'} [opts.navMode]
+ * @param {boolean} [opts.showSearch] — default: only app pages (never marketing landing)
  * @param {string} [opts.activePath]
  */
 export function renderSiteHeader({
@@ -39,30 +75,16 @@ export function renderSiteHeader({
   hashAnchors = false,
   extraActions = '',
   navMode = 'marketing',
+  showSearch,
   activePath = '',
 } = {}) {
   const navBlock = navMode === 'app'
     ? renderAppNavLinks({ activePath })
     : renderMainNavLinks({ hashAnchors });
 
-  // Marketing/landing: no site search. Cabinets: icon that expands/collapses.
-  const searchBlock = navMode === 'app'
-    ? `<div class="site-search site-search--collapsible" id="site-search">
-        <button type="button" class="site-search-toggle btn btn--ghost btn--sm" id="site-search-toggle"
-          aria-expanded="false" aria-controls="site-search-panel" title="${t('Пошук')}">
-          ${icon('search', 'ico ico--sm')}
-          <span class="visually-hidden">${t('Пошук')}</span>
-        </button>
-        <div class="site-search-panel" id="site-search-panel" hidden>
-          <label class="visually-hidden" for="site-search-input">${t('Пошук')}</label>
-          <input type="search" id="site-search-input" class="site-search-input"
-            placeholder="${t('Пошук у кабінеті...')}" autocomplete="off" maxlength="80">
-          <button type="button" class="site-search-close btn btn--ghost btn--sm" id="site-search-close"
-            title="${t('Згорнути')}" aria-label="${t('Згорнути')}">×</button>
-          <div class="site-search-results" id="site-search-results" hidden role="listbox"></div>
-        </div>
-      </div>`
-    : '';
+  // Landing / marketing: no site search. App cabinets: collapsible search.
+  const searchEnabled = showSearch === undefined ? navMode === 'app' : Boolean(showSearch);
+  const searchBlock = searchEnabled ? renderSearchBlock() : '';
 
   return `<nav class="nav container${navMode === 'app' ? ' nav--app' : ''}">
     ${renderLogo(logoHref)}
@@ -95,8 +117,25 @@ function bindSiteSearch(root) {
   input.dataset.bound = '1';
   let timer = null;
   let lastQ = '';
+  let activeIndex = -1;
 
-  const hideResults = () => { box.hidden = true; box.innerHTML = ''; };
+  const esc = (v) => String(v ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const items = () => [...box.querySelectorAll('.site-search-item')];
+
+  const setActive = (idx) => {
+    const list = items();
+    activeIndex = idx;
+    list.forEach((el, i) => el.classList.toggle('is-active', i === idx));
+    if (idx >= 0 && list[idx]) list[idx].scrollIntoView({ block: 'nearest' });
+  };
+
+  const hideResults = () => {
+    box.hidden = true;
+    box.innerHTML = '';
+    activeIndex = -1;
+  };
 
   const collapse = () => {
     if (!panel || !toggle) return;
@@ -126,28 +165,30 @@ function bindSiteSearch(root) {
     collapse();
   });
 
-  const esc = (v) => String(v ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
   const render = (payload) => {
     const results = payload?.results || [];
     if (!results.length) {
-      box.innerHTML = `<div class="site-search-empty">${t('Нічого не знайдено')}</div>`;
+      box.innerHTML = `<div class="site-search-empty">
+        <span class="site-search-empty__title">${t('Нічого не знайдено')}</span>
+        <span class="site-search-empty__hint">${t('Спробуйте інший запит')}</span>
+      </div>`;
       box.hidden = false;
+      activeIndex = -1;
       return;
     }
     box.innerHTML = results.map((r) => {
       const ext = r.external ? ' target="_blank" rel="noopener noreferrer"' : '';
-      const badge = r.type === 'spy-soft'
-        ? ' · spy-soft'
-        : (r.type === 'digitalocean' ? ' · DigitalOcean' : '');
+      const typeKey = r.type || '';
+      const typeLabel = TYPE_LABELS[typeKey] || typeKey;
       return `
       <a class="site-search-item${r.external ? ' site-search-item--external' : ''}" role="option" href="${esc(r.href)}"${ext}>
-        <strong>${esc(r.title)}</strong>
-        <span>${esc((r.subtitle || r.type || '') + badge)}</span>
+        <span class="site-search-item__type">${esc(t(typeLabel) || typeLabel)}</span>
+        <strong class="site-search-item__title">${esc(r.title)}</strong>
+        <span class="site-search-item__sub">${esc(r.subtitle || '')}</span>
       </a>`;
     }).join('');
     box.hidden = false;
+    activeIndex = -1;
   };
 
   input.addEventListener('input', () => {
@@ -160,27 +201,52 @@ function bindSiteSearch(root) {
     timer = setTimeout(async () => {
       if (q === lastQ) return;
       lastQ = q;
+      box.innerHTML = `<div class="site-search-empty site-search-empty--loading">${t('Шукаємо…')}</div>`;
+      box.hidden = false;
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         if (!res.ok) throw new Error('search failed');
+        if (input.value.trim() !== q) return;
         render(await res.json());
       } catch {
         box.innerHTML = `<div class="site-search-empty">${t('Помилка пошуку')}</div>`;
         box.hidden = false;
       }
-    }, 220);
+    }, 200);
   });
 
   input.addEventListener('keydown', (e) => {
+    const list = items();
     if (e.key === 'Escape') {
-      hideResults();
-      collapse();
+      e.preventDefault();
+      if (!box.hidden && list.length) hideResults();
+      else collapse();
+      return;
+    }
+    if (e.key === 'ArrowDown' && list.length) {
+      e.preventDefault();
+      setActive(activeIndex < list.length - 1 ? activeIndex + 1 : 0);
+    } else if (e.key === 'ArrowUp' && list.length) {
+      e.preventDefault();
+      setActive(activeIndex > 0 ? activeIndex - 1 : list.length - 1);
+    } else if (e.key === 'Enter' && activeIndex >= 0 && list[activeIndex]) {
+      e.preventDefault();
+      list[activeIndex].click();
     }
   });
+
   document.addEventListener('click', (e) => {
-    if (!wrap.contains(e.target) && wrap.classList.contains('is-open')) {
-      hideResults();
-      collapse();
+    if (!wrap.contains(e.target) && wrap.classList.contains('is-open')) collapse();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'k') return;
+    if (!document.body.contains(wrap)) return;
+    e.preventDefault();
+    if (wrap.classList.contains('is-open')) {
+      input.focus();
+    } else {
+      expand();
     }
   });
 }

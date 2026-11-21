@@ -1,23 +1,10 @@
 import db from '../db/index.js';
 import * as spySoftService from './spy-soft.service.js';
 import * as digitalOceanService from './digitalocean.service.js';
-
-const DO_TUTORIALS_URL = 'https://www.digitalocean.com/community/tutorials';
+import { interleave, toCatalogCard } from './external-manual.service.js';
 
 function like(q) {
   return `%${String(q || '').trim().slice(0, 80)}%`;
-}
-
-function mapExternalResult(r, type, label) {
-  return {
-    type,
-    id: r.url,
-    title: r.title,
-    subtitle: r.excerpt ? `${label} · ${r.excerpt.slice(0, 80)}` : label,
-    href: r.url,
-    external: true,
-    image: r.image || null,
-  };
 }
 
 async function safeRemote(fn) {
@@ -88,7 +75,7 @@ export function searchPublic(query, { limit = 20 } = {}) {
   };
 }
 
-/** Local site search + live external manuals. */
+/** Local site search + external manuals (opened on-site, no source labels). */
 export async function searchPublicWithExternal(query, { limit = 20 } = {}) {
   const local = searchPublic(query, { limit });
   const q = local.query;
@@ -102,18 +89,21 @@ export async function searchPublicWithExternal(query, { limit = 20 } = {}) {
     safeRemote(() => digitalOceanService.searchDigitalOcean(q, { limit: each, timeoutMs: 5000 })),
   ]);
 
-  const external = [
-    ...(spyRemote.results || []).map((r) => mapExternalResult(r, 'spy-soft', 'spy-soft.net')),
-    ...(doRemote.results || []).map((r) => mapExternalResult(r, 'digitalocean', 'DigitalOcean')),
-  ];
+  const mixed = interleave(spyRemote.results || [], doRemote.results || []).map((r) => ({
+    type: 'manual',
+    id: r.url,
+    title: r.title,
+    subtitle: r.excerpt ? r.excerpt.slice(0, 90) : 'Мануал',
+    href: `/manual.html?url=${encodeURIComponent(r.url)}`,
+  }));
 
   return {
     query: q,
-    results: [...local.results, ...external].slice(0, cap),
+    results: [...local.results, ...mixed].slice(0, cap),
   };
 }
 
-/** Manuals page: local published manuals + spy-soft + DigitalOcean. */
+/** Manuals page: local + interleaved external catalog (no source branding). */
 export async function searchManualsCatalog(query, {
   userId = null,
   userRole = null,
@@ -141,56 +131,32 @@ export async function searchManualsCatalog(query, {
   }));
 
   const remoteLimit = Math.min(12, cap);
-  let spySoft;
-  let digitalOcean;
+  let spy = { results: [], error: null, cached: false };
+  let doce = { results: [], error: null, cached: false };
 
   if (q.length >= 2) {
-    const [spy, doce] = await Promise.all([
+    [spy, doce] = await Promise.all([
       safeRemote(() => spySoftService.searchSpySoft(q, { limit: remoteLimit })),
       safeRemote(() => digitalOceanService.searchDigitalOcean(q, { limit: remoteLimit })),
     ]);
-    spySoft = {
-      results: spy.results || [],
-      source_url: spy.source_url || `https://spy-soft.net/?s=${encodeURIComponent(q)}`,
-      cached: Boolean(spy.cached),
-      error: spy.error || null,
-    };
-    digitalOcean = {
-      results: doce.results || [],
-      source_url: doce.source_url || `https://www.digitalocean.com/community/tutorials?q=${encodeURIComponent(q)}`,
-      cached: Boolean(doce.cached),
-      error: doce.error || null,
-    };
   } else {
-    const [spy, doce] = await Promise.all([
-      safeRemote(async () => {
-        const featured = await spySoftService.listFeatured({ limit: 6 });
-        return { ...featured, source_url: 'https://spy-soft.net/' };
-      }),
-      safeRemote(async () => {
-        const featured = await digitalOceanService.listFeatured({ limit: 6 });
-        return { ...featured, source_url: featured.source_url || DO_TUTORIALS_URL };
-      }),
+    [spy, doce] = await Promise.all([
+      safeRemote(() => spySoftService.listFeatured({ limit: 6 })),
+      safeRemote(() => digitalOceanService.listFeatured({ limit: 6 })),
     ]);
-    spySoft = {
-      results: spy.results || [],
-      source_url: spy.source_url || 'https://spy-soft.net/',
-      cached: Boolean(spy.cached),
-      error: spy.error || null,
-    };
-    digitalOcean = {
-      results: doce.results || [],
-      source_url: doce.source_url || DO_TUTORIALS_URL,
-      cached: Boolean(doce.cached),
-      error: doce.error || null,
-    };
   }
+
+  const external = interleave(spy.results || [], doce.results || [])
+    .map(toCatalogCard)
+    .slice(0, Math.min(18, cap));
+
+  const errors = [spy.error, doce.error].filter(Boolean);
 
   return {
     query: q,
     manuals: locals,
-    spySoft,
-    digitalOcean,
+    external,
+    error: external.length ? null : (errors[0] || null),
     meta: { userId, userRole },
   };
 }

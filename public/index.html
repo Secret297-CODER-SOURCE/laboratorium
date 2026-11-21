@@ -127,13 +127,14 @@
     (async () => {
       if (isLoggedIn()) await validateSession();
 
-      // Маркетингова головна: завжди публічне меню, без app-nav і без редіректу в кабінет
+      // Маркетингова головна: публічне меню, без site search і без app-nav
       initSiteHeader({
         logoHref: '/',
         hashAnchors: true,
         showEnroll: !isLoggedIn(),
         showLogout: isLoggedIn(),
         navMode: 'marketing',
+        showSearch: false,
       });
     })();
   </script>

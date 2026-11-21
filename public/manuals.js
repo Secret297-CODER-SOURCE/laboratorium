@@ -39,7 +39,7 @@ function renderManuals(manuals) {
     : manuals;
 
   if (!manuals.length) {
-    list.innerHTML = '<p class="empty-state">Мануалів поки немає</p>';
+    list.innerHTML = '<p class="empty-state">Мануалів школи поки немає</p>';
     return;
   }
   if (!filtered.length) {
@@ -97,76 +97,42 @@ function renderMine(mine) {
     </a>`).join('');
 }
 
-function renderExternalSource({
-  listId, subId, openId, payloadKey, label, emptyLabel, badgeClass = '',
-}, payload) {
-  const list = document.getElementById(listId);
-  const sub = document.getElementById(subId);
-  const open = document.getElementById(openId);
+function renderCatalog(payload) {
+  const list = document.getElementById('catalog-list');
+  const sub = document.getElementById('catalog-sub');
   if (!list) return;
 
-  const block = payload?.[payloadKey] || {};
-  const results = block.results || [];
+  const items = payload?.external || [];
   const query = payload?.query || '';
 
-  if (open && block.source_url) open.href = block.source_url;
   if (sub) {
-    if (block.error) sub.textContent = `Не вдалося завантажити ${label} — спробуйте пізніше`;
-    else if (query) sub.textContent = `Результати пошуку «${query}» на ${label}`;
-    else sub.textContent = emptyLabel;
+    if (payload?.error && !items.length) sub.textContent = 'Каталог тимчасово недоступний';
+    else if (query) sub.textContent = `Результати за запитом «${query}»`;
+    else sub.textContent = 'Підбірка гайдів і туторіалів';
   }
 
-  if (block.error && !results.length) {
-    list.innerHTML = `<p class="empty-state">${esc(block.error)}</p>`;
-    return;
-  }
-  if (!results.length) {
+  if (!items.length) {
     list.innerHTML = query
-      ? `<p class="empty-state">На ${esc(label)} нічого не знайдено</p>`
-      : '<p class="empty-state">Поки немає карток</p>';
+      ? '<p class="empty-state">Нічого не знайдено</p>'
+      : `<p class="empty-state">${esc(payload?.error || 'Поки немає карток')}</p>`;
     return;
   }
 
-  list.innerHTML = results.map((r) => {
+  list.innerHTML = items.map((r) => {
     const thumb = r.image
       ? `<img class="spy-soft-card__img" src="${esc(r.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
       : `<div class="spy-soft-card__img spy-soft-card__img--empty" aria-hidden="true">${icon('book', 'ico')}</div>`;
-    const meta = [
-      ...(r.authors || []).slice(0, 1),
-      ...(r.tags || []).slice(0, 2),
-    ].filter(Boolean);
+    const tags = (r.tags || []).slice(0, 2);
     return `
-      <a class="spy-soft-card ${badgeClass}" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">
+      <a class="spy-soft-card" href="${esc(r.href)}">
         ${thumb}
         <div class="spy-soft-card__body">
-          <span class="spy-soft-card__badge">${esc(r.source_label || label)}</span>
           <h3 class="spy-soft-card__title">${esc(r.title)}</h3>
           ${r.excerpt ? `<p class="spy-soft-card__excerpt">${esc(r.excerpt)}</p>` : ''}
-          ${meta.length ? `<p class="spy-soft-card__meta">${esc(meta.join(' · '))}</p>` : ''}
-          <span class="spy-soft-card__cta">Читати на сайті ${icon('link', 'ico ico--sm')}</span>
+          ${tags.length ? `<p class="spy-soft-card__meta">${esc(tags.join(' · '))}</p>` : ''}
         </div>
       </a>`;
   }).join('');
-}
-
-function renderExternal(payload) {
-  renderExternalSource({
-    listId: 'spy-soft-list',
-    subId: 'spy-soft-sub',
-    openId: 'spy-soft-open',
-    payloadKey: 'spySoft',
-    label: 'spy-soft.net',
-    emptyLabel: 'Свіжі мануали та гайди з зовнішнього каталогу',
-  }, payload);
-  renderExternalSource({
-    listId: 'digitalocean-list',
-    subId: 'digitalocean-sub',
-    openId: 'digitalocean-open',
-    payloadKey: 'digitalOcean',
-    label: 'DigitalOcean',
-    emptyLabel: 'Свіжі Community tutorials',
-    badgeClass: 'spy-soft-card--do',
-  }, payload);
 }
 
 function setHint(text, show) {
@@ -183,13 +149,10 @@ async function runSearch(query) {
     const payload = await api(`/manuals/search?q=${encodeURIComponent(query)}`);
     if (seq !== searchSeq) return;
     renderManuals(payload.manuals || []);
-    renderExternal(payload);
+    renderCatalog(payload);
     const nLocal = (payload.manuals || []).length;
-    const nSpy = (payload.spySoft?.results || []).length;
-    const nDo = (payload.digitalOcean?.results || []).length;
-    setHint(query
-      ? `Знайдено: ${nLocal} локально · ${nSpy} spy-soft · ${nDo} DigitalOcean`
-      : '', Boolean(query));
+    const nExt = (payload.external || []).length;
+    setHint(query ? `Знайдено: ${nLocal + nExt}` : '', Boolean(query));
   } catch (err) {
     if (seq !== searchSeq) return;
     setHint(err.message || 'Помилка пошуку', true);

@@ -10,6 +10,7 @@ initSiteHeader({ showLogout: true, navMode: 'app' });
 
 const params = new URLSearchParams(location.search);
 const slug = params.get('slug');
+const externalUrl = params.get('url');
 const root = document.getElementById('manual-view');
 const user = getUser();
 let activeManualId = null;
@@ -20,21 +21,62 @@ function esc(value) {
   })[char]);
 }
 
-function renderNotFound() {
+function renderNotFound(message = 'Такого мануала немає або його ще не опублікували.') {
   root.innerHTML = `
     <div class="course-hero course-hero--empty">
       <div class="container course-hero-inner">
         <span class="section-tag">404 / ціль втрачена</span>
         <h1 class="course-title">Мануал не знайдено</h1>
-        <p class="course-lede">Такого мануала немає або його ще не опублікували.</p>
+        <p class="course-lede">${esc(message)}</p>
         <a href="/manuals.html" class="btn btn--primary btn--sm">${icon('chevron-left', 'ico ico--sm')}Усі мануали</a>
       </div>
     </div>`;
 }
 
-async function load() {
-  if (!slug) return renderNotFound();
+function renderShell({ title, eyebrow = '', image = null, bodyHtml }) {
+  document.title = `${title} — laboratorium.`;
+  root.innerHTML = `
+    <header class="course-hero">
+      <div class="container course-hero-inner">
+        <a href="/manuals.html" class="course-back">${icon('chevron-left', 'ico ico--sm')}Усі мануали</a>
+        <div class="course-hero-top">
+          <div class="course-icon">${icon('notes', 'ico ico--lg')}</div>
+          <div>
+            ${eyebrow ? `<p class="course-eyebrow">${esc(eyebrow)}</p>` : ''}
+            <h1 class="course-title">${esc(title)}</h1>
+          </div>
+        </div>
+      </div>
+    </header>
+    <div class="container course-content">
+      ${image ? `<figure class="ext-manual-cover"><img src="${esc(image)}" alt="" loading="lazy" referrerpolicy="no-referrer"></figure>` : ''}
+      <article class="ext-manual-body">${bodyHtml}</article>
+    </div>`;
+}
 
+async function loadExternal() {
+  root.innerHTML = `
+    <div class="course-hero">
+      <div class="container course-hero-inner">
+        <a href="/manuals.html" class="course-back">${icon('chevron-left', 'ico ico--sm')}Усі мануали</a>
+        <p class="course-lede">Завантаження мануала…</p>
+      </div>
+    </div>`;
+
+  try {
+    const { article } = await api(`/manuals/external?url=${encodeURIComponent(externalUrl)}`);
+    renderShell({
+      title: article.title,
+      eyebrow: 'Мануал',
+      image: article.image,
+      bodyHtml: article.html,
+    });
+  } catch (err) {
+    renderNotFound(err.message || 'Не вдалося відкрити мануал.');
+  }
+}
+
+async function loadLocal() {
   let data;
   try {
     data = await api(`/manuals/${encodeURIComponent(slug)}`);
@@ -53,8 +95,8 @@ async function load() {
         <div class="course-hero-top">
           <div class="course-icon">${icon('notes', 'ico ico--lg')}</div>
           <div>
-            ${manual.direction_name ? `<p class="course-eyebrow">${manual.direction_name}</p>` : ''}
-            <h1 class="course-title">${manual.title}</h1>
+            ${manual.direction_name ? `<p class="course-eyebrow">${esc(manual.direction_name)}</p>` : ''}
+            <h1 class="course-title">${esc(manual.title)}</h1>
           </div>
         </div>
       </div>
@@ -151,5 +193,11 @@ document.getElementById('manual-view').addEventListener('submit', async (event) 
     button.disabled = false;
   }
 });
+
+async function load() {
+  if (externalUrl) return loadExternal();
+  if (slug) return loadLocal();
+  return renderNotFound();
+}
 
 load().catch(handleSessionError);

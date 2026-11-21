@@ -306,9 +306,9 @@
     "semantic_hash": ""
   },
   "public/course.js": {
-    "mtime": 1794698386.8835745,
-    "seen": 1794699528.218257,
-    "ast_hash": "1b20a76d9ff0c46ad516d316537f20e3",
+    "mtime": 1795247330.0658379,
+    "seen": 1795247349.226642,
+    "ast_hash": "9476f0719bc75c865b630d760a066d91",
     "semantic_hash": ""
   },
   "public/dashboard.js": {
@@ -342,9 +342,9 @@
     "semantic_hash": ""
   },
   "public/i18n-en.js": {
-    "mtime": 1794698386.886174,
-    "seen": 1794699528.218262,
-    "ast_hash": "72138fda079abbb420cd6595e839d072",
+    "mtime": 1795247325.7838585,
+    "seen": 1795247349.226649,
+    "ast_hash": "76ba7b7d1e2cc47cdfa16190b69cb663",
     "semantic_hash": ""
   },
   "public/i18n.js": {
@@ -450,9 +450,9 @@
     "semantic_hash": ""
   },
   "public/site-header.js": {
-    "mtime": 1795245402.710825,
-    "seen": 1795245439.183465,
-    "ast_hash": "08f109fc844e66b928011aa9019876aa",
+    "mtime": 1795247290.1680658,
+    "seen": 1795247349.226669,
+    "ast_hash": "80c06b857562ecfdf5402579e82f896c",
     "semantic_hash": ""
   },
   "public/site-qr.js": {
@@ -1254,9 +1254,9 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1794698386.8757238,
-    "seen": 1794699528.218383,
-    "ast_hash": "81d17d76687c03b74982143b2bbf17d7",
+    "mtime": 1795246181.5540094,
+    "seen": 1795246205.407413,
+    "ast_hash": "61f9d451a71a5b3d3814081ecb80c230",
     "semantic_hash": ""
   },
   "public/admin.html": {
@@ -1302,9 +1302,9 @@
     "semantic_hash": ""
   },
   "public/index.html": {
-    "mtime": 1794701092.4595315,
-    "seen": 1794701193.8374999,
-    "ast_hash": "f870c7496f15b861c237c019f29898d4",
+    "mtime": 1795247324.5302997,
+    "seen": 1795247349.226869,
+    "ast_hash": "1436ccb6e31eab1e321c3f32bfaa84ae",
     "semantic_hash": ""
   },
   "public/login.html": {
@@ -1578,9 +1578,9 @@
     "semantic_hash": ""
   },
   "server/services/digitalocean.service.js": {
-    "mtime": 1795245347.7503026,
-    "seen": 1795245439.183607,
-    "ast_hash": "b9affc052315ed4f801cd7ce4af39f2f",
+    "mtime": 1795245460.4470193,
+    "seen": 1795245486.030642,
+    "ast_hash": "7ac68f07806c594ee29d4ec9ed127a27",
     "semantic_hash": ""
   },
   "tests/digitalocean.test.js": {

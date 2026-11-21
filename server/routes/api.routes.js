@@ -110,6 +110,7 @@ router.post('/articles/:id/submit', requireTab('dash.article'), asyncHandler(api
 
 router.get('/manuals', asyncHandler(apiCtrl.listManuals));
 router.get('/manuals/search', asyncHandler(apiCtrl.searchManuals));
+router.get('/manuals/external', asyncHandler(apiCtrl.getExternalManual));
 router.get('/manuals/mine', requireTab('dash.manuals'), asyncHandler(apiCtrl.listMyManuals));
 router.post('/manuals', requireTab('dash.manuals'), asyncHandler(apiCtrl.createManual));
 router.get('/manuals/:id(\\d+)', asyncHandler(apiCtrl.getManualForActor));
