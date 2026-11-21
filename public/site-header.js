@@ -2,6 +2,7 @@ import { updateNavAuth, initBurger, clearSession } from '/auth.js';
 import { LOGO_SVG, renderLogo } from '/logo.js';
 import { renderAppNavLinks, setAppNavActive, refreshAppNav } from '/app-nav.js';
 import { t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
+import { icon } from '/icons.js';
 import { initNotificationBell } from '/notifications.js';
 
 export { LOGO_SVG, renderLogo, setAppNavActive, refreshAppNav };
@@ -44,11 +45,22 @@ export function renderSiteHeader({
     ? renderAppNavLinks({ activePath })
     : renderMainNavLinks({ hashAnchors });
 
-  const searchBlock = navMode === 'marketing'
-    ? `<div class="site-search" id="site-search">
-        <label class="visually-hidden" for="site-search-input">${t('Пошук')}</label>
-        <input type="search" id="site-search-input" class="site-search-input" placeholder="${t('Пошук по сайту...')}" autocomplete="off" maxlength="80">
-        <div class="site-search-results" id="site-search-results" hidden role="listbox"></div>
+  // Marketing/landing: no site search. Cabinets: icon that expands/collapses.
+  const searchBlock = navMode === 'app'
+    ? `<div class="site-search site-search--collapsible" id="site-search">
+        <button type="button" class="site-search-toggle btn btn--ghost btn--sm" id="site-search-toggle"
+          aria-expanded="false" aria-controls="site-search-panel" title="${t('Пошук')}">
+          ${icon('search', 'ico ico--sm')}
+          <span class="visually-hidden">${t('Пошук')}</span>
+        </button>
+        <div class="site-search-panel" id="site-search-panel" hidden>
+          <label class="visually-hidden" for="site-search-input">${t('Пошук')}</label>
+          <input type="search" id="site-search-input" class="site-search-input"
+            placeholder="${t('Пошук у кабінеті...')}" autocomplete="off" maxlength="80">
+          <button type="button" class="site-search-close btn btn--ghost btn--sm" id="site-search-close"
+            title="${t('Згорнути')}" aria-label="${t('Згорнути')}">×</button>
+          <div class="site-search-results" id="site-search-results" hidden role="listbox"></div>
+        </div>
       </div>`
     : '';
 
@@ -73,14 +85,46 @@ export function renderSiteHeader({
 }
 
 function bindSiteSearch(root) {
+  const wrap = root.querySelector('#site-search');
   const input = root.querySelector('#site-search-input');
   const box = root.querySelector('#site-search-results');
-  if (!input || !box || input.dataset.bound) return;
+  const toggle = root.querySelector('#site-search-toggle');
+  const panel = root.querySelector('#site-search-panel');
+  const closeBtn = root.querySelector('#site-search-close');
+  if (!wrap || !input || !box || input.dataset.bound) return;
   input.dataset.bound = '1';
   let timer = null;
   let lastQ = '';
 
-  const hide = () => { box.hidden = true; box.innerHTML = ''; };
+  const hideResults = () => { box.hidden = true; box.innerHTML = ''; };
+
+  const collapse = () => {
+    if (!panel || !toggle) return;
+    panel.hidden = true;
+    wrap.classList.remove('is-open');
+    toggle.setAttribute('aria-expanded', 'false');
+    hideResults();
+    input.value = '';
+    lastQ = '';
+  };
+
+  const expand = () => {
+    if (!panel || !toggle) return;
+    panel.hidden = false;
+    wrap.classList.add('is-open');
+    toggle.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(() => input.focus());
+  };
+
+  toggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (wrap.classList.contains('is-open')) collapse();
+    else expand();
+  });
+  closeBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    collapse();
+  });
 
   const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -92,11 +136,17 @@ function bindSiteSearch(root) {
       box.hidden = false;
       return;
     }
-    box.innerHTML = results.map((r) => `
-      <a class="site-search-item" role="option" href="${esc(r.href)}">
+    box.innerHTML = results.map((r) => {
+      const ext = r.external ? ' target="_blank" rel="noopener noreferrer"' : '';
+      const badge = r.type === 'spy-soft'
+        ? ' · spy-soft'
+        : (r.type === 'digitalocean' ? ' · DigitalOcean' : '');
+      return `
+      <a class="site-search-item${r.external ? ' site-search-item--external' : ''}" role="option" href="${esc(r.href)}"${ext}>
         <strong>${esc(r.title)}</strong>
-        <span>${esc(r.subtitle || r.type || '')}</span>
-      </a>`).join('');
+        <span>${esc((r.subtitle || r.type || '') + badge)}</span>
+      </a>`;
+    }).join('');
     box.hidden = false;
   };
 
@@ -104,7 +154,7 @@ function bindSiteSearch(root) {
     const q = input.value.trim();
     clearTimeout(timer);
     if (q.length < 2) {
-      hide();
+      hideResults();
       return;
     }
     timer = setTimeout(async () => {
@@ -122,10 +172,16 @@ function bindSiteSearch(root) {
   });
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') hide();
+    if (e.key === 'Escape') {
+      hideResults();
+      collapse();
+    }
   });
   document.addEventListener('click', (e) => {
-    if (!root.querySelector('#site-search')?.contains(e.target)) hide();
+    if (!wrap.contains(e.target) && wrap.classList.contains('is-open')) {
+      hideResults();
+      collapse();
+    }
   });
 }
 

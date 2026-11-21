@@ -41,9 +41,41 @@
           <h2 data-i18n="Мануали">Мануали</h2>
           <button type="button" class="btn btn--outline btn--sm" id="create-manual-btn">+ <span data-i18n="Створити мануал">Створити мануал</span></button>
         </div>
+        <div class="manuals-search-bar">
+          <label class="visually-hidden" for="manuals-search-input">Пошук мануалів</label>
+          <input type="search" id="manuals-search-input" class="manuals-search-input"
+            placeholder="Пошук мануалів, spy-soft і DigitalOcean…" autocomplete="off" spellcheck="false">
+          <span class="manuals-search-hint" id="manuals-search-hint" hidden></span>
+        </div>
         <div class="manuals-filters" id="manuals-filters" hidden></div>
         <div id="manuals-list" class="group-content-list">
           <p class="empty-state" data-i18n="Завантаження...">Завантаження...</p>
+        </div>
+      </section>
+
+      <section class="dash-panel dash-panel--wide" id="spy-soft-section">
+        <div class="panel-header panel-header--spy">
+          <div>
+            <h2 data-i18n="З spy-soft.net">З spy-soft.net</h2>
+            <p class="panel-sub" id="spy-soft-sub">Мануали та гайди з зовнішнього каталогу</p>
+          </div>
+          <a class="btn btn--ghost btn--sm" id="spy-soft-open" href="https://spy-soft.net/" target="_blank" rel="noopener noreferrer">Відкрити сайт</a>
+        </div>
+        <div id="spy-soft-list" class="spy-soft-grid">
+          <p class="empty-state">Завантаження…</p>
+        </div>
+      </section>
+
+      <section class="dash-panel dash-panel--wide" id="digitalocean-section">
+        <div class="panel-header panel-header--spy">
+          <div>
+            <h2>DigitalOcean Tutorials</h2>
+            <p class="panel-sub" id="digitalocean-sub">Community tutorials з digitalocean.com</p>
+          </div>
+          <a class="btn btn--ghost btn--sm" id="digitalocean-open" href="https://www.digitalocean.com/community/tutorials" target="_blank" rel="noopener noreferrer">Відкрити сайт</a>
+        </div>
+        <div id="digitalocean-list" class="spy-soft-grid">
+          <p class="empty-state">Завантаження…</p>
         </div>
       </section>
     </div>

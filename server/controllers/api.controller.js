@@ -177,7 +177,17 @@ export async function getSiteInfo(_req, res) {
 }
 
 export async function searchSite(req, res) {
-  res.json(searchService.searchPublic(req.query.q, { limit: req.query.limit }));
+  res.json(await searchService.searchPublicWithExternal(req.query.q, { limit: req.query.limit }));
+}
+
+export async function searchManuals(req, res) {
+  const manuals = manualService.listPublished(req.user?.id, req.user?.role);
+  res.json(await searchService.searchManualsCatalog(req.query.q, {
+    userId: req.user?.id,
+    userRole: req.user?.role,
+    limit: req.query.limit,
+    localManuals: manuals,
+  }));
 }
 
 export async function recordAnalyticsEvent(req, res) {
