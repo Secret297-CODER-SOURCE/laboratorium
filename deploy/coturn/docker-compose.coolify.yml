@@ -1,0 +1,24 @@
+# Paste/select this file in Coolify → Docker Compose (repo path: deploy/coturn/docker-compose.coolify.yml)
+# Prefer network_mode:host (sibling ../../docker-compose.coturn.yml). Use THIS file if Coolify
+# rejects host networking — then also open the published ports on the VPS firewall.
+#
+# Required env (Coolify → Environment Variables, Runtime):
+#   TURN_SECRET=<unchanged shared secret>
+#   TURN_EXTERNAL_IP=176.37.168.47
+#   TURN_REALM=turn.laboratorium.club
+#
+# Do not set Domains / Certificate resolver / Gzip on this resource.
+
+services:
+  coturn:
+    build: .
+    image: laboratorium-coturn:local
+    restart: always
+    environment:
+      TURN_SECRET: ${TURN_SECRET:?Set TURN_SECRET}
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:?Set public server IP}
+      TURN_REALM: ${TURN_REALM:-turn.laboratorium.club}
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49152-49200:49152-49200/udp"

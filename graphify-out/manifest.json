@@ -1614,9 +1614,21 @@
     "semantic_hash": ""
   },
   "docker-compose.coturn.yml": {
-    "mtime": 1795261805.7069714,
-    "seen": 1795261858.958766,
-    "ast_hash": "4a3778d99b7691517a1255091df5f779",
+    "mtime": 1795267564.1363363,
+    "seen": 1795267614.0866392,
+    "ast_hash": "7c6814c885c9acc35af6ed2c9a11b19f",
+    "semantic_hash": ""
+  },
+  "deploy/coturn/entrypoint.sh": {
+    "mtime": 1795267556.0516238,
+    "seen": 1795267614.086404,
+    "ast_hash": "66044f82d487bd8044f2a148191023ef",
+    "semantic_hash": ""
+  },
+  "deploy/coturn/docker-compose.coolify.yml": {
+    "mtime": 1795267595.1933362,
+    "seen": 1795267614.086638,
+    "ast_hash": "4f0068e6d0e568eaeeefea6b0cda4e0a",
     "semantic_hash": ""
   }
 }
