@@ -70,7 +70,14 @@ router.get('/tasks', asyncHandler(apiCtrl.listTasks));
 router.post('/tasks/:id/take', asyncHandler(apiCtrl.takeTask));
 router.post('/tasks/:id/submit', (req, res, next) => {
   uploadTaskSubmission(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) {
+      const message = err.code === 'LIMIT_FILE_SIZE'
+        ? 'Файл завеликий (макс. 30 МБ)'
+        : err.code === 'LIMIT_FILE_COUNT'
+          ? 'Забагато файлів за одну здачу'
+          : err.message || 'Не вдалося завантажити файл';
+      return res.status(400).json({ error: message });
+    }
     next();
   });
 }, asyncHandler(apiCtrl.submitTask));

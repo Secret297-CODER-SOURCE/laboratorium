@@ -4,7 +4,10 @@ import { initSiteHeader } from '/site-header.js';
 import { renderAchievementCard } from '/achievement-cards.js';
 import { showAlert } from '/dialog.js';
 
-if (!(await requireAuthAsync())) throw new Error('auth');
+if (!(await requireAuthAsync())) {
+  // Redirect to login already started. Do not throw — that became
+  // «Uncaught Error: auth» in the owner's error journal.
+} else {
 initTheme();
 initSiteHeader({ showLogout: true, navMode: 'app' });
 
@@ -201,3 +204,4 @@ loadProfile().catch((err) => {
     : err.message || 'Не вдалося завантажити профіль.';
   error.hidden = false;
 });
+}

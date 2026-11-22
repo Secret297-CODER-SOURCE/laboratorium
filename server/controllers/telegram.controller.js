@@ -7,6 +7,10 @@ export async function getOverview(req, res) {
   res.json(telegramBot.getAdminOverview());
 }
 
+export async function getMonitor(req, res) {
+  res.json({ monitor: telegramBot.getSiteMonitor() });
+}
+
 export async function updateSettings(req, res) {
   const settings = settingsService.saveTelegramSettings(req.body);
   res.json({ settings, message: 'Telegram налаштування збережено' });

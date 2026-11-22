@@ -8,6 +8,7 @@ const ADMIN_LINKS = [
   { href: '/portal.html', label: 'Головна', icon: 'home' },
   { href: '/admin.html', label: 'Панель', icon: 'grid', roles: ['teacher', 'owner', 'developer'] },
   { href: '/dashboard.html', label: 'Кабінет', icon: 'book', roles: ['teacher', 'owner', 'developer', 'student'] },
+  { href: '/dashboard.html?tab=lab', label: 'Інструменти', icon: 'shield', tab: 'lab' },
   { href: '/manuals.html', label: 'Мануали', icon: 'notes' },
   { href: '/conferences.html', label: 'Конференції', icon: 'calendar' },
   { href: '/recordings.html', label: 'Записи', icon: 'video' },
@@ -17,19 +18,34 @@ const ADMIN_LINKS = [
 const STUDENT_LINKS = [
   { href: '/portal.html', label: 'Головна', icon: 'home' },
   { href: '/dashboard.html', label: 'Кабінет', icon: 'book' },
+  { href: '/dashboard.html?tab=lab', label: 'Інструменти', icon: 'shield', tab: 'lab' },
   { href: '/manuals.html', label: 'Мануали', icon: 'notes' },
   { href: '/conferences.html', label: 'Конференції', icon: 'calendar' },
   { href: '/recordings.html', label: 'Записи', icon: 'video' },
   { href: '/groups-chat.html', label: 'Чати', icon: 'chat' },
 ];
 
+const MOBILE_PRIMARY = ['/portal.html', '/dashboard.html', '/dashboard.html?tab=lab', '/groups-chat.html', '/conferences.html'];
+
 function linkAllowed(href) {
   if (!href || href === '/portal.html' || href === '/admin.html') return true;
   if (href === '/dashboard.html') return canAccessTab('dash.home');
+  if (href.startsWith('/dashboard.html?tab=lab')) return canAccessTab('dash.lab');
   if (href === '/conferences.html') return pageAllowed('page.conferences');
   if (href === '/recordings.html') return pageAllowed('page.recordings');
   if (href === '/groups-chat.html') return pageAllowed('page.groups_chat');
   return true;
+}
+
+function linkIsActive(link, path, search) {
+  const hrefPath = link.href.split('?')[0];
+  if (link.tab === 'lab') {
+    return path === '/dashboard.html' && new URLSearchParams(search).get('tab') === 'lab';
+  }
+  if (hrefPath === '/dashboard.html') {
+    return path === '/dashboard.html' && new URLSearchParams(search).get('tab') !== 'lab';
+  }
+  return path === hrefPath;
 }
 
 export function getAppNavLinks(user = getUser()) {
@@ -47,18 +63,50 @@ export function getAppNavLinks(user = getUser()) {
 
 export function renderAppNavLinks({ activePath = '', user = getUser() } = {}) {
   const path = activePath || (typeof location !== 'undefined' ? location.pathname : '');
+  const search = typeof location !== 'undefined' ? location.search : '';
   const links = getAppNavLinks(user);
   return `<ul class="nav-links app-nav-links">
     ${links.map(link => {
-      const active = path === link.href ? ' active' : '';
-      return `<li><a href="${link.href}" class="app-nav-link${active}">${icon(link.icon, 'ico ico--sm')}${t(link.label)}</a></li>`;
+      const active = linkIsActive(link, path, search) ? ' active' : '';
+      return `<li><a href="${link.href}" class="app-nav-link${active}">${icon(link.icon, 'ico ico--sm')}<span class="app-nav-label">${t(link.label)}</span></a></li>`;
     }).join('')}
   </ul>`;
 }
 
+export function renderAppBottomNav({ activePath = '', user = getUser() } = {}) {
+  if (typeof document === 'undefined') return;
+  const path = activePath || location.pathname;
+  const search = location.search;
+  const links = getAppNavLinks(user);
+  const primary = links.filter((l) => MOBILE_PRIMARY.includes(l.href)).slice(0, 5);
+  const rest = links.filter((l) => !MOBILE_PRIMARY.includes(l.href));
+  let bar = document.getElementById('app-bottom-nav');
+  if (!bar) {
+    bar = document.createElement('nav');
+    bar.id = 'app-bottom-nav';
+    bar.className = 'app-bottom-nav';
+    bar.setAttribute('aria-label', t('Основна навігація'));
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = primary.map((link) => {
+    const active = linkIsActive(link, path, search) ? ' active' : '';
+    return `<a href="${link.href}" class="app-bottom-nav__item${active}">${icon(link.icon, 'ico ico--sm')}<span>${t(link.label)}</span></a>`;
+  }).join('') + (rest.length
+    ? `<button type="button" class="app-bottom-nav__item app-bottom-nav__more" data-open-menu>
+        ${icon('grid', 'ico ico--sm')}<span>${t('Ще')}</span>
+      </button>`
+    : '');
+  bar.querySelector('[data-open-menu]')?.addEventListener('click', () => {
+    document.querySelector('.burger')?.click();
+  });
+}
+
 export function setAppNavActive(activePath = location.pathname) {
-  document.querySelectorAll('.app-nav-links .app-nav-link').forEach(a => {
-    a.classList.toggle('active', a.getAttribute('href') === activePath);
+  const search = location.search;
+  document.querySelectorAll('.app-nav-links .app-nav-link').forEach((a) => {
+    const href = a.getAttribute('href') || '';
+    const tab = href.includes('tab=lab') ? 'lab' : undefined;
+    a.classList.toggle('active', linkIsActive({ href, tab }, activePath, search));
   });
 }
 

@@ -283,8 +283,8 @@ async function load() {
   }
 
   const seq = ++adminLoadSeq;
-  const { stats, applications, users, conferences, students, recordings, groups,
-    nodeVersion, uptime, memoryMB, recentUsers, db, directions, programs } = overviewData;
+    const { stats, applications, users, conferences, students, recordings, groups,
+    nodeVersion, uptime, memoryMB, recentUsers, db, directions, programs, health } = overviewData;
   if (seq !== adminLoadSeq) return;
 
   window.__ownerDirections = directions;
@@ -469,6 +469,9 @@ async function load() {
         <div class="admin-stat"><span class="admin-stat-val">${directions?.length || 0}</span><span class="admin-stat-label">Напрямки</span></div>
         <div class="admin-stat"><span class="admin-stat-val">${programs?.length || 0}</span><span class="admin-stat-label">Програми</span></div>
         <div class="admin-stat"><span class="admin-stat-val">${pending}</span><span class="admin-stat-label">Нові заявки</span></div>
+        <div class="admin-stat"><span class="admin-stat-val">${health?.liveConferences ?? 0}</span><span class="admin-stat-label">Live кімнати</span></div>
+        <div class="admin-stat"><span class="admin-stat-val">${health?.errors24h ?? 0}</span><span class="admin-stat-label">Помилки 24h</span></div>
+        <div class="admin-stat"><span class="admin-stat-val">${health?.botEnabled ? 'он' : 'оф'}</span><span class="admin-stat-label">User-bot</span></div>
       </div>
       <div class="admin-grid">
         <section class="admin-panel">

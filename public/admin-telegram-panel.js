@@ -19,13 +19,30 @@ export function renderTelegramPanel(data = {}) {
   const templates = data.templates || [];
   const autos = data.autoReplies || [];
   const chats = data.chats || [];
+  const m = data.monitor || {};
   return `<section class="admin-panel admin-panel--wide">
     <div class="admin-panel-head">
       <div>
-        <h2>${icon('chat', 'ico ico--md')}Telegram-бот</h2>
-        <p class="crm-panel-sub">Ліди, ДЗ, оплата, авто-відповіді. Надішліть боту <strong>Start</strong> від адміна — прийде мануал команд.</p>
+        <h2>${icon('chat', 'ico ico--md')}User-bot + адмін-бот</h2>
+        <p class="crm-panel-sub">Один Bot API: учні отримують user-bot команди, адмін — повний мануал і моніторинг. /link_me лишає цей чат адмінським.</p>
       </div>
       <span class="status-pill ${s.configured ? 'approved' : 'pending'}">${s.configured ? 'готовий' : 'не налаштовано'}</span>
+    </div>
+    <div class="tg-monitor-strip">
+      <article><strong>${m.users ?? '—'}</strong><span>Користувачі</span></article>
+      <article><strong>${m.errors24h ?? 0}</strong><span>Помилки 24h</span></article>
+      <article><strong>${m.liveConferences ?? 0}</strong><span>Live кімнати</span></article>
+      <article><strong>${m.botEnabled ? 'он' : 'оф'}</strong><span>Telegram</span></article>
+    </div>
+    <div class="tg-persona-grid">
+      <article class="admin-panel">
+        <h3>Адмін</h3>
+        <p class="crm-panel-sub">/start /monitor /pay_ask /reply /link_user. Ідентичність адміна не змінюється.</p>
+      </article>
+      <article class="admin-panel">
+        <h3>User-bot (учні)</h3>
+        <p class="crm-panel-sub">/cabinet /tools /ctf /schedule /pay /me. Не бачать адмін-мануал. Привʼязка: username = handle.</p>
+      </article>
     </div>
 
     <form class="admin-inline-form tg-settings" id="tg-settings">

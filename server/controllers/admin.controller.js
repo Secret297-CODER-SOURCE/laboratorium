@@ -20,6 +20,7 @@ import * as userNoteService from '../services/user-note.service.js';
 import * as referralService from '../services/referral.service.js';
 import * as marketingService from '../services/marketing.service.js';
 import * as supportService from '../services/support.service.js';
+import * as telegramBot from '../services/telegram-bot.service.js';
 import { addBounty } from '../services/bounty.service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/errors.js';
 import { isAdminRole } from '../utils/roles.js';
@@ -49,6 +50,7 @@ export async function getOverview(req, res) {
       programs: programService.getAllAdmin(),
       messagesUnread: supportService.getOwnerInboxSummary().unread_count || 0,
       crmOpen: dashboard.crmOpen || 0,
+      health: telegramBot.getSiteMonitor(),
     });
   }
 

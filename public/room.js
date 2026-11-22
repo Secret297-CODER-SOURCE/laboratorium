@@ -1,6 +1,7 @@
 import { getToken, getUser, initTheme, requireUnrestrictedAsync } from '/auth.js';
 import { icon, setIcon, initNavIcons } from '/icons.js';
 import { showAlert, showConfirm, showCopyDialog } from '/dialog.js';
+import { pickStagedScreenId, demoChipLabel } from '/room-stage.js';
 
 initTheme();
 initNavIcons();
@@ -132,6 +133,11 @@ const videoGrid = document.getElementById('video-grid');
 const localVideo = document.getElementById('local-video');
 const chatMessages = document.getElementById('chat-messages');
 const participantsList = document.getElementById('participants-list');
+const demoSwitcher = document.getElementById('demo-switcher');
+
+/** Which screen-share tile is on the main stage when several people present. */
+let stagedScreenId = null;
+let lastSwitcherKey = '';
 
 /* ───────────────────────── Аудио-анализ («говорит») ───────────────────────── */
 let _ctx = null;
@@ -194,8 +200,29 @@ function updateLocalVideo() {
   }
 }
 
+function listScreenTiles() {
+  return [...videoGrid.querySelectorAll('.video-tile.screen-share')];
+}
+
+function setStagedScreen(id, { force = true } = {}) {
+  stagedScreenId = pickStagedScreenId(
+    listScreenTiles().map((t) => t.id),
+    stagedScreenId,
+    { incomingId: id, force },
+  );
+  updateGridClass();
+}
+
 function updateGridClass() {
-  const hasScreen = !!videoGrid.querySelector(':scope > .video-tile.screen-share, .video-tile.screen-share');
+  const screens = listScreenTiles();
+  const hasScreen = screens.length > 0;
+  if (!hasScreen) stagedScreenId = null;
+  else {
+    stagedScreenId = pickStagedScreenId(
+      screens.map((t) => t.id),
+      stagedScreenId,
+    );
+  }
   syncStageRail(hasScreen);
   const tiles = videoGrid.querySelectorAll('.video-tile');
   const count = tiles.length;
@@ -203,9 +230,10 @@ function updateGridClass() {
     count <= 1 ? 'grid-1' : count === 2 ? 'grid-2' : count <= 4 ? 'grid-3' : 'grid-many'
   }${hasScreen ? ' has-screen' : ''}`;
   videoGrid.style.removeProperty('--screen-participant-count');
+  renderDemoSwitcher(screens);
 }
 
-/** Keep screen-share as fixed left stage; other tiles in a scrollable right rail. */
+/** Keep one screen-share as the left stage; cameras + other demos in the rail. */
 function syncStageRail(hasScreen) {
   let rail = videoGrid.querySelector(':scope > .video-side-rail');
   if (hasScreen) {
@@ -214,20 +242,44 @@ function syncStageRail(hasScreen) {
       rail.className = 'video-side-rail';
       videoGrid.appendChild(rail);
     }
-    const screen = videoGrid.querySelector('.video-tile.screen-share');
-    if (screen && screen.parentElement !== videoGrid) {
-      videoGrid.insertBefore(screen, rail);
-    } else if (screen && screen.nextElementSibling !== rail) {
-      videoGrid.insertBefore(screen, rail);
+    const screens = listScreenTiles();
+    const staged = screens.find((t) => t.id === stagedScreenId) || screens[0];
+    screens.forEach((tile) => tile.classList.toggle('is-stage', tile === staged));
+    if (staged) {
+      if (staged.parentElement !== videoGrid) videoGrid.insertBefore(staged, rail);
+      else if (staged.nextElementSibling !== rail) videoGrid.insertBefore(staged, rail);
     }
     videoGrid.querySelectorAll('.video-tile').forEach((tile) => {
-      if (tile.classList.contains('screen-share')) return;
+      if (tile === staged) return;
       if (tile.parentElement !== rail) rail.appendChild(tile);
     });
   } else if (rail) {
+    videoGrid.querySelectorAll('.video-tile.screen-share').forEach((t) => t.classList.remove('is-stage'));
     while (rail.firstChild) videoGrid.appendChild(rail.firstChild);
     rail.remove();
   }
+}
+
+function renderDemoSwitcher(screens) {
+  if (!demoSwitcher) return;
+  if (screens.length < 2) {
+    lastSwitcherKey = '';
+    demoSwitcher.hidden = true;
+    demoSwitcher.innerHTML = '';
+    return;
+  }
+  const key = `${screens.map((t) => t.id).join('\0')}#${stagedScreenId || ''}`;
+  if (key === lastSwitcherKey) return;
+  lastSwitcherKey = key;
+  demoSwitcher.hidden = false;
+  demoSwitcher.innerHTML = screens.map((tile) => {
+    const local = tile.id === 'tile-screen';
+    const label = escapeHtml(demoChipLabel(tile.querySelector('.tile-label span')?.textContent, { local }));
+    const active = tile.id === stagedScreenId;
+    return `<button type="button" class="demo-chip${active ? ' is-active' : ''}"
+      data-screen-id="${escapeHtml(tile.id)}" role="tab" aria-selected="${active}"
+      title="${active ? 'Зараз на сцені' : 'Показати на сцені'}">${icon('screen', 'ico ico--sm')}<span>${label}</span></button>`;
+  }).join('');
 }
 
 /* ───────────────────────── Отправка треков ───────────────────────── */
@@ -378,6 +430,11 @@ function makeTile({ id, handle, name, screen = false, muted = false }) {
   }
   tile.appendChild(label);
 
+  if (screen) {
+    tile.title = 'Показати цю демонстрацію на сцені';
+    tile.setAttribute('role', 'button');
+  }
+
   const fs = document.createElement('button');
   fs.className = 'tile-fs';
   fs.type = 'button';
@@ -450,6 +507,11 @@ function syncScreenTile(peer) {
       videoGrid.prepend(tile);
       peer.screenTile = tile;
       safePlay(video);
+      stagedScreenId = pickStagedScreenId(
+        listScreenTiles().map((t) => t.id),
+        stagedScreenId,
+        { incomingId: tile.id },
+      );
       updateGridClass();
     } else {
       const video = peer.screenTile.querySelector('video');
@@ -887,6 +949,11 @@ document.getElementById('screen-btn').addEventListener('click', async () => {
   tile.querySelector('.tile-label span').textContent = 'Ваш екран';
   tile.querySelector('video').srcObject = screenStream;
   videoGrid.prepend(tile);
+  stagedScreenId = pickStagedScreenId(
+    listScreenTiles().map((t) => t.id),
+    stagedScreenId,
+    { incomingId: 'tile-screen', force: true },
+  );
   updateGridClass();
 
   // Демка — в ОТДЕЛЬНЫЙ слот, камера и микрофон продолжают работать.
@@ -1080,6 +1147,12 @@ function setSidebarOpen(open) {
     sidebar.classList.remove('open');
   }
   chatBtn?.classList.toggle('active', open);
+  requestAnimationFrame(() => {
+    updateGridClass();
+    videoGrid?.querySelectorAll('video').forEach((v) => {
+      try { v.style.objectFit = v.closest('.screen-share') ? 'contain' : 'cover'; } catch { /* ignore */ }
+    });
+  });
 }
 
 function showChatPanel() {
@@ -1102,6 +1175,23 @@ document.getElementById('chat-btn').addEventListener('click', () => {
 document.getElementById('chat-btn')?.classList.toggle('active', isSidebarOpen());
 window.addEventListener('resize', () => {
   document.getElementById('chat-btn')?.classList.toggle('active', isSidebarOpen());
+  updateGridClass();
+});
+if (typeof ResizeObserver !== 'undefined' && videoGrid) {
+  new ResizeObserver(() => updateGridClass()).observe(videoGrid);
+}
+
+videoGrid?.addEventListener('click', (e) => {
+  if (e.target.closest('.tile-fs')) return;
+  const tile = e.target.closest('.video-tile.screen-share');
+  if (!tile || tile.classList.contains('is-stage')) return;
+  setStagedScreen(tile.id, { force: true });
+});
+
+demoSwitcher?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-screen-id]');
+  if (!btn) return;
+  setStagedScreen(btn.dataset.screenId, { force: true });
 });
 
 /* ───────────────────────── Выход ───────────────────────── */

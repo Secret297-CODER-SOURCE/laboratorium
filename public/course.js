@@ -13,7 +13,7 @@ initSiteHeader({
   showEnroll: !isLoggedIn(),
   showLogout: isLoggedIn(),
   navMode: 'marketing',
-  showSearch: true,
+  showSearch: false,
 });
 
 const params = new URLSearchParams(location.search);

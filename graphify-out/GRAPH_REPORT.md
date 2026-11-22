@@ -1,38 +1,37 @@
-# Graph Report - laboratorium  (2026-11-21)
+# Graph Report - laboratorium  (2026-11-23)
 
 ## Corpus Check
-- 244 files · ~312,482 words
+- 252 files · ~321,530 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3332 nodes · 7726 edges · 195 communities (177 shown, 18 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 287 edges (avg confidence: 0.85)
+- 3441 nodes · 8029 edges · 196 communities (179 shown, 17 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 295 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `522bf395`
+- Built from commit: `090b969b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - codemirror.js
 - javascript.js
-- admin.controller.js
 - dashboard.js
 - api.controller.js
-- errors.js
+- db/index.js
 - room.js
-- addEditorMethods
+- webpush.service.js
 - lab-workbench.js
 - helmet
 - registerEventHandlers
-- getContextBefore
+- getLine
 - getLabPublicConfig
 - markText
 - ctf-demo.controller.js
 - code-workspace.service.js
 - proxmox.service.js
-- config/index.js
+- ForbiddenError
 - setup.js
 - circuits.service.js
 - quiz.service.js
@@ -46,22 +45,21 @@
 - content-builder.js
 - theme-engine.js
 - app.js
-- defineOptions
+- updateDisplayIfNeeded
 - public/auth.js
 - support.service.js
 - laboratorium. — деплой на сервер (Docker)
 - lab-tools.js
 - telegram-bot.service.js
-- config
+- middleware/auth.js
 - access-policy.service.js
 - marketing.service.js
 - task.service.js
 - auth.controller.js
 - storage.service.js
-- getLine
+- Pos
 - ice.service.js
 - conferences.js
-- bounty.service.js
 - chat.service.js
 - notifications.js
 - payment.service.js
@@ -90,11 +88,11 @@
 - portal.js
 - python.js
 - settings.service.js
-- challenge-stage.service.js
-- password.service.js
+- challenge.service.js
+- defineOptions
 - script.js
 - css.js
-- challenge.service.js
+- lab-agent.service.js
 - admin-attendance-panel.js
 - admin-ctf-panel.js
 - admin-labs-panel.js
@@ -108,12 +106,13 @@
 - manual.js
 - unified-calendar.js
 - conference.service.js
-- addBounty
+- calendar.service.js
 - article.service.js
 - admin-billing-panel.js
 - admin-stats-panel.js
 - lab-tools-catalog.js
 - public/tab-access.js
+- addEditorMethods
 - lab-agent/server.js
 - admin-manuals-panel.js
 - admin-schedule-panel.js
@@ -127,20 +126,21 @@
 - app-nav.js
 - number-inputs.js
 - htmlmixed.js
-- homework-reminder.service.js
+- errors.js
 - package.json
 - chat-stickers.js
 - course.js
 - matchbrackets.js
 - shell.js
 - user-handle.js
+- room-stage.test.js
 - admin-errors-panel.js
 - admin-messages-panel.js
 - admin-quiz-panel.js
 - admin-storage-panel.js
 - content-view.js
 - site-header.js
-- lab-agent.service.js
+- challenge-stage.service.js
 - docker-entrypoint.sh
 - public/roles.js
 - elite-service.js
@@ -150,29 +150,32 @@
 - ctf-lab/entrypoint.sh
 - express-rate-limit
 - circuits-lab.js
-- jsonwebtoken
+- code-ide.js
 - external-manual.service.js
 - nodemailer
 - coturn/entrypoint.sh
-- webpush.service.js
+- sandbox.service.js
 - i18n-en.js
 - restart.sh
-- content.controller.js
+- schedule.service.js
 - timezone.js
 - upload.js
-- ctf-activity.service.js
-- admin-planner-panel.js
+- schedule.controller.js
 - socket/index.js
+- admin-planner-panel.js
+- direction.service.js
+- mail.service.js
+- calendar.controller.js
 - admin-telegram-panel.js
-- attendance.service.js
-- schedule.service.js
-- db/index.js
+- ConflictError
+- getOverview
+- config/index.js
 - express
 - telegram.service.js
 - program.service.js
-- stats.service.js
+- jsonwebtoken
 - multer
-- utils/roles.js
+- user-bot.js
 - better-sqlite3
 
 ## God Nodes (most connected - your core abstractions)
@@ -180,7 +183,7 @@
 2. `cont()` - 61 edges
 3. `db` - 60 edges
 4. `ValidationError` - 50 edges
-5. `config` - 41 edges
+5. `config` - 42 edges
 6. `getLine()` - 40 edges
 7. `NotFoundError` - 40 edges
 8. `pass()` - 38 edges
@@ -201,75 +204,71 @@
 
 ## Import Cycles
 - 3-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/settings.service.js -> server/db/index.js`
-- 3-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge-stage.service.js -> server/db/index.js`
-- 3-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge.service.js -> server/db/index.js`
 - 3-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/lab-agent.service.js -> server/db/index.js`
 - 3-file cycle: `server/services/ctf-demo.service.js -> server/services/lab-agent.service.js -> server/utils/publicUrl.js -> server/services/ctf-demo.service.js`
+- 3-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge-stage.service.js -> server/db/index.js`
+- 3-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge.service.js -> server/db/index.js`
+- 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge-stage.service.js -> server/services/bounty.service.js -> server/db/index.js`
 - 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/lab-agent.service.js -> server/services/settings.service.js -> server/db/index.js`
 - 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/utils/publicUrl.js -> server/services/settings.service.js -> server/db/index.js`
-- 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge-stage.service.js -> server/services/bounty.service.js -> server/db/index.js`
-- 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge-stage.service.js -> server/services/ctf-activity.service.js -> server/db/index.js`
 - 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge.service.js -> server/services/challenge-stage.service.js -> server/db/index.js`
+- 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge-stage.service.js -> server/services/ctf-activity.service.js -> server/db/index.js`
 - 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge.service.js -> server/services/ctf-activity.service.js -> server/db/index.js`
 - 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/utils/publicUrl.js -> server/services/ctf-demo.service.js -> server/db/index.js`
 - 4-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/utils/publicUrl.js -> server/services/tunnel.service.js -> server/db/index.js`
+- 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge.service.js -> server/services/challenge-stage.service.js -> server/services/bounty.service.js -> server/db/index.js`
 - 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/lab-agent.service.js -> server/utils/publicUrl.js -> server/services/settings.service.js -> server/db/index.js`
 - 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/utils/publicUrl.js -> server/services/tunnel-url.service.js -> server/services/settings.service.js -> server/db/index.js`
 - 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/utils/publicUrl.js -> server/services/tunnel.service.js -> server/services/settings.service.js -> server/db/index.js`
-- 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge.service.js -> server/services/challenge-stage.service.js -> server/services/bounty.service.js -> server/db/index.js`
-- 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/challenge.service.js -> server/services/challenge-stage.service.js -> server/services/ctf-activity.service.js -> server/db/index.js`
+- 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/utils/publicUrl.js -> server/services/tunnel-url.service.js -> server/services/tunnel.service.js -> server/db/index.js`
+- 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/utils/publicUrl.js -> server/services/ctf-demo.service.js -> server/services/lab-agent.service.js -> server/db/index.js`
 - 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/lab-agent.service.js -> server/utils/publicUrl.js -> server/services/ctf-demo.service.js -> server/db/index.js`
-- 5-file cycle: `server/db/index.js -> server/services/ctf.service.js -> server/services/lab-agent.service.js -> server/utils/publicUrl.js -> server/services/tunnel.service.js -> server/db/index.js`
 
-## Communities (195 total, 18 thin omitted)
+## Communities (196 total, 17 thin omitted)
 
 ### Community 0 - "codemirror.js"
 Cohesion: 0.04
-Nodes (89): alignHorizontally(), buildCollapsedSpan(), buildLineContent(), buildLineElement(), buildToken(), buildTokenBadBidi(), classTest(), cleanUpLine() (+81 more)
+Nodes (92): alignHorizontally(), buildCollapsedSpan(), buildLineContent(), buildLineElement(), buildToken(), buildTokenBadBidi(), classTest(), clearEmptySpans() (+84 more)
 
 ### Community 1 - "javascript.js"
 Cohesion: 0.09
 Nodes (92): afterExport(), afterImport(), afterprop(), afterType(), arrayLiteral(), arrowBody(), arrowBodyNoComma(), block() (+84 more)
 
-### Community 2 - "admin.controller.js"
-Cohesion: 0.02
-Nodes (3): getOverview(), listApplications(), isAdminRole()
-
 ### Community 3 - "dashboard.js"
 Cohesion: 0.06
-Nodes (75): addPortFlow(), ALL_TABS, APPLICATION_STATUS_LABELS, applyCtfFilters(), ARTICLE_STATUS_LABELS, bindCtfFiltersOnce(), clearCtfTimers(), clearTaskTimers() (+67 more)
+Nodes (76): addPortFlow(), ALL_TABS, APPLICATION_STATUS_LABELS, applyCtfFilters(), applyLabSubtab(), ARTICLE_STATUS_LABELS, bindCtfFiltersOnce(), clearCtfTimers() (+68 more)
 
 ### Community 4 - "api.controller.js"
 Cohesion: 0.04
-Nodes (6): escapeXml(), getSitemap(), health(), STAFF_ROLES, toSitemapDate(), ping()
+Nodes (18): approveTask(), completeChallenge(), enroll(), escapeXml(), getDashboard(), getLeaderboard(), getSitemap(), getStudentPublicProfile() (+10 more)
 
-### Community 5 - "errors.js"
-Cohesion: 0.10
-Nodes (21): create(), getAll(), getAllActive(), getById(), getPublicWithPrograms(), mapDirection(), remove(), slugify() (+13 more)
+### Community 5 - "db/index.js"
+Cohesion: 0.08
+Nodes (15): db, dbDir, SCHEMA, hash, password, targetEmail, log(), logPublished() (+7 more)
 
 ### Community 6 - "room.js"
 Cohesion: 0.06
-Nodes (59): addChatMessage(), addSystemMessage(), applyAllTracks(), audioCtx(), bindSlots(), buildRecordingStream(), camStreamLocal, chatInput (+51 more)
+Nodes (63): addChatMessage(), addSystemMessage(), applyAllTracks(), audioCtx(), bindSlots(), buildRecordingStream(), camStreamLocal, chatInput (+55 more)
 
-### Community 7 - "addEditorMethods"
-Cohesion: 0.11
-Nodes (33): addEditorMethods(), attachDoc(), charCoords(), charWidth(), clipLine(), coordsChar(), directionChanged(), doc() (+25 more)
+### Community 7 - "webpush.service.js"
+Cohesion: 0.16
+Nodes (5): ensureConfigured(), getPublicKey(), loadOrCreateKeys(), saveSubscription(), sendToUser()
 
 ### Community 8 - "lab-workbench.js"
 Cohesion: 0.06
-Nodes (50): addFinding(), analyzeEmailHeaders(), analyzeHeaders(), ATTACK_SIGNATURES, b64urlDecode(), b64urlFromBytes(), base64ToText(), calcCidr() (+42 more)
+Nodes (54): addFinding(), analyzeEmailHeaders(), analyzeHeaders(), ATTACK_SIGNATURES, b64urlDecode(), b64urlFromBytes(), base64ToText(), calcCidr() (+46 more)
 
 ### Community 10 - "registerEventHandlers"
-Cohesion: 0.05
-Nodes (58): activeElt(), addClass(), addModifierNames(), clearDragCursor(), clickInGutter(), CodeMirror(), contextMenuInGutter(), copyableRanges() (+50 more)
+Cohesion: 0.07
+Nodes (41): addModifierNames(), clearDragCursor(), clickInGutter(), clickRepeat(), contextMenuInGutter(), delayBlurEvent(), dispatchKey(), dispatchKeyInner() (+33 more)
 
-### Community 11 - "getContextBefore"
-Cohesion: 0.24
-Nodes (13): callBlankLine(), copyState(), save(), getContextBefore(), getLineStyles(), highlightLine(), highlightWorker(), innerMode() (+5 more)
+### Community 11 - "getLine"
+Cohesion: 0.06
+Nodes (42): addMarkedSpan(), attachMarkedSpans(), bind(), callBlankLine(), cleanUpLine(), copyHistoryArray(), copyState(), countColumn() (+34 more)
 
 ### Community 12 - "getLabPublicConfig"
-Cohesion: 0.20
-Nodes (25): buildDemoLabUrl(), listCtfForUser(), startChallenge(), mockDeploy(), deployDocker(), getLabOverview(), listDockerDeployments(), restoreDockerBackup() (+17 more)
+Cohesion: 0.21
+Nodes (23): listCtfForUser(), startChallenge(), getPublicInfra(), deployDocker(), getLabOverview(), listDockerDeployments(), restoreDockerBackup(), stopDocker() (+15 more)
 
 ### Community 13 - "markText"
 Cohesion: 0.09
@@ -287,25 +286,25 @@ Nodes (58): getSandboxInfo(), assertCanUse(), assertRunRateLimit(), canUseSandbo
 Cohesion: 0.28
 Nodes (25): agentExec(), agentListDir(), agentReadFile(), agentWriteFile(), cfg(), cloneVm(), createSnapshot(), deleteSnapshot() (+17 more)
 
-### Community 17 - "config/index.js"
-Cohesion: 0.13
-Nodes (4): __dirname, INSECURE_JWT_SECRETS, jwtSecret, root
+### Community 17 - "ForbiddenError"
+Cohesion: 0.12
+Nodes (17): assertConferenceManage(), computeUserAttendance(), getConferenceAttendance(), getGroupAttendanceOverview(), assertQuizInScope(), assertStudentInScope(), assertTaskInScope(), getOverview() (+9 more)
 
 ### Community 18 - "setup.js"
-Cohesion: 0.15
-Nodes (23): api(), createUserDirect(), __dirname, loginAs(), randSuffix(), scratchDbDir, setTestEnv(), startServer() (+15 more)
+Cohesion: 0.13
+Nodes (25): api(), createUserDirect(), __dirname, loginAs(), randSuffix(), scratchDbDir, setTestEnv(), startServer() (+17 more)
 
 ### Community 19 - "circuits.service.js"
 Cohesion: 0.13
 Nodes (15): assertCanUse(), canUseCircuits(), create(), createFromTemplate(), diagnose(), getInfo(), getOne(), getOwned() (+7 more)
 
 ### Community 20 - "quiz.service.js"
-Cohesion: 0.23
-Nodes (9): canAccessQuiz(), getForStudent(), listForStudent(), mapQuizRow(), parseOptions(), startQuiz(), studentProgramIds(), submitAttempt() (+1 more)
+Cohesion: 0.13
+Nodes (8): canAccessQuiz(), getForStudent(), listForStudent(), mapQuizRow(), parseOptions(), startQuiz(), studentProgramIds(), submitAttempt()
 
 ### Community 21 - "cmp"
-Cohesion: 0.09
-Nodes (36): applyTextInput(), bidiSimplify(), clickRepeat(), cmp(), contains(), delayBlurEvent(), deleteNearSelection(), drawSelectionRange() (+28 more)
+Cohesion: 0.08
+Nodes (37): activeElt(), applyTextInput(), bidiSimplify(), cmp(), contains(), copyableRanges(), deleteNearSelection(), drawSelectionRange() (+29 more)
 
 ### Community 22 - "crm.service.js"
 Cohesion: 0.10
@@ -320,8 +319,8 @@ Cohesion: 0.08
 Nodes (16): esc(), number(), renderMarketingPanel(), contains(), cpp11StringHook(), cTypes(), def(), isTopScope() (+8 more)
 
 ### Community 25 - "code-editor.js"
-Cohesion: 0.12
-Nodes (44): addFile(), appendConsole(), bindMainEvents(), buildLivePreviewHtml(), cloneFromRemote(), createGitCommit(), createWorkspace(), currentWorkspace() (+36 more)
+Cohesion: 0.09
+Nodes (78): activityButton(), addFile(), appendConsole(), applyDiagnosticMarks(), applyToggleComment(), bindGlobalKeys(), bindMainEvents(), bindSearchHits() (+70 more)
 
 ### Community 26 - "admin.js"
 Cohesion: 0.12
@@ -340,20 +339,20 @@ Cohesion: 0.15
 Nodes (25): EDGES, ensureCanvas(), ensureFaviconLink(), FACES, initFavicon(), parseRgb(), renderFavicon(), rgba() (+17 more)
 
 ### Community 30 - "app.js"
-Cohesion: 0.11
-Nodes (26): createApp(), __dirname, escapeHtml(), injectAssetVersion(), publicDir, renderCourseBlock(), renderCourseContent(), sendCoursePage() (+18 more)
+Cohesion: 0.12
+Nodes (24): createApp(), __dirname, escapeHtml(), injectAssetVersion(), publicDir, renderCourseBlock(), renderCourseContent(), sendCoursePage() (+16 more)
 
-### Community 31 - "defineOptions"
-Cohesion: 0.08
-Nodes (36): bind(), calculateScrollPos(), clearCaches(), clearLineMeasurementCache(), clearLineMeasurementCacheFor(), configureMouse(), countDirtyView(), defaultSpecialCharPlaceholder() (+28 more)
+### Community 31 - "updateDisplayIfNeeded"
+Cohesion: 0.17
+Nodes (23): calculateScrollPos(), countDirtyView(), displayHeight(), displayWidth(), endOperation_finish(), endOperation_R2(), endOperation_W1(), endOperation_W2() (+15 more)
 
 ### Community 32 - "public/auth.js"
 Cohesion: 0.16
 Nodes (23): api(), clearSession(), getHomeForRole(), getSiteHome(), getToken(), getUser(), guardSite(), handleSessionError() (+15 more)
 
 ### Community 33 - "support.service.js"
-Cohesion: 0.13
-Nodes (19): getTransporter(), sendMail(), sendNewLeadEmail(), sendPasswordResetEmail(), sendWelcomeCredentialsEmail(), testSmtp(), transportFingerprint(), cleanText() (+11 more)
+Cohesion: 0.21
+Nodes (12): cleanText(), createTemplate(), createThread(), escapeHtml(), getOwnerThread(), getUserThread(), listMessages(), replyAsOwner() (+4 more)
 
 ### Community 34 - "laboratorium. — деплой на сервер (Docker)"
 Cohesion: 0.06
@@ -364,12 +363,12 @@ Cohesion: 0.19
 Nodes (25): activeProject(), chainOptionsHtml(), chainTextFor(), DIFF, downloadProject(), esc(), FINDERS, findingSummary() (+17 more)
 
 ### Community 36 - "telegram-bot.service.js"
-Cohesion: 0.22
-Nodes (24): adminReply(), cfg(), getAdminOverview(), getTemplate(), handleAdminCommand(), handleCallback(), handlePayAsk(), handleUpdate() (+16 more)
+Cohesion: 0.15
+Nodes (33): listStudentLessons(), adminReply(), cfg(), commandName(), countSafe(), formatMonitorText(), getAdminOverview(), getSiteMonitor() (+25 more)
 
-### Community 37 - "config"
-Cohesion: 0.18
-Nodes (14): config, authRequired(), loadAccessFlags(), optionalAuth(), requireRole(), requireUnrestricted(), BYPASS_ROLES, requirePlatformAccess() (+6 more)
+### Community 37 - "middleware/auth.js"
+Cohesion: 0.27
+Nodes (9): authRequired(), loadAccessFlags(), requireUnrestricted(), BYPASS_ROLES, requirePlatformAccess(), requireTab(), authLimiter, form (+1 more)
 
 ### Community 38 - "access-policy.service.js"
 Cohesion: 0.26
@@ -380,20 +379,20 @@ Cohesion: 0.16
 Nodes (22): ACCESS_RETENTION_DAYS, ACCESS_SORT, accessFilter(), analyticsDimension(), analyticsPath(), BOT_PATTERNS, clickDetail(), createCampaign() (+14 more)
 
 ### Community 40 - "task.service.js"
-Cohesion: 0.23
-Nodes (18): approveTask(), assertStudentAssignment(), assertTeacherCanManageAssignment(), createTask(), deleteSubmissionFiles(), deleteTask(), getAssignment(), getSubmissionFiles() (+10 more)
+Cohesion: 0.21
+Nodes (20): approveTask(), assertStudentAssignment(), assertTeacherCanManageAssignment(), createTask(), decodeOriginalName(), deleteSubmissionFiles(), deleteTask(), getAssignment() (+12 more)
 
 ### Community 41 - "auth.controller.js"
-Cohesion: 0.15
-Nodes (14): completeGoogleCallback(), cookieValue(), createHashSha256(), fetchGoogleKeys(), googleFlows, googleGrants, login(), pruneExpired() (+6 more)
+Cohesion: 0.13
+Nodes (15): completeGoogleCallback(), cookieValue(), createHashSha256(), fetchGoogleKeys(), googleFlows, googleGrants, login(), pruneExpired() (+7 more)
 
 ### Community 42 - "storage.service.js"
 Cohesion: 0.05
 Nodes (41): attrContinuedState(), attrEqState(), attrState(), attrValueState(), closeState(), closeStateErr(), closeTagNameState(), doctype() (+33 more)
 
-### Community 43 - "getLine"
-Cohesion: 0.05
-Nodes (64): addChangeToHistory(), addSelectionToHistory(), adjustForChange(), attachLocalSpans(), badPos(), changeEnd(), clearSelectionEvents(), clipPos() (+56 more)
+### Community 43 - "Pos"
+Cohesion: 0.09
+Nodes (40): addChangeToHistory(), addSelectionToHistory(), adjustForChange(), attachLocalSpans(), badPos(), changeEnd(), clearSelectionEvents(), clipPos() (+32 more)
 
 ### Community 44 - "ice.service.js"
 Cohesion: 0.39
@@ -402,10 +401,6 @@ Nodes (7): buildPrivateIceServers(), getIceServersForUser(), isPrivateTurnReacha
 ### Community 45 - "conferences.js"
 Cohesion: 0.14
 Nodes (16): allConferences, closeCreateModal(), confCardHTML(), DAYS_SHORT, loadConferences(), modal, MONTHS, openCreateModal() (+8 more)
-
-### Community 46 - "bounty.service.js"
-Cohesion: 0.33
-Nodes (7): getDashboard(), getLeaderboard(), getStudentPublicProfile(), getBountyLog(), getUserRank(), getNextTier(), getTier()
 
 ### Community 47 - "chat.service.js"
 Cohesion: 0.20
@@ -420,8 +415,8 @@ Cohesion: 0.21
 Nodes (16): addDays(), assertPlatformAccess(), BYPASS_ROLES, clampBillingDay(), dueDate(), endOfDay(), getAccessStatus(), getPaymentRecord() (+8 more)
 
 ### Community 50 - "notification.service.js"
-Cohesion: 0.14
-Nodes (14): app, io, server, runCheck(), startBillingReminderScheduler(), isAgentEnabled(), emitToUser(), hasNotificationLike() (+6 more)
+Cohesion: 0.09
+Nodes (24): app, io, server, runAutoBackupCycle(), startBackupScheduler(), schedule(), runCheck(), startBillingReminderScheduler() (+16 more)
 
 ### Community 51 - "tab-access.service.js"
 Cohesion: 0.22
@@ -432,12 +427,12 @@ Cohesion: 0.21
 Nodes (16): announceOwnerCredentials(), bootstrapAdmin(), CHALLENGES, ensureAllPrograms(), ensureDirections(), ensureExtraPrograms(), ensureOwner(), ensureTestStudent() (+8 more)
 
 ### Community 53 - "admin.service.js"
-Cohesion: 0.20
-Nodes (15): getStats(), assertCanTargetUser(), deleteUser(), getDeveloperInfo(), getOwnerDashboard(), getPersonProfile(), getPlatformStats(), listApplications() (+7 more)
+Cohesion: 0.13
+Nodes (19): getStats(), assertCanTargetUser(), deleteUser(), getDeveloperInfo(), getOwnerDashboard(), getPersonProfile(), getPlatformStats(), listApplications() (+11 more)
 
 ### Community 54 - "coordsCharInner"
-Cohesion: 0.09
-Nodes (34): addMarkedSpan(), attachMarkedSpans(), boxIsAfter(), cmpCoords(), coordsBidiPart(), coordsBidiPartWrapped(), coordsCharInner(), cursorCoords() (+26 more)
+Cohesion: 0.11
+Nodes (30): boxIsAfter(), cmpCoords(), coordsBidiPart(), coordsBidiPartWrapped(), coordsCharInner(), cursorCoords(), get(), getBidi() (+22 more)
 
 ### Community 55 - "referral.service.js"
 Cohesion: 0.19
@@ -488,8 +483,8 @@ Cohesion: 0.18
 Nodes (14): completeOAuth(), exchangeGithub(), exchangeGitlab(), flows, getAccessToken(), getAccount(), providerConfig(), prune() (+6 more)
 
 ### Community 67 - "tunnel.service.js"
-Cohesion: 0.21
-Nodes (16): router, tunnelLimiter, agentRelayRequest(), directProxyRequest(), ensureAccessToken(), handleTunnelProxy(), isPrivateHost(), lookupToken() (+8 more)
+Cohesion: 0.27
+Nodes (14): agentRelayRequest(), directProxyRequest(), ensureAccessToken(), handleTunnelProxy(), isPrivateHost(), lookupToken(), newToken(), parseSslipHost() (+6 more)
 
 ### Community 68 - "admin-crm-panel.js"
 Cohesion: 0.29
@@ -519,13 +514,13 @@ Nodes (11): dedent(), formatStringFactory(), tokenNestedExpr(), tokenString(), p
 Cohesion: 0.19
 Nodes (18): envDefaults(), getLabPublicSettingsPublic(), getProxmoxConfig(), getProxmoxSettingsPublic(), getSmtpConfig(), getSmtpSettingsPublic(), getTelegramConfig(), getTelegramSettingsPublic() (+10 more)
 
-### Community 75 - "challenge-stage.service.js"
-Cohesion: 0.29
-Nodes (10): assertStageUnlockedForUser(), assertUnlocked(), getAttachmentsRaw(), getChallenge(), getStagesAdmin(), getStagesRaw(), getUserStageView(), replaceStages() (+2 more)
+### Community 75 - "challenge.service.js"
+Cohesion: 0.26
+Nodes (9): assertCanManage(), assertOwnership(), complete(), deleteAdmin(), getById(), getStagesForManage(), recordCompletion(), startChallenge() (+1 more)
 
-### Community 76 - "password.service.js"
-Cohesion: 0.43
-Nodes (7): adminSendNewPassword(), adminSendPasswordReset(), createResetToken(), generateToken(), hashToken(), requestPasswordReset(), resetPassword()
+### Community 76 - "defineOptions"
+Cohesion: 0.09
+Nodes (28): addClass(), attachDoc(), clearCaches(), clearLineMeasurementCache(), clearLineMeasurementCacheFor(), CodeMirror(), configureMouse(), copyObj() (+20 more)
 
 ### Community 77 - "script.js"
 Cohesion: 0.19
@@ -535,9 +530,9 @@ Nodes (9): animateCounters(), draw(), escHtml(), heroStats, lines, loadLeaderboa
 Cohesion: 0.23
 Nodes (6): pass(), popAndPass(), ret(), tokenBase(), tokenParenthesized(), tokenString()
 
-### Community 79 - "challenge.service.js"
-Cohesion: 0.26
-Nodes (9): assertCanManage(), assertOwnership(), complete(), deleteAdmin(), getById(), getStagesForManage(), recordCompletion(), startChallenge() (+1 more)
+### Community 79 - "lab-agent.service.js"
+Cohesion: 0.24
+Nodes (18): buildDemoLabUrl(), agentRequest(), allocatePorts(), backupContainer(), collectUsedPorts(), deleteBackupImage(), deployContainer(), ensureCtfImageBuilt() (+10 more)
 
 ### Community 80 - "admin-attendance-panel.js"
 Cohesion: 0.29
@@ -591,9 +586,9 @@ Nodes (10): dayKey(), escapeHtml(), mountUnifiedCalendar(), load(), render(), re
 Cohesion: 0.16
 Nodes (12): assertCanAccessConference(), canAccessConference(), cancel(), conferenceVisibilitySql(), create(), end(), generateRoomCode(), getById() (+4 more)
 
-### Community 94 - "addBounty"
-Cohesion: 0.40
-Nodes (5): approveTask(), completeChallenge(), enroll(), updateEnrollmentProgress(), addBounty()
+### Community 94 - "calendar.service.js"
+Cohesion: 0.24
+Nodes (13): cleanText(), createManualEvent(), getCtfSyncStatus(), getMonthRange(), httpUrl(), listForAdmin(), listForStudent(), mapCtfEvent() (+5 more)
 
 ### Community 95 - "article.service.js"
 Cohesion: 0.36
@@ -615,6 +610,10 @@ Nodes (8): CATEGORIES, DIFFICULTIES, filterTools(), pathProgress(), PATHS, SCENA
 Cohesion: 0.29
 Nodes (7): canAccessTab(), DASH_TAB_MAP, dashTabAllowed(), firstAllowedDashTab(), pageAllowed(), PORTAL_TAB_MAP, portalHrefAllowed()
 
+### Community 100 - "addEditorMethods"
+Cohesion: 0.12
+Nodes (30): addEditorMethods(), charCoords(), charWidth(), clipLine(), coordsChar(), doc(), docMethodOp(), endOperation() (+22 more)
+
 ### Community 101 - "lab-agent/server.js"
 Cohesion: 0.25
 Nodes (4): app, buildTargetUrl(), ipToPublicHost(), PORT
@@ -632,8 +631,8 @@ Cohesion: 0.34
 Nodes (13): allManuals, createManual(), esc(), load(), renderCatalog(), renderFilters(), renderManuals(), renderMine() (+5 more)
 
 ### Community 105 - "student-profile.js"
-Cohesion: 0.27
-Nodes (10): article, bindProfileActions(), error, escapeHtml(), handle, loading, loadProfile(), params (+2 more)
+Cohesion: 0.67
+Nodes (5): bindProfileActions(), escapeHtml(), loadProfile(), renderActions(), renderProfile()
 
 ### Community 106 - "conference.controller.js"
 Cohesion: 0.18
@@ -656,8 +655,8 @@ Cohesion: 0.36
 Nodes (10): bindAccessPanelEvents(), collectPolicy(), collectRules(), esc(), loadAccessAdminData(), renderAccessPanel(), renderPolicyPanel(), renderRuleCard() (+2 more)
 
 ### Community 111 - "app-nav.js"
-Cohesion: 0.36
-Nodes (6): ADMIN_LINKS, getAppNavLinks(), linkAllowed(), refreshAppNav(), renderAppNavLinks(), STUDENT_LINKS
+Cohesion: 0.31
+Nodes (10): ADMIN_LINKS, getAppNavLinks(), linkAllowed(), linkIsActive(), MOBILE_PRIMARY, refreshAppNav(), renderAppBottomNav(), renderAppNavLinks() (+2 more)
 
 ### Community 112 - "number-inputs.js"
 Cohesion: 0.46
@@ -667,9 +666,9 @@ Nodes (7): clampValue(), enhanceNumberInputs(), initNumberInputs(), parseStep(),
 Cohesion: 0.43
 Nodes (6): findMatchingMode(), getAttrRegexp(), getAttrValue(), getTagRegexp(), html(), maybeBackup()
 
-### Community 114 - "homework-reminder.service.js"
-Cohesion: 0.29
-Nodes (7): getSettings(), logReminder(), pendingAssignments(), recentlyReminded(), runCheck(), saveSettings(), startHomeworkReminderScheduler()
+### Community 114 - "errors.js"
+Cohesion: 0.07
+Nodes (9): getContentEditor(), getContentStatus(), parseTarget(), saveContent(), PRIORITIES, STATUSES, NotFoundError, PaymentRequiredError (+1 more)
 
 ### Community 115 - "package.json"
 Cohesion: 0.29
@@ -695,6 +694,10 @@ Nodes (5): tokenBase(), tokenHeredoc(), tokenize(), tokenString(), tokenStringSt
 Cohesion: 0.83
 Nodes (3): esc(), handleLink(), profileUrl()
 
+### Community 121 - "room-stage.test.js"
+Cohesion: 0.60
+Nodes (3): demoChipLabel(), pickStagedScreenId(), root
+
 ### Community 122 - "admin-errors-panel.js"
 Cohesion: 0.47
 Nodes (3): esc(), fmtDate(), renderErrorsPanel()
@@ -716,12 +719,12 @@ Cohesion: 0.40
 Nodes (3): params, targetId, targetType
 
 ### Community 127 - "site-header.js"
-Cohesion: 0.36
-Nodes (8): bindSiteSearch(), initSiteHeader(), MAIN_LINKS, renderMainNavLinks(), renderSearchBlock(), renderSiteHeader(), shortcutHint(), TYPE_LABELS
+Cohesion: 0.33
+Nodes (9): bindSiteSearch(), ensureSearchOverlay(), initSiteHeader(), MAIN_LINKS, renderMainNavLinks(), renderSearchBlock(), renderSiteHeader(), shortcutHint() (+1 more)
 
-### Community 128 - "lab-agent.service.js"
-Cohesion: 0.15
-Nodes (29): agentRequest(), allocatePort(), allocatePorts(), backupContainer(), collectUsedPorts(), deleteBackupImage(), deployContainer(), ensureCtfImageBuilt() (+21 more)
+### Community 128 - "challenge-stage.service.js"
+Cohesion: 0.29
+Nodes (10): assertStageUnlockedForUser(), assertUnlocked(), getAttachmentsRaw(), getChallenge(), getStagesAdmin(), getStagesRaw(), getUserStageView(), replaceStages() (+2 more)
 
 ### Community 129 - "docker-entrypoint.sh"
 Cohesion: 0.50
@@ -731,45 +734,65 @@ Nodes (3): HOME, docker-entrypoint.sh script, USER
 Cohesion: 0.42
 Nodes (11): createFromLink(), createFromTemplate(), esc(), initCircuitsLab(), renderList(), renderMain(), renderShell(), runDiagnose() (+3 more)
 
+### Community 140 - "code-ide.js"
+Cohesion: 0.15
+Nodes (24): buildFileTree(), commandCatalog(), commentPrefix(), completions(), createHistoryStore(), get(), key(), list() (+16 more)
+
 ### Community 141 - "external-manual.service.js"
 Cohesion: 0.07
 Nodes (49): cache, cleanText(), clearDigitalOceanCache(), decodeEntities(), fetchJson(), fetchText(), listFeatured(), mapHit() (+41 more)
 
-### Community 144 - "webpush.service.js"
-Cohesion: 0.16
-Nodes (5): ensureConfigured(), getPublicKey(), loadOrCreateKeys(), saveSubscription(), sendToUser()
+### Community 144 - "sandbox.service.js"
+Cohesion: 0.21
+Nodes (20): allocatePort(), buildSandboxRunArgs(), detectSelfContainerId(), dockerCopySource(), execDockerWithStdin(), execFileAsync, isSandboxEnabled(), LANGUAGES (+12 more)
 
-### Community 176 - "content.controller.js"
-Cohesion: 0.70
-Nodes (4): getContentEditor(), getContentStatus(), parseTarget(), saveContent()
+### Community 176 - "schedule.service.js"
+Cohesion: 0.28
+Nodes (14): acknowledgeAbsence(), assertGroupManage(), createLesson(), deleteLesson(), getLessonById(), getScheduleStats(), isGroupMember(), listAbsences() (+6 more)
 
 ### Community 177 - "timezone.js"
 Cohesion: 0.39
 Nodes (5): formatInSiteTz(), getSiteLocale(), getSiteTimeZone(), LOCALE_TZ, timezoneLabel()
 
 ### Community 178 - "upload.js"
-Cohesion: 0.16
-Nodes (13): CHAT_MIME_EXT, chatStorage, CTF_BLOCKED_EXTENSIONS, ctfStorage, DANGEROUS_UPLOAD_EXT, ensureDir(), storage, TASK_BLOCKED_EXTENSIONS (+5 more)
+Cohesion: 0.14
+Nodes (15): requireRole(), CHAT_MIME_EXT, chatStorage, CTF_BLOCKED_EXTENSIONS, ctfStorage, DANGEROUS_UPLOAD_EXT, ensureDir(), storage (+7 more)
+
+### Community 179 - "schedule.controller.js"
+Cohesion: 0.24
+Nodes (4): createLesson(), deleteLesson(), notifyGroupAboutLesson(), updateLesson()
+
+### Community 180 - "socket/index.js"
+Cohesion: 0.67
+Nodes (6): broadcastRoom(), getOnlineParticipants(), getRoom(), initSocket(), leaveRoom(), roomSockets
 
 ### Community 181 - "admin-planner-panel.js"
 Cohesion: 0.43
 Nodes (6): bindPlannerPanelEvents(), esc(), loadPlannerData(), PRIORITY_LABEL, renderPlannerPanel(), STATUS_LABEL
 
-### Community 182 - "socket/index.js"
+### Community 182 - "direction.service.js"
+Cohesion: 0.38
+Nodes (9): create(), getAll(), getAllActive(), getById(), getPublicWithPrograms(), mapDirection(), remove(), slugify() (+1 more)
+
+### Community 183 - "mail.service.js"
+Cohesion: 0.36
+Nodes (7): getTransporter(), sendMail(), sendNewLeadEmail(), sendPasswordResetEmail(), sendWelcomeCredentialsEmail(), testSmtp(), transportFingerprint()
+
+### Community 184 - "calendar.controller.js"
+Cohesion: 0.31
+Nodes (4): conferenceEvent(), lessonEvent(), listStudentEvents(), requestedMonth()
+
+### Community 186 - "ConflictError"
+Cohesion: 0.39
+Nodes (7): areConnected(), follow(), getFollowCounts(), getStudentByHandle(), isFollowing(), unfollow(), ConflictError
+
+### Community 187 - "getOverview"
 Cohesion: 0.67
-Nodes (6): broadcastRoom(), getOnlineParticipants(), getRoom(), initSocket(), leaveRoom(), roomSockets
+Nodes (3): getOverview(), listApplications(), isAdminRole()
 
-### Community 186 - "attendance.service.js"
-Cohesion: 0.24
-Nodes (6): assertConferenceManage(), computeUserAttendance(), getConferenceAttendance(), getGroupAttendanceOverview(), parseSqliteDate(), secondsBetween()
-
-### Community 187 - "schedule.service.js"
-Cohesion: 0.07
-Nodes (36): conferenceEvent(), lessonEvent(), listStudentEvents(), requestedMonth(), createLesson(), deleteLesson(), notifyGroupAboutLesson(), updateLesson() (+28 more)
-
-### Community 188 - "db/index.js"
-Cohesion: 0.07
-Nodes (9): db, dbDir, SCHEMA, hash, password, targetEmail, runAutoBackupCycle(), startBackupScheduler() (+1 more)
+### Community 188 - "config/index.js"
+Cohesion: 0.10
+Nodes (10): config, __dirname, INSECURE_JWT_SECRETS, jwtSecret, root, optionalAuth(), clientErrorLimiter, router (+2 more)
 
 ### Community 190 - "telegram.service.js"
 Cohesion: 0.60
@@ -779,33 +802,29 @@ Nodes (5): answerCallbackQuery(), call(), getTelegramConfig(), getUpdates(), sen
 Cohesion: 0.18
 Nodes (14): create(), getAll(), getAllAdmin(), getAvailableForEnrollment(), getById(), mapProgram(), remove(), slugify() (+6 more)
 
-### Community 193 - "stats.service.js"
-Cohesion: 0.44
-Nodes (10): assertQuizInScope(), assertStudentInScope(), assertTaskInScope(), getOverview(), getQuizDetail(), getScope(), getStudentDetail(), getTaskDetail() (+2 more)
-
-### Community 199 - "utils/roles.js"
-Cohesion: 0.29
-Nodes (4): ROLE_RANK, ROLES, STUDENT_MEMBER_ROLE_LABELS, STUDENT_MEMBER_ROLES
+### Community 195 - "user-bot.js"
+Cohesion: 0.38
+Nodes (5): ADMIN_ACTIONS, answerFor(), esc(), initUserBot(), STUDENT_ACTIONS
 
 ## Knowledge Gaps
-- **356 isolated node(s):** `__dirname`, `markerPath`, `repoRoot`, `./server/config/index.js`, `PORT` (+351 more)
+- **362 isolated node(s):** `__dirname`, `markerPath`, `repoRoot`, `./server/config/index.js`, `PORT` (+357 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `db` connect `db/index.js` to `lab-agent.service.js`, `errors.js`, `external-manual.service.js`, `ctf-demo.controller.js`, `code-workspace.service.js`, `webpush.service.js`, `circuits.service.js`, `quiz.service.js`, `crm.service.js`, `lab.service.js`, `support.service.js`, `telegram-bot.service.js`, `config`, `access-policy.service.js`, `marketing.service.js`, `task.service.js`, `storage.service.js`, `bounty.service.js`, `chat.service.js`, `payment.service.js`, `notification.service.js`, `tab-access.service.js`, `ctf-activity.service.js`, `admin.service.js`, `referral.service.js`, `attendance.service.js`, `schedule.service.js`, `recording.service.js`, `program.service.js`, `content.service.js`, `git-oauth.service.js`, `stats.service.js`, `tunnel.service.js`, `settings.service.js`, `challenge-stage.service.js`, `password.service.js`, `challenge.service.js`, `group.service.js`, `user.service.js`, `ctf.service.js`, `conference.service.js`, `article.service.js`, `homework-reminder.service.js`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
-- **Why does `ValidationError` connect `errors.js` to `lab-agent.service.js`, `admin.controller.js`, `api.controller.js`, `external-manual.service.js`, `code-workspace.service.js`, `proxmox.service.js`, `webpush.service.js`, `circuits.service.js`, `quiz.service.js`, `crm.service.js`, `lab.service.js`, `support.service.js`, `access-policy.service.js`, `marketing.service.js`, `task.service.js`, `storage.service.js`, `chat.service.js`, `content.controller.js`, `payment.service.js`, `tab-access.service.js`, `admin.service.js`, `referral.service.js`, `schedule.service.js`, `db/index.js`, `recording.service.js`, `program.service.js`, `content.service.js`, `git-oauth.service.js`, `settings.service.js`, `challenge-stage.service.js`, `password.service.js`, `challenge.service.js`, `group.service.js`, `user.service.js`, `ctf.service.js`, `conference.service.js`, `article.service.js`?**
-  _High betweenness centrality (0.019) - this node is a cross-community bridge._
-- **Why does `NotFoundError` connect `errors.js` to `admin.controller.js`, `api.controller.js`, `external-manual.service.js`, `code-workspace.service.js`, `circuits.service.js`, `quiz.service.js`, `crm.service.js`, `lab.service.js`, `support.service.js`, `task.service.js`, `storage.service.js`, `chat.service.js`, `payment.service.js`, `notification.service.js`, `admin.service.js`, `referral.service.js`, `attendance.service.js`, `schedule.service.js`, `recording.service.js`, `program.service.js`, `content.service.js`, `git-oauth.service.js`, `stats.service.js`, `challenge-stage.service.js`, `password.service.js`, `challenge.service.js`, `group.service.js`, `user.service.js`, `ctf.service.js`, `conference.service.js`, `article.service.js`?**
+- **Why does `db` connect `db/index.js` to `challenge-stage.service.js`, `api.controller.js`, `webpush.service.js`, `external-manual.service.js`, `ctf-demo.controller.js`, `code-workspace.service.js`, `ForbiddenError`, `circuits.service.js`, `quiz.service.js`, `crm.service.js`, `lab.service.js`, `support.service.js`, `telegram-bot.service.js`, `middleware/auth.js`, `access-policy.service.js`, `marketing.service.js`, `task.service.js`, `storage.service.js`, `chat.service.js`, `schedule.service.js`, `payment.service.js`, `notification.service.js`, `tab-access.service.js`, `admin.service.js`, `direction.service.js`, `referral.service.js`, `ConflictError`, `recording.service.js`, `program.service.js`, `content.service.js`, `git-oauth.service.js`, `tunnel.service.js`, `settings.service.js`, `challenge.service.js`, `lab-agent.service.js`, `group.service.js`, `user.service.js`, `ctf.service.js`, `conference.service.js`, `calendar.service.js`, `article.service.js`, `errors.js`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **Why does `ValidationError` connect `errors.js` to `challenge-stage.service.js`, `admin.controller.js`, `api.controller.js`, `db/index.js`, `webpush.service.js`, `external-manual.service.js`, `code-workspace.service.js`, `proxmox.service.js`, `sandbox.service.js`, `circuits.service.js`, `quiz.service.js`, `crm.service.js`, `lab.service.js`, `support.service.js`, `access-policy.service.js`, `marketing.service.js`, `task.service.js`, `storage.service.js`, `chat.service.js`, `schedule.service.js`, `payment.service.js`, `tab-access.service.js`, `admin.service.js`, `direction.service.js`, `referral.service.js`, `ConflictError`, `recording.service.js`, `program.service.js`, `content.service.js`, `git-oauth.service.js`, `settings.service.js`, `challenge.service.js`, `lab-agent.service.js`, `group.service.js`, `user.service.js`, `ctf.service.js`, `conference.service.js`, `calendar.service.js`, `article.service.js`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+- **Why does `NotFoundError` connect `errors.js` to `challenge-stage.service.js`, `admin.controller.js`, `api.controller.js`, `db/index.js`, `external-manual.service.js`, `code-workspace.service.js`, `ForbiddenError`, `circuits.service.js`, `quiz.service.js`, `crm.service.js`, `lab.service.js`, `support.service.js`, `task.service.js`, `storage.service.js`, `chat.service.js`, `schedule.service.js`, `payment.service.js`, `notification.service.js`, `admin.service.js`, `direction.service.js`, `referral.service.js`, `ConflictError`, `recording.service.js`, `program.service.js`, `content.service.js`, `git-oauth.service.js`, `challenge.service.js`, `group.service.js`, `user.service.js`, `ctf.service.js`, `conference.service.js`, `calendar.service.js`, `article.service.js`?**
   _High betweenness centrality (0.012) - this node is a cross-community bridge._
 - **Are the 4 inferred relationships involving `addEditorMethods()` (e.g. with `onKeyDown()` and `onKeyUp()`) actually correct?**
   _`addEditorMethods()` has 4 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `__dirname`, `markerPath`, `repoRoot` to the rest of the system?**
-  _356 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _362 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `codemirror.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.03772931810314988 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.036036036036036036 - nodes in this community are weakly interconnected._
 - **Should `javascript.js` be split into smaller, more focused modules?**
   _Cohesion score 0.08878602987586787 - nodes in this community are weakly interconnected._

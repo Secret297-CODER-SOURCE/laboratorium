@@ -1,9 +1,10 @@
 import { updateNavAuth, initBurger, clearSession } from '/auth.js';
 import { LOGO_SVG, renderLogo } from '/logo.js';
-import { renderAppNavLinks, setAppNavActive, refreshAppNav } from '/app-nav.js';
+import { renderAppNavLinks, setAppNavActive, refreshAppNav, renderAppBottomNav } from '/app-nav.js';
 import { t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
 import { icon } from '/icons.js';
 import { initNotificationBell } from '/notifications.js';
+import { initUserBot } from '/user-bot.js';
 
 export { LOGO_SVG, renderLogo, setAppNavActive, refreshAppNav };
 
@@ -36,25 +37,40 @@ function shortcutHint() {
 }
 
 function renderSearchBlock() {
-  return `<div class="site-search site-search--collapsible" id="site-search">
+  return `<div class="site-search site-search--overlay" id="site-search">
       <button type="button" class="site-search-toggle" id="site-search-toggle"
-        aria-expanded="false" aria-controls="site-search-panel" title="${t('Пошук')} (${shortcutHint()})">
+        aria-expanded="false" aria-controls="site-search-overlay" title="${t('Пошук')} (${shortcutHint()})">
         ${icon('search', 'ico ico--sm')}
         <span class="site-search-toggle__label">${t('Пошук')}</span>
         <kbd class="site-search-toggle__kbd" aria-hidden="true">${shortcutHint()}</kbd>
       </button>
-      <div class="site-search-panel" id="site-search-panel" hidden>
+    </div>`;
+}
+
+function ensureSearchOverlay() {
+  let overlay = document.getElementById('site-search-overlay');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'site-search-overlay';
+  overlay.className = 'site-search-overlay';
+  overlay.hidden = true;
+  overlay.innerHTML = `
+    <div class="site-search-overlay__box" role="dialog" aria-modal="true" aria-labelledby="site-search-heading">
+      <div class="site-search-panel" id="site-search-panel">
         <span class="site-search-panel__icon" aria-hidden="true">${icon('search', 'ico ico--sm')}</span>
+        <h2 id="site-search-heading" class="visually-hidden">${t('Пошук')}</h2>
         <label class="visually-hidden" for="site-search-input">${t('Пошук')}</label>
         <input type="search" id="site-search-input" class="site-search-input"
-          placeholder="${t('Шукати програми, мануали…')}" autocomplete="off" maxlength="80" enterkeyhint="search">
+          placeholder="${t('Шукати програми, мануали, інструменти…')}" autocomplete="off" maxlength="80" enterkeyhint="search">
         <button type="button" class="site-search-close" id="site-search-close"
-          title="${t('Згорнути')}" aria-label="${t('Згорнути')}">
+          title="${t('Закрити')}" aria-label="${t('Закрити')}">
           ${icon('x', 'ico ico--sm')}
         </button>
-        <div class="site-search-results" id="site-search-results" hidden role="listbox"></div>
       </div>
+      <div class="site-search-results" id="site-search-results" hidden role="listbox"></div>
     </div>`;
+  document.body.appendChild(overlay);
+  return overlay;
 }
 
 /**
@@ -108,12 +124,18 @@ export function renderSiteHeader({
 
 function bindSiteSearch(root) {
   const wrap = root.querySelector('#site-search');
-  const input = root.querySelector('#site-search-input');
-  const box = root.querySelector('#site-search-results');
   const toggle = root.querySelector('#site-search-toggle');
-  const panel = root.querySelector('#site-search-panel');
-  const closeBtn = root.querySelector('#site-search-close');
-  if (!wrap || !input || !box || input.dataset.bound) return;
+  if (!wrap || !toggle) return;
+  const overlay = ensureSearchOverlay();
+  const input = overlay.querySelector('#site-search-input');
+  const box = overlay.querySelector('#site-search-results');
+  const closeBtn = overlay.querySelector('#site-search-close');
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (wrap.classList.contains('is-open')) overlay._collapse?.();
+    else overlay._expand?.();
+  });
+  if (!input || !box || input.dataset.bound) return;
   input.dataset.bound = '1';
   let timer = null;
   let lastQ = '';
@@ -138,28 +160,26 @@ function bindSiteSearch(root) {
   };
 
   const collapse = () => {
-    if (!panel || !toggle) return;
-    panel.hidden = true;
+    overlay.hidden = true;
     wrap.classList.remove('is-open');
     toggle.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('search-open');
     hideResults();
     input.value = '';
     lastQ = '';
   };
 
   const expand = () => {
-    if (!panel || !toggle) return;
-    panel.hidden = false;
+    overlay.hidden = false;
     wrap.classList.add('is-open');
     toggle.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('search-open');
     requestAnimationFrame(() => input.focus());
   };
 
-  toggle?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (wrap.classList.contains('is-open')) collapse();
-    else expand();
-  });
+  overlay._expand = expand;
+  overlay._collapse = collapse;
+
   closeBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     collapse();
@@ -235,8 +255,8 @@ function bindSiteSearch(root) {
     }
   });
 
-  document.addEventListener('click', (e) => {
-    if (!wrap.contains(e.target) && wrap.classList.contains('is-open')) collapse();
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) collapse();
   });
 
   document.addEventListener('keydown', (e) => {
@@ -261,6 +281,11 @@ export function initSiteHeader(options = {}) {
     bindLangSwitch(document);
     bindSiteSearch(el);
     el.classList.add('is-ready');
+    if (options.navMode === 'app') {
+      document.body.classList.add('has-app-shell');
+      renderAppBottomNav({ activePath: options.activePath });
+      initUserBot({ mode: 'app' });
+    }
 
     const notifMount = document.getElementById('notif-bell-mount');
     if (notifMount) initNotificationBell(notifMount);

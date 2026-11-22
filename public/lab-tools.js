@@ -8,6 +8,7 @@ import {
   sha256Hex, multiHash, identifyHash, analyzeHeaders, parseHttpMessage, parseUrlParts, parseUserAgent,
   decodeJwt, testJwtWeakSecret, extractIocs, detectAttackPatterns, testRegex, parseWhoisText,
   analyzeEmailHeaders, calcCidr, generateSubdomainWordlist, extractStrings, xorBruteforce, nestedDecode,
+  unixTimestampConvert, caseConvert, unicodeInspect,
 } from '/lab-workbench.js';
 
 const DIFF = { beginner: 'Початковий', intermediate: 'Середній', advanced: 'Просунутий' };
@@ -320,6 +321,21 @@ const FINDERS = {
     body: (r) => `<p class="lt-meta">${esc(r.candidates.join(', '))}</p>`,
     chain: (r, input) => input,
   },
+  timestamp: {
+    summary: (r) => r.iso,
+    body: (r) => kvRows([['Unix', r.unix], ['ISO', r.iso], ['Local', r.local]]),
+    chain: (r) => String(r.unix),
+  },
+  case: {
+    summary: (r) => r.snake || r.lower,
+    body: (r) => kvRows(Object.entries(r)),
+    chain: (r) => r.snake,
+  },
+  unicode: {
+    summary: (r) => t('Символів: {n}', { n: r.length }),
+    body: (r) => `<ul class="lab-tool-checklist">${r.chars.map((c) => `<li><code>${esc(c.ch)}</code> ${esc(c.hex)} (${c.dec})</li>`).join('')}</ul>`,
+    chain: (r) => r.chars.map((c) => c.hex).join(' '),
+  },
 };
 
 function findingSummary(toolId, result, input) {
@@ -403,6 +419,9 @@ async function runTool(root, action) {
       result = extractStrings(input, min);
     } else if (tool === 'xor') result = xorBruteforce(input);
     else if (tool === 'nested-decode') result = nestedDecode(input);
+    else if (tool === 'timestamp') result = unixTimestampConvert(input);
+    else if (tool === 'case') result = caseConvert(input);
+    else if (tool === 'unicode') result = unicodeInspect(input);
     else throw new Error(`unknown tool: ${tool}`);
 
     const summary = findingSummary(tool, result, input);

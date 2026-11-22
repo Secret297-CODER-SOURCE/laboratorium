@@ -490,6 +490,42 @@ export function testRegex(pattern, flags, text) {
   return { count: matches.length, matches: matches.slice(0, 200) };
 }
 
+export function unixTimestampConvert(value) {
+  const raw = String(value || '').trim();
+  if (!raw) throw new Error('вставте unix timestamp або дату ISO');
+  if (/^-?\d+(\.\d+)?$/.test(raw)) {
+    const n = Number(raw);
+    const ms = n > 1e12 ? n : n * 1000;
+    const d = new Date(ms);
+    if (Number.isNaN(d.getTime())) throw new Error('некоректний timestamp');
+    return { input: raw, iso: d.toISOString(), local: d.toString(), unix: Math.floor(ms / 1000) };
+  }
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) throw new Error('некоректна дата');
+  return { input: raw, iso: d.toISOString(), local: d.toString(), unix: Math.floor(d.getTime() / 1000) };
+}
+
+export function caseConvert(value) {
+  const s = String(value ?? '');
+  return {
+    original: s,
+    lower: s.toLowerCase(),
+    upper: s.toUpperCase(),
+    title: s.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()),
+    snake: s.trim().replace(/([a-z])([A-Z])/g, '$1_$2').replace(/[\s-]+/g, '_').toLowerCase(),
+    kebab: s.trim().replace(/([a-z])([A-Z])/g, '$1-$2').replace(/[\s_]+/g, '-').toLowerCase(),
+  };
+}
+
+export function unicodeInspect(value) {
+  const s = String(value ?? '').slice(0, 400);
+  const chars = [...s].map((ch, i) => {
+    const cp = ch.codePointAt(0);
+    return { i, ch, hex: `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`, dec: cp };
+  });
+  return { length: chars.length, chars: chars.slice(0, 120) };
+}
+
 // --- Tool catalogue -----------------------------------------------------------
 
 export const TOOL_CATEGORIES = [
@@ -525,6 +561,9 @@ export const WORKBENCH_TOOLS = [
   { id: 'strings', category: 'reverse', name: 'Витяг рядків (strings)', inputLabel: 'Hex-дамп або текстовий блок' },
   { id: 'xor', category: 'reverse', name: 'XOR brute-force (1 байт)', inputLabel: 'Hex-рядок' },
   { id: 'nested-decode', category: 'reverse', name: 'Автодекодер шарів (base64/url/hex)', inputLabel: 'Закодований рядок' },
+  { id: 'timestamp', category: 'web', name: 'Unix timestamp', inputLabel: 'Unix секунди або ISO-дата' },
+  { id: 'case', category: 'encoding', name: 'Регістр / snake / kebab', inputLabel: 'Текст' },
+  { id: 'unicode', category: 'reverse', name: 'Кодпоінти Unicode', inputLabel: 'Текст для розбору' },
 ];
 
 // --- Project store (localStorage) -------------------------------------------

@@ -1,17 +1,25 @@
 import db from '../db/index.js';
+import config from '../config/index.js';
 import * as tg from './telegram.service.js';
 import * as settings from './settings.service.js';
 import { getAccessStatus } from './payment.service.js';
+import { listStudentLessons } from './schedule.service.js';
+import * as errorLog from './error-log.service.js';
 
 let polling = false;
 let offset = 0;
 let pollTimer = null;
 
-const ADMIN_MANUAL = `📚 Мануал бота laboratorium.
+function siteBase() {
+  return String(config.siteUrl || 'https://laboratorium.club').replace(/\/+$/, '');
+}
+
+const ADMIN_MANUAL = `📚 Адмін-бот laboratorium (особистість адміна не змінюється).
 
 Команди адміна:
 /start — цей мануал
 /status — стан бота
+/monitor — здоровʼя сайту (користувачі, помилки, live-кімнати)
 /templates — шаблони повідомлень
 /tpl <ключ> — показати шаблон (lead_interest | homework_group | payment_reminder)
 /send_lead <chat_id|@user> — надіслати шаблон «зацікавлення курсом»
@@ -25,10 +33,29 @@ const ADMIN_MANUAL = `📚 Мануал бота laboratorium.
 /link_user <chat_id|@user> <user_id> — привʼязати чат учня
 /set_hw_group — позначити цей чат як групу для ДЗ-нагадувань
 
+Учні в цьому ж боті бачать user-bot (/cabinet, /tools, /schedule, /pay), не адмін-команди.
+Моніторинг також у адмінці: ${siteBase()}/admin.html?tab=telegram
+
 Підказки:
 • Оплата: /pay_ask → оберіть учнів кнопками → бот надішле шаблон payment_reminder.
 • ДЗ у групу: текст без імен учнів (налаштовується в адмінці / шаблоні homework_group).
 • Авто-відповіді спрацьовують у особистих чатах, якщо немає відкритої admin-команди.`;
+
+const STUDENT_MANUAL = `👋 User-bot laboratorium — швидкий доступ до школи.
+
+Команди:
+/start /help — ця підказка
+/cabinet — особистий кабінет
+/tools — лабораторія (VM, Docker, workbench)
+/ctf — CTF-завдання
+/schedule — найближчі заняття
+/pay — статус оплати
+/me — хто привʼязаний до цього чату
+/link — як привʼязати акаунт
+
+Сайт: ${siteBase()}
+Кабінет: ${siteBase()}/dashboard.html
+Інструменти: ${siteBase()}/dashboard.html?tab=lab`;
 
 function cfg() {
   return settings.getTelegramConfig();
@@ -220,10 +247,152 @@ function tryAutoReply(text) {
   return null;
 }
 
+function countSafe(sql, params = []) {
+  try {
+    return db.prepare(sql).get(...params)?.n || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function getSiteMonitor() {
+  const c = cfg();
+  return {
+    users: countSafe('SELECT COUNT(*) AS n FROM users'),
+    students: countSafe("SELECT COUNT(*) AS n FROM users WHERE role = 'student'"),
+    errors24h: errorLog.countSinceHours(24),
+    liveConferences: countSafe("SELECT COUNT(*) AS n FROM conferences WHERE status = 'live'"),
+    pendingApplications: countSafe("SELECT COUNT(*) AS n FROM applications WHERE status = 'pending'"),
+    linkedChats: countSafe('SELECT COUNT(*) AS n FROM telegram_chats WHERE linked_user_id IS NOT NULL'),
+    inbound24h: countSafe(`
+      SELECT COUNT(*) AS n FROM telegram_message_log
+      WHERE direction = 'in' AND created_at >= datetime('now', '-1 day')
+    `),
+    botEnabled: !!(c.enabled && c.botToken),
+    hasAdminChat: !!c.adminChatId,
+    uptimeSec: Math.floor(process.uptime()),
+    memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+  };
+}
+
+export function formatMonitorText(monitor = getSiteMonitor()) {
+  const m = monitor;
+  const bot = m.botEnabled ? 'он' : 'оф';
+  return [
+    '🩺 Моніторинг laboratorium',
+    `Користувачі: ${m.users} (учні: ${m.students})`,
+    `Заявки pending: ${m.pendingApplications}`,
+    `Live-конференції: ${m.liveConferences}`,
+    `Помилки 24h: ${m.errors24h}`,
+    `Telegram: ${bot}${m.hasAdminChat ? ' · admin chat ок' : ' · немає admin chat'}`,
+    `Привʼязані чати: ${m.linkedChats} · вхідні 24h: ${m.inbound24h}`,
+    `Процес: ${m.uptimeSec}s · heap ${m.memoryMB}MB`,
+  ].join('\n');
+}
+
+function linkedUserForChat(chatId) {
+  const row = db.prepare(`
+    SELECT linked_user_id FROM telegram_chats WHERE chat_id = ?
+  `).get(String(chatId));
+  if (!row?.linked_user_id) return null;
+  return db.prepare(`
+    SELECT id, name, handle, role FROM users WHERE id = ?
+  `).get(row.linked_user_id);
+}
+
+function tryLinkByUsername(chat, from) {
+  const uname = String(from?.username || '').replace(/^@/, '').toLowerCase();
+  if (!uname) return null;
+  const existing = db.prepare('SELECT linked_user_id FROM telegram_chats WHERE chat_id = ?')
+    .get(String(chat.id));
+  if (existing?.linked_user_id) return existing.linked_user_id;
+  const matches = db.prepare('SELECT id FROM users WHERE lower(handle) = ?').all(uname);
+  if (matches.length !== 1) return null;
+  db.prepare('UPDATE telegram_chats SET linked_user_id = ? WHERE chat_id = ?')
+    .run(matches[0].id, String(chat.id));
+  return matches[0].id;
+}
+
+function commandName(text) {
+  const raw = String(text || '').trim().split(/\s+/)[0] || '';
+  return raw.split('@')[0].toLowerCase();
+}
+
+async function handleStudentCommand(msg) {
+  const chatId = msg.chat.id;
+  const text = String(msg.text || '').trim();
+  const cmd = commandName(text);
+  const user = linkedUserForChat(chatId);
+  const base = siteBase();
+
+  if (cmd === '/start' || cmd === '/help' || cmd === 'start') {
+    await reply(chatId, STUDENT_MANUAL);
+    return;
+  }
+  if (cmd === '/cabinet') {
+    await reply(chatId, `Кабінет: ${base}/dashboard.html`);
+    return;
+  }
+  if (cmd === '/tools') {
+    await reply(chatId, `Інструменти (VM, Docker, JWT/hashes workbench):\n${base}/dashboard.html?tab=lab&lab=tools`);
+    return;
+  }
+  if (cmd === '/ctf') {
+    await reply(chatId, `CTF: ${base}/dashboard.html?tab=ctf`);
+    return;
+  }
+  if (cmd === '/link') {
+    await reply(chatId, user
+      ? `Чат уже привʼязано до @${user.handle}.`
+      : 'Поставте Telegram @username = ваш handle на сайті і напишіть /me, або попросіть адміна /link_user.');
+    return;
+  }
+  if (cmd === '/me') {
+    if (!user) {
+      await reply(chatId, 'Акаунт не привʼязано. Надішліть /link');
+      return;
+    }
+    await reply(chatId, `Ви: ${user.name} (@${user.handle})\nРоль: ${user.role}`);
+    return;
+  }
+  if (cmd === '/pay') {
+    if (!user) {
+      await reply(chatId, 'Спочатку привʼяжіть акаунт: /link');
+      return;
+    }
+    try {
+      const st = getAccessStatus(user.id);
+      await reply(chatId, `Оплата: ${st.status}${st.dueDate ? `\nНаступна дата: ${st.dueDate}` : ''}`);
+    } catch {
+      await reply(chatId, 'Не вдалося прочитати статус оплати. Відкрийте кабінет.');
+    }
+    return;
+  }
+  if (cmd === '/schedule') {
+    if (!user) {
+      await reply(chatId, `Розклад: ${base}/dashboard.html#schedule-panel\n(привʼяжіть акаунт через /link, щоб бачити заняття тут)`);
+      return;
+    }
+    const lessons = listStudentLessons(user.id, {
+      from: new Date().toISOString(),
+      to: new Date(Date.now() + 14 * 86400000).toISOString(),
+    }).slice(0, 5);
+    if (!lessons.length) {
+      await reply(chatId, `Найближчих занять немає.\nКабінет: ${base}/dashboard.html`);
+      return;
+    }
+    const lines = lessons.map((l) => `• ${l.lesson_at} — ${l.title} (${l.group_name})`);
+    await reply(chatId, `Найближчі заняття:\n${lines.join('\n')}`);
+    return;
+  }
+  await reply(chatId, 'Невідома команда. Надішліть /help');
+}
+
 async function handleAdminCommand(msg) {
   const chatId = msg.chat.id;
   const text = String(msg.text || '').trim();
-  const [cmd, ...rest] = text.split(/\s+/);
+  const [rawCmd, ...rest] = text.split(/\s+/);
+  const cmd = String(rawCmd || '').split('@')[0];
   const arg = rest.join(' ').trim();
 
   if (cmd === '/start' || cmd.toLowerCase() === 'start') {
@@ -233,6 +402,10 @@ async function handleAdminCommand(msg) {
   if (cmd === '/status') {
     const c = cfg();
     await reply(chatId, `Бот: ${c.enabled ? 'увімкнено' : 'вимкнено'}\nAdmin: @${c.adminUsername || '—'}\nAdmin chat: ${c.adminChatId || chatId}\nДЗ-група: ${c.homeworkGroupChatId || '—'}`);
+    return;
+  }
+  if (cmd === '/monitor') {
+    await reply(chatId, formatMonitorText());
     return;
   }
   if (cmd === '/templates') {
@@ -389,24 +562,29 @@ async function handleUpdate(update) {
   const msg = update.message;
   if (!msg?.chat) return;
   upsertChat(msg.chat);
+  if (msg.chat.type === 'private') tryLinkByUsername(msg.chat, msg.from);
   const text = msg.text || '';
   if (text) logMessage(msg.chat.id, 'in', text, msg.message_id);
 
   const admin = isAdminChat(msg.chat.id, msg.from?.username);
-  if (admin && (text.startsWith('/') || text.toLowerCase() === 'start')) {
+  const cmd = commandName(text);
+  const isSlash = cmd.startsWith('/') || text.toLowerCase() === 'start';
+  if (admin && isSlash) {
     await handleAdminCommand(msg);
+    return;
+  }
+  if (!admin && msg.chat.type === 'private' && isSlash) {
+    await handleStudentCommand(msg);
     return;
   }
 
   if (msg.chat.type === 'private' && text) {
-    // link student by telegram username ↔ handle coincidence is weak; skip auto-link
     const auto = tryAutoReply(text);
     if (auto) {
       await reply(msg.chat.id, auto);
       return;
     }
     if (admin) return;
-    // Forward unknown private messages to admin for smart reply
     const c = cfg();
     const adminTarget = c.adminChatId;
     if (adminTarget) {
@@ -453,5 +631,6 @@ export function getAdminOverview() {
     autoReplies: db.prepare('SELECT * FROM telegram_auto_replies ORDER BY id DESC LIMIT 50').all(),
     chats: db.prepare('SELECT * FROM telegram_chats ORDER BY id DESC LIMIT 50').all(),
     pending: db.prepare(`SELECT * FROM telegram_pending WHERE status = 'open' ORDER BY id DESC LIMIT 20`).all(),
+    monitor: getSiteMonitor(),
   };
 }

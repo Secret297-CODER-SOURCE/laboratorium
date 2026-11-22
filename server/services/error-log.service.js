@@ -47,3 +47,15 @@ export function clear() {
   db.prepare('DELETE FROM error_logs').run();
   return { ok: true };
 }
+
+export function countSinceHours(hours = 24) {
+  const n = Math.max(1, Math.min(parseInt(hours, 10) || 24, 168));
+  try {
+    return db.prepare(`
+      SELECT COUNT(*) AS n FROM error_logs
+      WHERE created_at >= datetime('now', ?)
+    `).get(`-${n} hours`).n || 0;
+  } catch {
+    return 0;
+  }
+}

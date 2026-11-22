@@ -204,6 +204,7 @@ router.get('/homework-reminders', requireRole('owner', 'developer', 'teacher'), 
 router.patch('/homework-reminders', requireRole('owner', 'developer', 'teacher'), asyncHandler(homeworkReminderCtrl.saveSettings));
 
 router.get('/telegram', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.getOverview));
+router.get('/telegram/monitor', requireRole('owner', 'developer', 'teacher'), asyncHandler(telegramCtrl.getMonitor));
 router.patch('/telegram/settings', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.updateSettings));
 router.patch('/telegram/templates/:key', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.updateTemplate));
 router.post('/telegram/auto-replies', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.addAutoReply));

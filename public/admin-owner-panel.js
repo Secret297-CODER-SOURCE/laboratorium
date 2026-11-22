@@ -29,7 +29,7 @@ export function renderOwnerTabs(active = 'overview', badges = {}) {
       { id: 'users', label: 'Користувачі та пошта', icon: 'users' },
       { id: 'access', label: 'Доступ', icon: 'shield' },
       { id: 'billing', label: 'Оплата', icon: 'chart' },
-      { id: 'telegram', label: 'Telegram', icon: 'chat' },
+      { id: 'telegram', label: 'User-bot / Telegram', icon: 'chat' },
       { id: 'proxmox', label: 'Proxmox', icon: 'server' },
       { id: 'labs', label: 'Машини', icon: 'database' },
       { id: 'storage', label: 'Сховище', icon: 'upload' },

@@ -239,6 +239,7 @@ export function getStudentDetail(actorId, actorRole, studentId) {
     SELECT qa.*, q.title, q.pass_percent, q.time_limit_minutes, g.name as group_name
     FROM quiz_attempts qa
     JOIN quizzes q ON q.id = qa.quiz_id
+    LEFT JOIN study_groups g ON g.id = q.group_id
     WHERE qa.user_id = ? AND q.group_id IN (${ph}) AND qa.submitted_at IS NOT NULL
     ORDER BY qa.submitted_at DESC
   `).all(studentId, ...scope.groupIds).map(q => ({

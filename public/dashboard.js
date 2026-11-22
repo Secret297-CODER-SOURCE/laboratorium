@@ -419,6 +419,26 @@ function setupDashTabs(canWriteArticles) {
   if (circuitsPanel) circuitsPanel.hidden = activeDashTab !== 'circuits';
   document.getElementById('dash-panel-article').hidden = activeDashTab !== 'article';
   document.getElementById('dash-panel-manuals').hidden = activeDashTab !== 'manuals';
+  if (activeDashTab === 'lab') applyLabSubtab();
+}
+
+function applyLabSubtab(name) {
+  const allowed = ['vm', 'docker', 'tools'];
+  const fromUrl = new URLSearchParams(location.search).get('lab');
+  const lab = allowed.includes(name) ? name : (allowed.includes(fromUrl) ? fromUrl : 'vm');
+  document.querySelectorAll('.lab-subtab').forEach((t) => t.classList.toggle('active', t.dataset.lab === lab));
+  const vm = document.getElementById('lab-panel-vm');
+  const docker = document.getElementById('lab-panel-docker');
+  const tools = document.getElementById('lab-panel-tools');
+  if (!vm || !docker || !tools) return;
+  vm.hidden = lab !== 'vm';
+  docker.hidden = lab !== 'docker';
+  tools.hidden = lab !== 'tools';
+  if (lab === 'tools') initLabTools();
+  const url = new URL(location.href);
+  if (lab === 'vm') url.searchParams.delete('lab');
+  else url.searchParams.set('lab', lab);
+  history.replaceState({}, '', url);
 }
 
 if (!window.__dashTabsBound) {
@@ -1894,11 +1914,7 @@ if (!window.__labSubtabsBound) {
   document.querySelector('.lab-subtabs')?.addEventListener('click', (e) => {
     const tab = e.target.closest('.lab-subtab');
     if (!tab) return;
-    document.querySelectorAll('.lab-subtab').forEach(t => t.classList.toggle('active', t === tab));
-    document.getElementById('lab-panel-vm').hidden = tab.dataset.lab !== 'vm';
-    document.getElementById('lab-panel-docker').hidden = tab.dataset.lab !== 'docker';
-    document.getElementById('lab-panel-tools').hidden = tab.dataset.lab !== 'tools';
-    if (tab.dataset.lab === 'tools') initLabTools();
+    applyLabSubtab(tab.dataset.lab);
   });
 }
 

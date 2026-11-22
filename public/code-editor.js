@@ -1,14 +1,28 @@
 import { api } from '/auth.js';
 import { icon } from '/icons.js';
 import { showConfirm, showForm, showPrompt } from '/dialog.js';
+import {
+  LANGUAGE_LABELS,
+  buildFileTree,
+  commandCatalog,
+  commentPrefix,
+  completions,
+  createHistoryStore,
+  filterCommands,
+  findRanges,
+  formatCursorStatus,
+  lineDiff,
+  modeForFile,
+  parseDiagnostics,
+  relativeTime,
+  searchInFiles,
+  toggleLineComments,
+  tokenPrefix,
+} from '/code-ide.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
-
-const LANGUAGE_LABELS = {
-  python: 'Python', node: 'Node.js', cpp: 'C++', bash: 'Bash', web: 'Web (HTML/CSS/JS)',
-};
 
 const WEB_TEMPLATES = {
   starter: {
@@ -41,17 +55,6 @@ const WEB_TEMPLATES = {
   },
 };
 
-function modeForFile(language, path) {
-  if (/\.md$/i.test(path)) return 'markdown';
-  if (language === 'cpp') return 'text/x-c++src';
-  if (language === 'bash') return 'shell';
-  if (language === 'node') return 'javascript';
-  if (language === 'python') return 'python';
-  if (/\.css$/i.test(path)) return 'css';
-  if (/\.html?$/i.test(path)) return 'htmlmixed';
-  return 'javascript';
-}
-
 function renderMarkdown(src) {
   let html = esc(src);
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
@@ -68,6 +71,7 @@ function renderMarkdown(src) {
 let sandboxInfo = null;
 let livePreviewTimer = null;
 let gitAccounts = { accounts: [], providers: {} };
+const historyStore = createHistoryStore();
 
 export async function loadSandboxInfo() {
   sandboxInfo = await api('/code/info');
@@ -85,7 +89,22 @@ let state = {
   files: [],
   cm: null,
   dirty: false,
-  previewMode: 'live', // live | publish | md
+  previewMode: 'live',
+  activity: 'explorer',
+  bottomTab: 'output',
+  problems: [],
+  findOpen: false,
+  findQuery: '',
+  findReplace: '',
+  findIndex: 0,
+  paletteOpen: false,
+  paletteMode: 'command',
+  paletteQuery: '',
+  searchQuery: '',
+  marks: [],
+  matchMarks: [],
+  activeLine: null,
+  hintEl: null,
 };
 
 function showToastLocal(msg, type) {
@@ -97,21 +116,203 @@ function showToastLocal(msg, type) {
   setTimeout(() => { el.hidden = true; }, 3500);
 }
 
+function currentWorkspace() {
+  return state.workspaces.find((w) => w.id === state.activeId);
+}
+
+function isMod(e) {
+  return e.metaKey || e.ctrlKey;
+}
+
 function renderShell(root) {
   root.innerHTML = `
-    <div class="code-editor-sidebar">
-      <button type="button" class="btn btn--outline btn--sm code-new-btn">${icon('plus', 'ico ico--sm')}Новий проєкт</button>
-      <button type="button" class="btn btn--ghost btn--sm" id="code-clone-btn">${icon('download', 'ico ico--sm')}Clone з Git</button>
-      <div class="code-workspace-list" id="code-workspace-list"></div>
-      <div class="code-git-accounts" id="code-git-accounts"></div>
+    <div class="ide-shell">
+      <nav class="ide-activity" aria-label="IDE">
+        ${activityButton('explorer', 'folder', 'Провідник')}
+        ${activityButton('search', 'search', 'Пошук')}
+        ${activityButton('git', 'code', 'Git')}
+        ${activityButton('history', 'history', 'Історія змін')}
+      </nav>
+      <aside class="ide-sidebar" id="ide-sidebar"></aside>
+      <div class="ide-work" id="code-editor-main">
+        <p class="empty-state">Оберіть або створіть проєкт зліва</p>
+      </div>
     </div>
-    <div class="code-editor-main" id="code-editor-main">
-      <p class="empty-state">Оберіть або створіть проєкт зліва</p>
+    <div class="ide-palette" id="ide-palette" hidden>
+      <input class="ide-palette-input" id="ide-palette-input" type="search" autocomplete="off" spellcheck="false">
+      <div class="ide-palette-list" id="ide-palette-list" role="listbox"></div>
     </div>`;
-
-  root.querySelector('.code-new-btn').addEventListener('click', createWorkspace);
-  root.querySelector('#code-clone-btn')?.addEventListener('click', cloneFromRemote);
+  root.querySelectorAll('.ide-activity-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setActivity(btn.dataset.activity));
+  });
+  bindGlobalKeys(root);
   renderGitAccounts();
+  renderSidebar();
+}
+
+function activityButton(id, name, label) {
+  return `<button type="button" class="ide-activity-btn${state.activity === id ? ' is-active' : ''}" data-activity="${id}" title="${esc(label)}" aria-label="${esc(label)}">${icon(name, 'ico')}</button>`;
+}
+
+function setActivity(id) {
+  state.activity = id;
+  document.querySelectorAll('.ide-activity-btn').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.dataset.activity === id);
+  });
+  renderSidebar();
+  if (id === 'git' && state.activeId) loadGitStatus();
+}
+
+function renderSidebar() {
+  const el = document.getElementById('ide-sidebar');
+  if (!el) return;
+  if (state.activity === 'search') return renderSearchSidebar(el);
+  if (state.activity === 'git') return renderGitSidebar(el);
+  if (state.activity === 'history') return renderHistorySidebar(el);
+  renderExplorerSidebar(el);
+}
+
+function renderExplorerSidebar(el) {
+  el.innerHTML = `
+    <div class="ide-side-head">
+      <span>Провідник</span>
+      <span class="ide-side-actions">
+        <button type="button" class="ide-icon-btn" id="code-new-btn" title="Новий проєкт">${icon('plus', 'ico ico--sm')}</button>
+        <button type="button" class="ide-icon-btn" id="code-clone-btn" title="Clone з Git">${icon('download', 'ico ico--sm')}</button>
+      </span>
+    </div>
+    <div class="code-workspace-list" id="code-workspace-list"></div>
+    <div class="ide-files-head">Файли</div>
+    <div class="ide-file-tree" id="ide-file-tree"></div>
+    <div class="code-git-accounts" id="code-git-accounts"></div>`;
+  el.querySelector('#code-new-btn').addEventListener('click', createWorkspace);
+  el.querySelector('#code-clone-btn').addEventListener('click', cloneFromRemote);
+  renderWorkspaceList();
+  renderFileTree();
+  renderGitAccounts();
+}
+
+function renderFileTree() {
+  const host = document.getElementById('ide-file-tree');
+  if (!host) return;
+  if (!state.activeId) {
+    host.innerHTML = '<p class="empty-state" style="padding:8px 0;font-size:0.75rem">Немає відкритого проєкту</p>';
+    return;
+  }
+  const tree = buildFileTree(state.files);
+  const walk = (nodes, depth) => nodes.map((node) => {
+    if (node.type === 'dir') {
+      return `<div class="ide-tree-dir" style="padding-left:${8 + depth * 12}px">${icon('folder', 'ico ico--sm')}<span>${esc(node.name)}</span></div>${walk(node.children || [], depth + 1)}`;
+    }
+    const active = node.path === state.activeFilePath ? ' is-active' : '';
+    const dirty = state.dirty && node.path === state.activeFilePath ? ' is-dirty' : '';
+    return `<button type="button" class="ide-tree-file${active}${dirty}" data-path="${esc(node.path)}" style="padding-left:${8 + depth * 12}px">${icon('file', 'ico ico--sm')}<span>${esc(node.name)}</span></button>`;
+  }).join('');
+  host.innerHTML = walk(tree.children || [], 0) || '<p class="empty-state" style="padding:8px 0">Немає файлів</p>';
+  host.querySelectorAll('.ide-tree-file').forEach((btn) => {
+    btn.addEventListener('click', () => switchFile(btn.dataset.path));
+  });
+}
+
+function searchHitsMarkup(query) {
+  const hits = searchInFiles(state.files, query);
+  if (!hits.length) {
+    return `<p class="empty-state" style="padding:12px 0">${query ? 'Нічого не знайдено' : 'Введіть запит'}</p>`;
+  }
+  return hits.map((hit) => `<button type="button" class="ide-search-hit" data-path="${esc(hit.path)}" data-line="${hit.line}" data-col="${hit.col}">
+      <strong>${esc(hit.path)}:${hit.line}</strong>
+      <span>${esc(hit.preview)}</span>
+    </button>`).join('');
+}
+
+function bindSearchHits(el) {
+  el.querySelectorAll('.ide-search-hit').forEach((btn) => {
+    btn.addEventListener('click', () => jumpTo(btn.dataset.path, Number(btn.dataset.line), Number(btn.dataset.col)));
+  });
+}
+
+function renderSearchSidebar(el) {
+  el.innerHTML = `
+    <div class="ide-side-head"><span>Пошук у проєкті</span></div>
+    <input class="ide-side-input" id="ide-search-input" type="search" placeholder="Знайти в файлах…" value="${esc(state.searchQuery)}" autocomplete="off">
+    <div class="ide-search-hits" id="ide-search-hits">${searchHitsMarkup(state.searchQuery)}</div>`;
+  const input = el.querySelector('#ide-search-input');
+  const hitsEl = el.querySelector('#ide-search-hits');
+  input?.addEventListener('input', () => {
+    state.searchQuery = input.value;
+    hitsEl.innerHTML = searchHitsMarkup(state.searchQuery);
+    bindSearchHits(el);
+  });
+  bindSearchHits(el);
+}
+
+function renderGitSidebar(el) {
+  el.innerHTML = `
+    <div class="ide-side-head"><span>Git</span></div>
+    <section class="code-git-panel" id="code-git-panel" aria-label="Git">
+      <p class="empty-state">Завантаження…</p>
+    </section>
+    <div class="code-git-accounts" id="code-git-accounts"></div>`;
+  renderGitAccounts();
+}
+
+function renderHistorySidebar(el) {
+  const entries = state.activeId && state.activeFilePath
+    ? historyStore.list(state.activeId, state.activeFilePath)
+    : [];
+  el.innerHTML = `
+    <div class="ide-side-head"><span>Історія змін</span></div>
+    <p class="ide-history-file">${esc(state.activeFilePath || '—')}</p>
+    <div class="ide-history-list">${entries.length
+    ? entries.map((entry) => `<button type="button" class="ide-history-item" data-id="${esc(entry.id)}">
+        <strong>${esc(entry.label || 'Знімок')}</strong>
+        <span>${esc(relativeTime(entry.ts))}</span>
+      </button>`).join('')
+    : '<p class="empty-state" style="padding:12px 0">Збережіть файл, щоб зʼявилась історія</p>'}</div>
+    <div class="ide-diff" id="ide-diff" hidden></div>`;
+  el.querySelectorAll('.ide-history-item').forEach((btn) => {
+    btn.addEventListener('click', () => previewHistory(btn.dataset.id));
+  });
+}
+
+function previewHistory(id) {
+  const entry = historyStore.get(state.activeId, state.activeFilePath, id);
+  const host = document.getElementById('ide-diff');
+  if (!entry || !host) return;
+  syncActiveFileContent();
+  const current = state.files.find((f) => f.path === state.activeFilePath)?.content || '';
+  const hunks = lineDiff(entry.content, current);
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="ide-diff-bar">
+      <span>${esc(relativeTime(entry.ts))}</span>
+      <button type="button" class="btn btn--primary btn--sm" id="ide-restore-btn">Відновити</button>
+    </div>
+    <pre class="ide-diff-body">${hunks.filter((h) => h.type !== 'equal' || hunks.length < 40).map((h) => {
+      const cls = h.type === 'add' ? 'is-add' : h.type === 'del' ? 'is-del' : '';
+      const mark = h.type === 'add' ? '+' : h.type === 'del' ? '−' : ' ';
+      return `<div class="ide-diff-line ${cls}">${mark} ${esc(h.text)}</div>`;
+    }).join('')}</pre>`;
+  host.querySelector('#ide-restore-btn')?.addEventListener('click', () => restoreHistory(entry));
+}
+
+function restoreHistory(entry) {
+  const file = state.files.find((f) => f.path === state.activeFilePath);
+  if (!file) return;
+  file.content = entry.content;
+  state.dirty = true;
+  if (state.cm) state.cm.setValue(entry.content);
+  updateStatusBar();
+  showToastLocal('Відновлено з історії');
+}
+
+async function jumpTo(path, line, col) {
+  if (path !== state.activeFilePath) await switchFile(path);
+  if (!state.cm) return;
+  const pos = { line: Math.max(0, line - 1), ch: Math.max(0, col - 1) };
+  state.cm.setCursor(pos);
+  state.cm.focus();
+  state.cm.scrollIntoView(pos, 80);
 }
 
 function renderGitAccounts() {
@@ -163,8 +364,8 @@ async function loadGitAccounts() {
   renderGitAccounts();
 }
 
-function renderWorkspaceList(root) {
-  const list = root.querySelector('#code-workspace-list');
+function renderWorkspaceList() {
+  const list = document.getElementById('code-workspace-list');
   if (!list) return;
   if (!state.workspaces.length) {
     list.innerHTML = '<p class="empty-state" style="padding:12px 0">Немає проєктів</p>';
@@ -208,7 +409,7 @@ async function createWorkspace() {
       }),
     });
     state.workspaces = await api('/code/workspaces').then((r) => r.workspaces);
-    renderWorkspaceList(document.getElementById('code-editor-root'));
+    renderWorkspaceList();
     await selectWorkspace(workspace.id);
   } catch (err) {
     showToastLocal(err.message, 'error');
@@ -233,7 +434,7 @@ async function cloneFromRemote() {
       body: JSON.stringify(result),
     });
     state.workspaces = await api('/code/workspaces').then((r) => r.workspaces);
-    renderWorkspaceList(document.getElementById('code-editor-root'));
+    renderWorkspaceList();
     await selectWorkspace(workspace.id);
     showToastLocal('Репозиторій склоновано');
   } catch (err) {
@@ -242,12 +443,9 @@ async function cloneFromRemote() {
 }
 
 function destroyEditor() {
+  hideHint();
   if (state.cm) state.cm = null;
   if (livePreviewTimer) clearTimeout(livePreviewTimer);
-}
-
-function currentWorkspace() {
-  return state.workspaces.find((w) => w.id === state.activeId);
 }
 
 async function selectWorkspace(id) {
@@ -259,9 +457,10 @@ async function selectWorkspace(id) {
     state.activeFilePath = state.files[0].path;
     state.activeRun = workspace.activeWebRun || null;
     state.dirty = false;
+    state.problems = [];
     const idx = state.workspaces.findIndex((w) => w.id === id);
     if (idx >= 0) state.workspaces[idx] = { ...state.workspaces[idx], ...workspace };
-    renderWorkspaceList(root);
+    renderSidebar();
     renderMain(root);
   } catch (err) {
     showToastLocal(err.message, 'error');
@@ -278,13 +477,15 @@ function renderMain(root) {
 
   const isWeb = ws.language === 'web';
   const dirtyMark = state.dirty ? ' <span class="code-dirty" title="Є незбережені зміни">●</span>' : '';
+  const crumbs = [ws.name, ...(String(state.activeFilePath || '').split('/'))].filter(Boolean);
   main.innerHTML = `
     <div class="code-editor-toolbar">
       <div class="code-file-tabs" id="code-file-tabs"></div>
       <div class="code-editor-actions">
         <button type="button" class="btn btn--ghost btn--sm" id="code-add-file-btn" title="Новий файл">${icon('plus', 'ico ico--sm')}</button>
+        <button type="button" class="btn btn--ghost btn--sm" id="code-find-btn" title="Знайти">${icon('search', 'ico ico--sm')}</button>
+        <button type="button" class="btn btn--ghost btn--sm" id="code-palette-btn" title="Палітра команд">${icon('grid', 'ico ico--sm')}</button>
         <button type="button" class="btn btn--outline btn--sm" id="code-save-btn">${icon('check', 'ico ico--sm')}Зберегти${dirtyMark}</button>
-        <button type="button" class="btn btn--outline btn--sm" id="code-git-btn" aria-expanded="false" aria-controls="code-git-panel">${icon('clock', 'ico ico--sm')}Git</button>
         ${['python', 'node'].includes(ws.language)
     ? `<button type="button" class="btn btn--outline btn--sm" id="code-test-btn">${icon('check', 'ico ico--sm')}Тести</button>`
     : ''}
@@ -294,9 +495,19 @@ function renderMain(root) {
         <button type="button" class="btn btn--ghost btn--sm" id="code-delete-ws-btn" title="Видалити проєкт">${icon('trash', 'ico ico--sm')}</button>
       </div>
     </div>
-    <section class="code-git-panel" id="code-git-panel" aria-label="Git" hidden></section>
+    <div class="ide-breadcrumb">${crumbs.map((c) => `<span>${esc(c)}</span>`).join('<i>/</i>')}</div>
     <div class="code-ide-split ${isWeb || /\.md$/i.test(state.activeFilePath || '') ? 'code-ide-split--preview' : ''}">
       <div class="code-ide-editor-pane">
+        <div class="ide-find-bar" id="ide-find-bar" ${state.findOpen ? '' : 'hidden'}>
+          <input id="ide-find-input" type="search" placeholder="Знайти" value="${esc(state.findQuery)}" autocomplete="off">
+          <input id="ide-replace-input" type="text" placeholder="Замінити" value="${esc(state.findReplace)}" autocomplete="off">
+          <span class="ide-find-count" id="ide-find-count"></span>
+          <button type="button" class="ide-icon-btn" id="ide-find-prev" title="Попереднє">↑</button>
+          <button type="button" class="ide-icon-btn" id="ide-find-next" title="Наступне">↓</button>
+          <button type="button" class="btn btn--ghost btn--xs" id="ide-replace-one">Замінити</button>
+          <button type="button" class="btn btn--ghost btn--xs" id="ide-replace-all">Усі</button>
+          <button type="button" class="ide-icon-btn" id="ide-find-close">${icon('x', 'ico ico--sm')}</button>
+        </div>
         <div class="code-editor-cm" id="code-cm-host"></div>
         <p class="code-editor-diagnostic" id="code-editor-diagnostic" role="status" aria-live="polite" hidden></p>
       </div>
@@ -311,22 +522,31 @@ function renderMain(root) {
           <div class="code-console" id="code-console" hidden><pre id="code-console-log"></pre></div>
         ` : /\.md$/i.test(state.activeFilePath || '')
     ? `<div class="code-web-preview" id="code-md-host"></div>`
-    : `<div class="code-output" id="code-output"><p class="empty-state">Вивід зʼявиться тут після запуску</p></div>`}
+    : ''}
       </div>
     </div>
+    <div class="ide-bottom">
+      <div class="ide-bottom-tabs">
+        <button type="button" class="ide-bottom-tab${state.bottomTab === 'output' ? ' is-active' : ''}" data-tab="output">${icon('terminal', 'ico ico--sm')}Вивід</button>
+        <button type="button" class="ide-bottom-tab${state.bottomTab === 'problems' ? ' is-active' : ''}" data-tab="problems">${icon('warning', 'ico ico--sm')}Проблеми <span id="ide-problem-count">${state.problems.length || ''}</span></button>
+      </div>
+      <div class="code-output" id="code-output" ${state.bottomTab === 'output' ? '' : 'hidden'}><p class="empty-state">Вивід зʼявиться тут після запуску</p></div>
+      <div class="ide-problems" id="ide-problems" ${state.bottomTab === 'problems' ? '' : 'hidden'}></div>
+    </div>
+    <footer class="ide-statusbar" id="ide-statusbar"></footer>
   `;
 
   renderFileTabs(main);
   mountEditor(main);
   bindMainEvents(main, isWeb);
+  renderProblems();
+  updateStatusBar();
+  if (state.findOpen) refreshFindMarks();
 
   if (isWeb) {
     state.previewMode = 'live';
     refreshLivePreview();
-    if (ws.activeWebRun?.target_url) {
-      // keep published url available
-      state.activeRun = ws.activeWebRun;
-    }
+    if (ws.activeWebRun?.target_url) state.activeRun = ws.activeWebRun;
   } else if (/\.md$/i.test(state.activeFilePath || '')) {
     updateMarkdownPreview();
   }
@@ -335,9 +555,26 @@ function renderMain(root) {
 function bindMainEvents(main, isWeb) {
   main.querySelector('#code-add-file-btn').addEventListener('click', addFile);
   main.querySelector('#code-save-btn').addEventListener('click', saveFiles);
-  main.querySelector('#code-git-btn').addEventListener('click', toggleGitPanel);
+  main.querySelector('#code-find-btn')?.addEventListener('click', () => setFindOpen(true));
+  main.querySelector('#code-palette-btn')?.addEventListener('click', () => openPalette('command'));
   main.querySelector('#code-test-btn')?.addEventListener('click', runTests);
   main.querySelector('#code-delete-ws-btn').addEventListener('click', deleteWorkspace);
+  main.querySelector('#ide-find-close')?.addEventListener('click', () => setFindOpen(false));
+  main.querySelector('#ide-find-next')?.addEventListener('click', () => stepFind(1));
+  main.querySelector('#ide-find-prev')?.addEventListener('click', () => stepFind(-1));
+  main.querySelector('#ide-replace-one')?.addEventListener('click', () => replaceFind(false));
+  main.querySelector('#ide-replace-all')?.addEventListener('click', () => replaceFind(true));
+  main.querySelector('#ide-find-input')?.addEventListener('input', (e) => {
+    state.findQuery = e.target.value;
+    state.findIndex = 0;
+    refreshFindMarks(true);
+  });
+  main.querySelector('#ide-replace-input')?.addEventListener('input', (e) => {
+    state.findReplace = e.target.value;
+  });
+  main.querySelectorAll('.ide-bottom-tab').forEach((btn) => {
+    btn.addEventListener('click', () => setBottomTab(btn.dataset.tab));
+  });
   if (isWeb) {
     main.querySelector('#code-run-web-btn').addEventListener('click', runWeb);
     main.querySelectorAll('.code-preview-tab').forEach((btn) => {
@@ -366,13 +603,17 @@ function bindMainEvents(main, isWeb) {
   } else {
     main.querySelector('#code-run-btn')?.addEventListener('click', runExec);
   }
+}
 
-  main.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-      e.preventDefault();
-      saveFiles();
-    }
+function setBottomTab(tab) {
+  state.bottomTab = tab;
+  document.querySelectorAll('.ide-bottom-tab').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.dataset.tab === tab);
   });
+  const output = document.getElementById('code-output');
+  const problems = document.getElementById('ide-problems');
+  if (output) output.hidden = tab !== 'output';
+  if (problems) problems.hidden = tab !== 'problems';
 }
 
 function webPreviewMarkup(url) {
@@ -395,7 +636,6 @@ function buildLivePreviewHtml() {
       ? html.replace('</head>', `<style>${css}</style></head>`)
       : `<style>${css}</style>${html}`;
   }
-  // strip external script/link to local files we already inlined
   html = html.replace(/<link[^>]+href=["']style\.css["'][^>]*>/gi, '');
   html = html.replace(/<script[^>]+src=["']script\.js["'][^>]*>\s*<\/script>/gi, '');
   if (html.includes('</body>')) {
@@ -469,8 +709,9 @@ function syncActiveFileContent() {
 function switchFile(path) {
   syncActiveFileContent();
   state.activeFilePath = path;
-  const main = document.getElementById('code-editor-main');
   renderMain(document.getElementById('code-editor-root'));
+  if (state.activity === 'history') renderSidebar();
+  else renderFileTree();
 }
 
 async function addFile() {
@@ -489,6 +730,7 @@ function removeFile(path) {
   if (state.activeFilePath === path) state.activeFilePath = state.files[0].path;
   state.dirty = true;
   renderMain(document.getElementById('code-editor-root'));
+  renderFileTree();
 }
 
 function mountEditor(main) {
@@ -500,15 +742,39 @@ function mountEditor(main) {
   const mode = modeForFile(ws.language, file?.path || '');
   state.cm = window.CodeMirror(host, {
     value: file?.content || '',
-    mode: mode === 'markdown' ? 'htmlmixed' : mode,
+    mode,
     theme: 'material-darker',
     lineNumbers: true,
+    lineWrapping: false,
     gutters: ['CodeMirror-linenumbers', 'lab-diagnostics'],
     matchBrackets: true,
     autoCloseBrackets: true,
     indentUnit: 2,
     tabSize: 2,
+    indentWithTabs: false,
+    styleActiveLine: false,
     viewportMargin: Infinity,
+    extraKeys: {
+      'Ctrl-S': () => { saveFiles(); return false; },
+      'Cmd-S': () => { saveFiles(); return false; },
+      'Ctrl-F': () => { setFindOpen(true); return false; },
+      'Cmd-F': () => { setFindOpen(true); return false; },
+      'Ctrl-H': () => { setFindOpen(true, true); return false; },
+      'Cmd-Alt-F': () => { setFindOpen(true, true); return false; },
+      'Ctrl-P': () => { openPalette('file'); return false; },
+      'Cmd-P': () => { openPalette('file'); return false; },
+      'Ctrl-Shift-P': () => { openPalette('command'); return false; },
+      'Cmd-Shift-P': () => { openPalette('command'); return false; },
+      'Ctrl-Shift-F': () => { setActivity('search'); document.getElementById('ide-search-input')?.focus(); return false; },
+      'Ctrl-G': () => { goToLine(); return false; },
+      'Cmd-G': () => { goToLine(); return false; },
+      'Ctrl-/': () => { applyToggleComment(); return false; },
+      'Cmd-/': () => { applyToggleComment(); return false; },
+      'Ctrl-Space': () => { showCompletions(); return false; },
+      'F5': () => { (currentWorkspace()?.language === 'web' ? runWeb() : runExec()); return false; },
+      'Ctrl-Enter': () => { (currentWorkspace()?.language === 'web' ? runWeb() : runExec()); return false; },
+      Esc: () => { closeOverlays(); return false; },
+    },
   });
   state.cm.on('change', () => {
     state.dirty = true;
@@ -516,41 +782,358 @@ function mountEditor(main) {
     if (saveBtn && !saveBtn.innerHTML.includes('code-dirty')) {
       saveBtn.insertAdjacentHTML('beforeend', ' <span class="code-dirty">●</span>');
     }
+    hideHint();
     if (/\.md$/i.test(state.activeFilePath || '')) {
       syncActiveFileContent();
       updateMarkdownPreview();
     } else {
       scheduleLivePreview();
     }
+    if (state.findOpen) refreshFindMarks();
+    updateStatusBar();
+  });
+  state.cm.on('cursorActivity', () => {
+    highlightActiveLine();
+    highlightSelectionMatches();
+    updateStatusBar();
+  });
+  highlightActiveLine();
+  if (state.problems.length) applyDiagnosticMarks(state.problems);
+}
+
+function highlightActiveLine() {
+  if (!state.cm) return;
+  if (state.activeLine != null) {
+    state.cm.removeLineClass(state.activeLine, 'background', 'ide-active-line');
+  }
+  state.activeLine = state.cm.getCursor().line;
+  state.cm.addLineClass(state.activeLine, 'background', 'ide-active-line');
+}
+
+function clearMarks(list) {
+  (list || []).forEach((mark) => mark.clear?.());
+}
+
+function highlightSelectionMatches() {
+  if (!state.cm) return;
+  clearMarks(state.matchMarks);
+  state.matchMarks = [];
+  const selected = state.cm.getSelection();
+  if (!selected || selected.length < 2 || selected.length > 40 || /\s/.test(selected)) return;
+  const ranges = findRanges(state.cm.getValue(), selected, { caseSensitive: true });
+  ranges.slice(0, 80).forEach((range) => {
+    state.matchMarks.push(state.cm.markText(
+      state.cm.posFromIndex(range.start),
+      state.cm.posFromIndex(range.end),
+      { className: 'cm-ide-match' },
+    ));
   });
 }
 
-function showCompilerDiagnostics(output) {
-  const notice = document.getElementById('code-editor-diagnostic');
-  if (!state.cm || !notice) return;
-  state.cm.clearGutter('lab-diagnostics');
-  const diagnostics = String(output || '').split('\n').flatMap((line) => {
-    const cpp = line.match(/(?:^|\/)([^/\s:]+):(\d+):\d+:\s+(?:fatal\s+)?error:\s*(.+)$/);
-    const python = line.match(/File ".*\/([^/"]+)", line (\d+)/);
-    const node = line.match(/(?:^|\/)([^/\s:]+\.js):(\d+)(?::\d+)?/);
-    const match = cpp || python || node;
-    return match ? [{ file: match[1], line: Number(match[2]), message: cpp?.[3] || 'Помилка' }] : [];
-  }).filter((item, index, all) => all.findIndex((o) => o.file === item.file && o.line === item.line) === index);
+function setFindOpen(open, focusReplace = false) {
+  state.findOpen = open;
+  const bar = document.getElementById('ide-find-bar');
+  if (bar) bar.hidden = !open;
+  if (open) {
+    const input = document.getElementById(focusReplace ? 'ide-replace-input' : 'ide-find-input');
+    input?.focus();
+    input?.select();
+    refreshFindMarks(true);
+  } else {
+    clearMarks(state.marks);
+    state.marks = [];
+  }
+}
 
-  const currentFile = state.files.find((file) => file.path === state.activeFilePath)?.path;
-  diagnostics.filter((item) => !item.file || currentFile?.endsWith(item.file))
+function refreshFindMarks(jump = false) {
+  if (!state.cm) return;
+  clearMarks(state.marks);
+  state.marks = [];
+  const ranges = findRanges(state.cm.getValue(), state.findQuery);
+  ranges.forEach((range, index) => {
+    state.marks.push(state.cm.markText(
+      state.cm.posFromIndex(range.start),
+      state.cm.posFromIndex(range.end),
+      { className: index === state.findIndex ? 'cm-ide-find-current' : 'cm-ide-find' },
+    ));
+  });
+  const count = document.getElementById('ide-find-count');
+  if (count) count.textContent = ranges.length ? `${state.findIndex + 1}/${ranges.length}` : '0';
+  if (jump && ranges[state.findIndex] && state.cm) {
+    const pos = state.cm.posFromIndex(ranges[state.findIndex].start);
+    state.cm.setCursor(pos);
+    state.cm.scrollIntoView(pos, 60);
+  }
+}
+
+function stepFind(dir) {
+  const ranges = findRanges(state.cm?.getValue() || '', state.findQuery);
+  if (!ranges.length) return;
+  state.findIndex = (state.findIndex + dir + ranges.length) % ranges.length;
+  refreshFindMarks(true);
+}
+
+function replaceFind(all) {
+  if (!state.cm || !state.findQuery) return;
+  const value = state.cm.getValue();
+  if (all) {
+    const next = value.split(state.findQuery).join(state.findReplace);
+    state.cm.setValue(next);
+  } else {
+    const ranges = findRanges(value, state.findQuery);
+    const range = ranges[state.findIndex];
+    if (!range) return;
+    state.cm.replaceRange(
+      state.findReplace,
+      state.cm.posFromIndex(range.start),
+      state.cm.posFromIndex(range.end),
+    );
+  }
+  refreshFindMarks(true);
+}
+
+function applyToggleComment() {
+  if (!state.cm) return;
+  const ws = currentWorkspace();
+  const prefix = commentPrefix(ws?.language, state.activeFilePath);
+  const from = state.cm.getCursor('from').line;
+  const to = state.cm.getCursor('to').line;
+  const lines = [];
+  for (let line = from; line <= to; line += 1) lines.push(state.cm.getLine(line));
+  const next = toggleLineComments(lines, prefix);
+  state.cm.replaceRange(
+    next.join('\n'),
+    { line: from, ch: 0 },
+    { line: to, ch: state.cm.getLine(to).length },
+  );
+}
+
+async function goToLine() {
+  const raw = await showPrompt('Номер рядка:');
+  const line = parseInt(raw, 10);
+  if (!Number.isFinite(line) || !state.cm) return;
+  jumpTo(state.activeFilePath, line, 1);
+}
+
+function showCompletions() {
+  if (!state.cm) return;
+  hideHint();
+  const cursor = state.cm.getCursor();
+  const prefix = tokenPrefix(state.cm.getLine(cursor.line), cursor.ch);
+  const items = completions(state.cm.getValue(), prefix);
+  if (!items.length) return;
+  const hint = document.createElement('div');
+  hint.className = 'ide-hint';
+  hint.innerHTML = items.map((word, i) => `<button type="button" class="ide-hint-item${i === 0 ? ' is-active' : ''}" data-word="${esc(word)}">${esc(word)}</button>`).join('');
+  const coords = state.cm.cursorCoords(true, 'page');
+  hint.style.left = `${coords.left}px`;
+  hint.style.top = `${coords.bottom + 4}px`;
+  document.body.appendChild(hint);
+  state.hintEl = hint;
+  hint.querySelectorAll('.ide-hint-item').forEach((btn) => {
+    btn.addEventListener('click', () => insertCompletion(prefix, btn.dataset.word));
+  });
+}
+
+function insertCompletion(prefix, word) {
+  if (!state.cm) return;
+  const cursor = state.cm.getCursor();
+  state.cm.replaceRange(word, { line: cursor.line, ch: cursor.ch - prefix.length }, cursor);
+  hideHint();
+  state.cm.focus();
+}
+
+function hideHint() {
+  state.hintEl?.remove();
+  state.hintEl = null;
+}
+
+function openPalette(mode) {
+  state.paletteOpen = true;
+  state.paletteMode = mode;
+  state.paletteQuery = '';
+  const palette = document.getElementById('ide-palette');
+  const input = document.getElementById('ide-palette-input');
+  if (!palette || !input) return;
+  palette.hidden = false;
+  input.placeholder = mode === 'file' ? 'Перейти до файлу…' : 'Палітра команд…';
+  input.value = '';
+  renderPaletteList();
+  input.focus();
+}
+
+function renderPaletteList() {
+  const list = document.getElementById('ide-palette-list');
+  if (!list) return;
+  if (state.paletteMode === 'file') {
+    const q = state.paletteQuery.toLowerCase();
+    const files = state.files.filter((f) => !q || f.path.toLowerCase().includes(q));
+    list.innerHTML = files.map((f, i) => `<button type="button" class="ide-palette-item${i === 0 ? ' is-active' : ''}" data-kind="file" data-path="${esc(f.path)}">${esc(f.path)}</button>`).join('')
+      || '<p class="empty-state">Немає файлів</p>';
+  } else {
+    const items = filterCommands(commandCatalog({ language: currentWorkspace()?.language, dirty: state.dirty }), state.paletteQuery);
+    list.innerHTML = items.map((item, i) => `<button type="button" class="ide-palette-item${i === 0 ? ' is-active' : ''}" data-kind="cmd" data-id="${item.id}">
+      <span>${esc(item.label)}</span><kbd>${esc(item.keys)}</kbd>
+    </button>`).join('');
+  }
+  list.querySelectorAll('.ide-palette-item').forEach((btn) => {
+    btn.addEventListener('click', () => runPaletteItem(btn));
+  });
+}
+
+function runPaletteItem(btn) {
+  closeOverlays();
+  if (btn.dataset.kind === 'file') {
+    switchFile(btn.dataset.path);
+    return;
+  }
+  const actions = {
+    save: saveFiles,
+    'new-file': addFile,
+    find: () => setFindOpen(true),
+    replace: () => setFindOpen(true, true),
+    'search-files': () => { setActivity('search'); document.getElementById('ide-search-input')?.focus(); },
+    'goto-line': goToLine,
+    run: () => (currentWorkspace()?.language === 'web' ? runWeb() : runExec()),
+    test: runTests,
+    'toggle-comment': applyToggleComment,
+    undo: () => state.cm?.undo(),
+    redo: () => state.cm?.redo(),
+    history: () => setActivity('history'),
+    git: () => { setActivity('git'); loadGitStatus(); },
+    explorer: () => setActivity('explorer'),
+  };
+  actions[btn.dataset.id]?.();
+}
+
+function closeOverlays() {
+  hideHint();
+  const palette = document.getElementById('ide-palette');
+  if (palette) palette.hidden = true;
+  state.paletteOpen = false;
+  if (state.findOpen) setFindOpen(false);
+}
+
+function bindGlobalKeys(root) {
+  const input = root.querySelector('#ide-palette-input');
+  input?.addEventListener('input', () => {
+    state.paletteQuery = input.value;
+    renderPaletteList();
+  });
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeOverlays();
+      e.preventDefault();
+    }
+    if (e.key === 'Enter') {
+      const item = root.querySelector('.ide-palette-item.is-active') || root.querySelector('.ide-palette-item');
+      if (item) runPaletteItem(item);
+      e.preventDefault();
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const items = [...root.querySelectorAll('.ide-palette-item')];
+      const idx = items.findIndex((el) => el.classList.contains('is-active'));
+      const next = e.key === 'ArrowDown' ? Math.min(items.length - 1, idx + 1) : Math.max(0, idx - 1);
+      items.forEach((el, i) => el.classList.toggle('is-active', i === next));
+      items[next]?.scrollIntoView({ block: 'nearest' });
+      e.preventDefault();
+    }
+  });
+  root.addEventListener('keydown', (e) => {
+    if (isMod(e) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      saveFiles();
+    }
+    if (isMod(e) && e.shiftKey && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      openPalette('command');
+    } else if (isMod(e) && e.key.toLowerCase() === 'p' && !e.shiftKey) {
+      e.preventDefault();
+      openPalette('file');
+    }
+  });
+}
+
+function updateStatusBar() {
+  const el = document.getElementById('ide-statusbar');
+  if (!el) return;
+  const cursor = state.cm?.getCursor() || { line: 0, ch: 0 };
+  const status = formatCursorStatus({
+    line: cursor.line + 1,
+    ch: cursor.ch,
+    lineCount: state.cm ? state.cm.lineCount() : 1,
+    language: currentWorkspace()?.language,
+    dirty: state.dirty,
+  });
+  const hist = typeof state.cm?.historySize === 'function' ? state.cm.historySize() : null;
+  el.innerHTML = `
+    <span>${esc(status.cursor)}</span>
+    <span>${esc(status.lines)}</span>
+    <span>${esc(status.language)}</span>
+    <span>${esc(status.indent)}</span>
+    <span>${esc(status.encoding)}</span>
+    <span>${hist ? `undo ${hist.undo}` : ''}</span>
+    <span class="${state.dirty ? 'is-dirty' : ''}">${esc(status.dirty)}</span>`;
+}
+
+function renderProblems() {
+  const host = document.getElementById('ide-problems');
+  const count = document.getElementById('ide-problem-count');
+  if (count) count.textContent = state.problems.length || '';
+  if (!host) return;
+  if (!state.problems.length) {
+    host.innerHTML = '<p class="empty-state">Немає проблем</p>';
+    return;
+  }
+  host.innerHTML = state.problems.map((p, i) => `<button type="button" class="ide-problem ${p.severity}" data-i="${i}">
+    <strong>${esc(p.file)}:${p.line}</strong> ${esc(p.message)}
+  </button>`).join('');
+  host.querySelectorAll('.ide-problem').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const p = state.problems[Number(btn.dataset.i)];
+      if (p) jumpTo(p.file === state.activeFilePath || state.files.some((f) => f.path === p.file || f.path.endsWith(p.file))
+        ? (state.files.find((f) => f.path === p.file || f.path.endsWith(p.file))?.path || state.activeFilePath)
+        : state.activeFilePath, p.line, p.col);
+    });
+  });
+}
+
+function applyDiagnosticMarks(diagnostics) {
+  if (!state.cm) return;
+  state.cm.clearGutter('lab-diagnostics');
+  const currentFile = state.activeFilePath;
+  diagnostics
+    .filter((item) => !item.file || currentFile?.endsWith(item.file))
     .forEach((item) => {
+      const line = Math.max(0, item.line - 1);
       const marker = document.createElement('span');
       marker.className = 'code-diagnostic-marker';
       marker.textContent = '●';
       marker.title = `${item.file}:${item.line} ${item.message}`;
-      state.cm.setGutterMarker(item.line - 1, 'lab-diagnostics', marker);
+      state.cm.setGutterMarker(line, 'lab-diagnostics', marker);
+      const text = state.cm.getLine(line) || '';
+      const fromCh = Math.max(0, (item.col || 1) - 1);
+      const toCh = Math.min(text.length, fromCh + Math.max(1, (text.slice(fromCh).match(/[A-Za-z0-9_]+/)?.[0].length || 1)));
+      state.cm.markText(
+        { line, ch: fromCh },
+        { line, ch: Math.max(fromCh + 1, toCh) },
+        { className: item.severity === 'warning' ? 'cm-ide-warning' : 'cm-ide-error', title: item.message },
+      );
     });
+}
 
-  notice.hidden = diagnostics.length === 0;
-  notice.textContent = diagnostics.length
-    ? `${diagnostics.length} ${diagnostics.length === 1 ? 'помилка' : 'помилки'}: рядки підсвічені`
-    : '';
+function showCompilerDiagnostics(output) {
+  const notice = document.getElementById('code-editor-diagnostic');
+  state.problems = parseDiagnostics(output);
+  if (state.cm) applyDiagnosticMarks(state.problems);
+  renderProblems();
+  if (notice) {
+    notice.hidden = state.problems.length === 0;
+    notice.textContent = state.problems.length
+      ? `${state.problems.length} ${state.problems.length === 1 ? 'помилка' : 'помилки'}: рядки підкреслені`
+      : '';
+  }
+  if (state.problems.length) setBottomTab('problems');
 }
 
 async function saveFiles() {
@@ -561,11 +1144,15 @@ async function saveFiles() {
       body: JSON.stringify({ files: state.files }),
     });
     state.dirty = false;
+    const current = state.files.find((f) => f.path === state.activeFilePath);
+    if (current) historyStore.push(state.activeId, current.path, current.content, 'Збереження');
     showCompilerDiagnostics('');
     showToastLocal('Збережено');
     const saveBtn = document.getElementById('code-save-btn');
     if (saveBtn) saveBtn.innerHTML = `${icon('check', 'ico ico--sm')}Зберегти`;
-    if (!document.getElementById('code-git-panel')?.hidden) await loadGitStatus();
+    updateStatusBar();
+    if (state.activity === 'history') renderSidebar();
+    if (state.activity === 'git') await loadGitStatus();
     return true;
   } catch (err) {
     showToastLocal(err.message, 'error');
@@ -681,25 +1268,19 @@ async function reloadWorkspaceFiles() {
     state.activeFilePath = state.files[0]?.path;
   }
   renderMain(document.getElementById('code-editor-root'));
+  renderSidebar();
 }
 
 async function loadGitStatus() {
   if (!state.activeId) return;
   try {
     const { status } = await api(`/code/workspaces/${state.activeId}/git`);
+    if (state.activity !== 'git') return;
     renderGitPanel(status);
   } catch (err) {
     const panel = document.getElementById('code-git-panel');
     if (panel) panel.innerHTML = `<p class="empty-state">${esc(err.message)}</p>`;
   }
-}
-
-async function toggleGitPanel() {
-  const panel = document.getElementById('code-git-panel');
-  const button = document.getElementById('code-git-btn');
-  panel.hidden = !panel.hidden;
-  button.setAttribute('aria-expanded', String(!panel.hidden));
-  if (!panel.hidden) await loadGitStatus();
 }
 
 async function createGitCommit(event) {
@@ -723,26 +1304,35 @@ async function createGitCommit(event) {
   }
 }
 
+function paintRunOutput(run, okLabel, failLabel) {
+  const output = document.getElementById('code-output');
+  if (!output) return;
+  const passed = run.status === 'done' && (run.exit_code === 0 || run.exit_code == null);
+  const statusLabel = { done: okLabel, error: failLabel, timeout: 'Перевищено час' }[run.status] || run.status;
+  output.innerHTML = `
+    <div class="code-output-status status-pill ${passed ? 'running' : 'error'}">${statusLabel}</div>
+    ${run.stdout ? `<pre class="code-output-stream">${esc(run.stdout)}</pre>` : ''}
+    ${run.stderr ? `<pre class="code-output-stream code-output-stderr">${esc(run.stderr)}</pre>` : ''}
+    ${!run.stdout && !run.stderr ? '<p class="empty-state">Немає виводу</p>' : ''}
+  `;
+  setBottomTab('output');
+}
+
 async function runExec() {
   if (!await saveFiles()) return;
   const output = document.getElementById('code-output');
   const btn = document.getElementById('code-run-btn');
-  btn.disabled = true;
-  output.innerHTML = '<p class="empty-state">Виконується…</p>';
+  if (btn) btn.disabled = true;
+  if (output) output.innerHTML = '<p class="empty-state">Виконується…</p>';
+  setBottomTab('output');
   try {
     const { run } = await api(`/code/workspaces/${state.activeId}/run`, { method: 'POST' });
     showCompilerDiagnostics(run.stderr);
-    const statusLabel = { done: 'Готово', error: 'Помилка', timeout: 'Перевищено час' }[run.status] || run.status;
-    output.innerHTML = `
-      <div class="code-output-status status-pill ${run.status === 'done' ? 'running' : 'error'}">${statusLabel}</div>
-      ${run.stdout ? `<pre class="code-output-stream">${esc(run.stdout)}</pre>` : ''}
-      ${run.stderr ? `<pre class="code-output-stream code-output-stderr">${esc(run.stderr)}</pre>` : ''}
-      ${!run.stdout && !run.stderr ? '<p class="empty-state">Немає виводу</p>' : ''}
-    `;
+    paintRunOutput(run, 'Готово', 'Помилка');
   } catch (err) {
-    output.innerHTML = `<p class="empty-state">${esc(err.message)}</p>`;
+    if (output) output.innerHTML = `<p class="empty-state">${esc(err.message)}</p>`;
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -750,23 +1340,17 @@ async function runTests() {
   if (!await saveFiles()) return;
   const btn = document.getElementById('code-test-btn');
   const output = document.getElementById('code-output');
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   if (output) output.innerHTML = '<p class="empty-state">Запуск тестів…</p>';
+  setBottomTab('output');
   try {
     const { run } = await api(`/code/workspaces/${state.activeId}/test`, { method: 'POST' });
     showCompilerDiagnostics(run.stderr);
-    const passed = run.status === 'done' && run.exit_code === 0;
-    if (output) {
-      output.innerHTML = `
-        <div class="code-output-status status-pill ${passed ? 'running' : 'error'}">${passed ? 'Тести пройшли' : 'Є помилки'}</div>
-        ${run.stdout ? `<pre class="code-output-stream">${esc(run.stdout)}</pre>` : ''}
-        ${run.stderr ? `<pre class="code-output-stream code-output-stderr">${esc(run.stderr)}</pre>` : ''}
-      `;
-    }
+    paintRunOutput(run, 'Тести пройшли', 'Є помилки');
   } catch (err) {
     if (output) output.innerHTML = `<p class="empty-state">${esc(err.message)}</p>`;
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -774,7 +1358,7 @@ async function runWeb() {
   if (!await saveFiles()) return;
   const preview = document.getElementById('code-web-preview');
   const btn = document.getElementById('code-run-web-btn');
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   state.previewMode = 'publish';
   document.querySelectorAll('.code-preview-tab').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === 'publish');
@@ -793,7 +1377,7 @@ async function runWeb() {
   } catch (err) {
     preview.innerHTML = `<p class="empty-state">${esc(err.message)}</p>`;
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -816,7 +1400,7 @@ async function deleteWorkspace() {
     state.activeId = null;
     destroyEditor();
     const root = document.getElementById('code-editor-root');
-    renderWorkspaceList(root);
+    renderSidebar();
     renderMain(root);
     showToastLocal('Проєкт видалено');
   } catch (err) {
@@ -847,7 +1431,7 @@ export async function initCodeEditor() {
   await loadGitAccounts();
   try {
     state.workspaces = await api('/code/workspaces').then((r) => r.workspaces);
-    renderWorkspaceList(root);
+    renderWorkspaceList();
     if (state.workspaces.length) await selectWorkspace(state.workspaces[0].id);
   } catch (err) {
     root.querySelector('#code-editor-main').innerHTML = `<p class="empty-state">${esc(err.message)}</p>`;

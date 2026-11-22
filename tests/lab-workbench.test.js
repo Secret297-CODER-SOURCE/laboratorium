@@ -6,6 +6,7 @@ import {
   hexEncode, hexDecode, rot13, multiHash, identifyHash, parseHttpMessage, parseUrlParts, parseUserAgent,
   parseWhoisText, analyzeEmailHeaders, calcCidr, generateSubdomainWordlist, extractStrings, xorBruteforce,
   nestedDecode, testJwtWeakSecret, detectAttackPatterns, textToBase64,
+  unixTimestampConvert, caseConvert, unicodeInspect,
 } from '../public/lab-workbench.js';
 
 function b64url(obj) {
@@ -192,6 +193,24 @@ test('testJwtWeakSecret finds a secret from a short local wordlist via HMAC only
   assert.equal(found.found, 'secret123');
   const notFound = await testJwtWeakSecret(token, 'wrongpass\nadmin');
   assert.equal(notFound.found, null);
+});
+
+test('unixTimestampConvert round-trips seconds and ISO without network', () => {
+  const fromUnix = unixTimestampConvert('1700000000');
+  assert.equal(fromUnix.unix, 1700000000);
+  assert.ok(fromUnix.iso.includes('2023'));
+  const fromIso = unixTimestampConvert(fromUnix.iso);
+  assert.equal(fromIso.unix, 1700000000);
+  assert.throws(() => unixTimestampConvert('not-a-date'));
+});
+
+test('caseConvert and unicodeInspect stay offline on pasted text', () => {
+  const c = caseConvert('Hello World');
+  assert.equal(c.snake, 'hello_world');
+  assert.equal(c.kebab, 'hello-world');
+  const u = unicodeInspect('AЇ');
+  assert.equal(u.length, 2);
+  assert.equal(u.chars[0].hex, 'U+0041');
 });
 
 test('detectAttackPatterns flags common attack signatures in pasted logs only', () => {

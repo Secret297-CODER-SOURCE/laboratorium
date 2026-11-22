@@ -1,5 +1,5 @@
 import { unlinkSync } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 import db from '../db/index.js';
 import config from '../config/index.js';
 import * as groupService from './group.service.js';
@@ -262,6 +262,28 @@ export function takeTask(userId, assignmentId) {
   return mapAssignment(getAssignment(assignmentId));
 }
 
+function decodeOriginalName(raw) {
+  const value = String(raw || '');
+  if (!value) return '';
+  if (/^[\u0000-\u007f]*$/.test(value) || /[А-Яа-яЁёІіЇїЄєҐґ]/.test(value)) return value;
+  try {
+    const decoded = Buffer.from(value, 'latin1').toString('utf8');
+    if (/[А-Яа-яЁёІіЇїЄєҐґ]/.test(decoded)) return decoded;
+  } catch { /* keep as-is */ }
+  return value;
+}
+
+function normalizeSubmissionFile(file = {}) {
+  const filename = String(file.filename || (file.path ? basename(file.path) : '') || '').replace(/[/\\]/g, '');
+  const original = decodeOriginalName(file.originalname) || filename || 'file';
+  return {
+    filename,
+    original_name: original.replace(/[\u0000-\u001f]/g, '').slice(0, 255) || 'file',
+    mime_type: file.mimetype || null,
+    size_bytes: Number(file.size) || 0,
+  };
+}
+
 export function submitTask(userId, assignmentId, note = '', files = []) {
   const assignment = assertStudentAssignment(assignmentId, userId);
   if (assignment.status !== 'taken') {
@@ -287,7 +309,11 @@ export function submitTask(userId, assignmentId, note = '', files = []) {
     `).run(trimmedNote, assignmentId);
 
     for (const file of files) {
-      insertFile.run(assignmentId, file.filename, file.originalname, file.mimetype || null, file.size || 0);
+      const row = normalizeSubmissionFile(file);
+      if (!row.filename) {
+        throw new ValidationError('Не вдалося зберегти файл здачі. Спробуйте інший формат або архів .zip');
+      }
+      insertFile.run(assignmentId, row.filename, row.original_name, row.mime_type, row.size_bytes);
     }
   });
   tx();

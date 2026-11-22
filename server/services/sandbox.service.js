@@ -1,6 +1,6 @@
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
-import { mkdtemp, writeFile, chmod, rm } from 'fs/promises';
+import { mkdtemp, writeFile, chmod, rm, readFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import config from '../config/index.js';
@@ -22,6 +22,8 @@ const LANGUAGES = {
 const MAX_OUTPUT_BYTES = 64 * 1024;
 const RUN_TIMEOUT_MS = 12_000;
 const KILL_GRACE_MS = 3_000;
+const TAR_MAX_BYTES = 8 * 1024 * 1024;
+const SANDBOX_WORKDIR = '/workspace';
 
 export function isSandboxEnabled() {
   return !!config.labAgent.useLocalDocker;
@@ -50,6 +52,85 @@ async function writeWorkspaceFiles(dir, files) {
 }
 
 /**
+ * The app talks to the host Docker daemon via a mounted docker.sock
+ * (Coolify / compose). A `-v /tmp/foo:/workspace` bind is resolved on the
+ * *host*, so the sandbox sees an empty directory and Python dies with
+ * `can't open file '/workspace/main.py'`. Feed the files through stdin
+ * instead: the daemon never needs a shared filesystem.
+ */
+export function wrapSandboxCommand(command) {
+  if (!Array.isArray(command) || !command.length) {
+    throw new ValidationError('Непідтримувана мова або команда');
+  }
+  return [
+    'sh', '-c',
+    `tar -xf - -o -C ${SANDBOX_WORKDIR} && exec "$@"`,
+    'sh',
+    ...command,
+  ];
+}
+
+export function buildSandboxRunArgs(containerName, image, command) {
+  return [
+    'run', '--rm', '-i',
+    '--name', containerName,
+    '--network', 'none',
+    '--memory', '256m',
+    '--cpus', '1',
+    '--pids-limit', '128',
+    '--security-opt', 'no-new-privileges',
+    '--cap-drop', 'ALL',
+    '--user', '65534:65534',
+    '--read-only',
+    '--tmpfs', '/tmp:rw,exec,size=32m',
+    '--tmpfs', `${SANDBOX_WORKDIR}:rw,exec,size=32m,mode=1777`,
+    '-w', SANDBOX_WORKDIR,
+    image,
+    ...wrapSandboxCommand(command),
+  ];
+}
+
+export function parseContainerIdsFromProc(cgroupText, mountinfoText) {
+  const ids = [];
+  const seen = new Set();
+  const text = `${cgroupText || ''}\n${mountinfoText || ''}`;
+  const patterns = [
+    /\/docker\/containers\/([0-9a-f]{64})\//g,
+    /\/docker-([0-9a-f]{64})\.scope/g,
+    /\/docker\/([0-9a-f]{64})(?:\/|$)/g,
+  ];
+  for (const re of patterns) {
+    for (const match of text.matchAll(re)) {
+      if (!seen.has(match[1])) {
+        seen.add(match[1]);
+        ids.push(match[1]);
+      }
+    }
+  }
+  return ids;
+}
+
+export function dockerCopySource(hostDir, selfContainerId) {
+  return selfContainerId ? `${selfContainerId}:${hostDir}/.` : `${hostDir}/.`;
+}
+
+export async function detectSelfContainerId() {
+  let cgroup = '';
+  let mountinfo = '';
+  try { cgroup = await readFile('/proc/self/cgroup', 'utf8'); } catch { /* host / non-linux */ }
+  try { mountinfo = await readFile('/proc/self/mountinfo', 'utf8'); } catch { /* host / non-linux */ }
+  const candidates = parseContainerIdsFromProc(cgroup, mountinfo);
+  if (process.env.HOSTNAME) candidates.push(process.env.HOSTNAME);
+  for (const id of candidates) {
+    try {
+      await execFileAsync('docker', ['inspect', '--type', 'container', id, '-f', '{{.Id}}'], { timeout: 3000 });
+      return id;
+    } catch { /* try next candidate */ }
+  }
+  return null;
+}
+
+/**
  * Kills the container directly by name (`docker kill`, SIGKILL) rather than
  * relying on execFile's own timeout — that only signals the local `docker`
  * CLI process, which forwards a *graceful* stop (SIGTERM + up to 10s grace)
@@ -69,6 +150,42 @@ function scheduleHardKill(containerName, ms) {
   };
 }
 
+function execDockerWithStdin(args, input, { timeout, maxBuffer }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('docker', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    const timer = timeout ? setTimeout(() => child.kill('SIGKILL'), timeout) : null;
+
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      if (stdout.length < maxBuffer) stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      if (stderr.length < maxBuffer) stderr += chunk;
+    });
+    child.on('error', (err) => {
+      if (timer) clearTimeout(timer);
+      reject(err);
+    });
+    child.on('close', (code) => {
+      if (timer) clearTimeout(timer);
+      resolve({ stdout, stderr, code });
+    });
+    child.stdin.on('error', () => {});
+    child.stdin.end(input);
+  });
+}
+
+async function tarWorkspace(dir) {
+  const { stdout } = await execFileAsync('tar', ['-C', dir, '-cf', '-', '.'], {
+    encoding: 'buffer',
+    maxBuffer: TAR_MAX_BYTES,
+  });
+  return stdout;
+}
+
 /** One-shot code execution (Python/Node/C++/Bash) — no network, hard resource caps, ephemeral container. */
 async function runInSandbox(language, files, command) {
   if (!isSandboxEnabled()) throw new ValidationError('Пісочницю коду не налаштовано на цьому сервері');
@@ -82,31 +199,31 @@ async function runInSandbox(language, files, command) {
   const killer = scheduleHardKill(containerName, RUN_TIMEOUT_MS);
   try {
     await writeWorkspaceFiles(dir, files);
-
-    const args = [
-      'run', '--rm',
-      '--name', containerName,
-      '--network', 'none',
-      '--memory', '256m',
-      '--cpus', '1',
-      '--pids-limit', '128',
-      '--security-opt', 'no-new-privileges',
-      '--cap-drop', 'ALL',
-      '--user', '65534:65534',
-      '--read-only',
-      '--tmpfs', '/tmp:rw,exec,size=32m',
-      '-v', `${dir}:/workspace:ro`,
-      '-w', '/workspace',
-      lang.image,
-      ...command,
-    ];
+    const tarBuf = await tarWorkspace(dir);
+    const args = buildSandboxRunArgs(containerName, lang.image, command);
 
     try {
-      const { stdout, stderr } = await execFileAsync('docker', args, {
+      const result = await execDockerWithStdin(args, tarBuf, {
         timeout: RUN_TIMEOUT_MS + KILL_GRACE_MS,
         maxBuffer: MAX_OUTPUT_BYTES * 2,
       });
-      return { status: 'done', stdout: truncate(stdout), stderr: truncate(stderr), exit_code: 0 };
+      if (killer.didFire()) {
+        return {
+          status: 'timeout',
+          stdout: truncate(result.stdout),
+          stderr: `Перевищено ліміт часу виконання (${RUN_TIMEOUT_MS / 1000}с)`,
+          exit_code: null,
+        };
+      }
+      if (result.code === 0) {
+        return { status: 'done', stdout: truncate(result.stdout), stderr: truncate(result.stderr), exit_code: 0 };
+      }
+      return {
+        status: 'error',
+        stdout: truncate(result.stdout),
+        stderr: truncate(result.stderr),
+        exit_code: result.code ?? 1,
+      };
     } catch (err) {
       if (killer.didFire()) {
         return {
@@ -146,7 +263,7 @@ export async function runTests(language, files) {
       : 'Додайте тестові файли *.test.js або *.spec.js');
   }
   const args = language === 'python'
-    ? ['python3', '-m', 'unittest', 'discover', '-s', '/workspace', '-p', 'test*.py']
+    ? ['python3', '-m', 'unittest', 'discover', '-s', SANDBOX_WORKDIR, '-p', 'test*.py']
     : ['node', '--test', ...testFiles.map((file) => safeFileName(file.path))];
   return runInSandbox(language, files, args);
 }
@@ -170,7 +287,7 @@ export async function startWebPreview(workspaceId, files) {
 
   const hostPort = allocatePort(workspaceId);
   await execFileAsync('docker', [
-    'run', '-d',
+    'create',
     '--name', containerName,
     '-p', `${hostPort}:80`,
     '--memory', '128m',
@@ -181,9 +298,22 @@ export async function startWebPreview(workspaceId, files) {
     '--tmpfs', '/var/run:rw,size=8m',
     '--tmpfs', '/tmp:rw,size=8m',
     '--security-opt', 'no-new-privileges',
-    '-v', `${dir}:/usr/share/nginx/html:ro`,
     'nginx:alpine',
   ]);
+
+  try {
+    const selfId = await detectSelfContainerId();
+    await execFileAsync('docker', [
+      'cp',
+      dockerCopySource(dir, selfId),
+      `${containerName}:/usr/share/nginx/html`,
+    ]);
+    await execFileAsync('docker', ['start', containerName]);
+  } catch (err) {
+    await execFileAsync('docker', ['rm', '-f', containerName]).catch(() => {});
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
 
   const cfg = getLabPublicConfig();
   const targetUrl = buildDockerTargetUrl(cfg.dockerHostIp, hostPort, cfg);

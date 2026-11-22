@@ -20,11 +20,19 @@ function report(message, stack) {
   } catch { /* never let the reporter itself throw */ }
 }
 
+function isAuthRedirectNoise(message) {
+  const msg = String(message || '');
+  return msg === 'auth' || msg === 'no auth' || /Uncaught Error: (no )?auth/.test(msg);
+}
+
 window.addEventListener('error', (e) => {
+  if (isAuthRedirectNoise(e.message) || isAuthRedirectNoise(e.error?.message)) return;
   report(e.message, e.error?.stack);
 });
 
 window.addEventListener('unhandledrejection', (e) => {
   const reason = e.reason;
-  report(reason?.message || String(reason), reason?.stack);
+  const message = reason?.message || String(reason);
+  if (isAuthRedirectNoise(message)) return;
+  report(message, reason?.stack);
 });
