@@ -646,7 +646,9 @@ input[type="number"]::-webkit-inner-spin-button {
   gap: 2px;
   flex-wrap: nowrap;
   min-width: 0;
+  justify-content: safe center;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 3px;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: 14px;
@@ -660,13 +662,13 @@ input[type="number"]::-webkit-inner-spin-button {
   display: none;
 }
 
-.app-nav-links li {
+.app-nav-links > li:not(.app-nav-indicator) {
   position: relative;
   z-index: 1;
   flex-shrink: 0;
 }
 
-.app-nav-indicator {
+.app-nav-links .app-nav-indicator {
   position: absolute;
   top: 0;
   left: 0;
@@ -675,6 +677,9 @@ input[type="number"]::-webkit-inner-spin-button {
   height: 0;
   padding: 0;
   margin: 0;
+  flex: none;
+  overflow: visible;
+  list-style: none;
   pointer-events: none;
   border-radius: 11px;
   background: var(--accent-subtle);
@@ -684,6 +689,10 @@ input[type="number"]::-webkit-inner-spin-button {
     width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.18s ease;
+}
+
+.app-nav-links .app-nav-indicator.is-instant {
+  transition-duration: 0s !important;
 }
 
 .app-nav-links .app-nav-link {
@@ -714,7 +723,7 @@ input[type="number"]::-webkit-inner-spin-button {
 .nav--app .nav-links {
   flex: 1 1 0;
   min-width: 0;
-  justify-content: center;
+  justify-content: safe center;
 }
 
 .nav--app .nav-actions {
@@ -725,7 +734,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* Wider bar for the app header so links never slide under the logo or actions */
 .nav.nav--app { gap: 20px; }
-.nav--app .nav-links { justify-content: center; margin: 0 auto; padding: 2px 4px; }
+.nav--app .nav-links { margin: 0; padding: 3px; }
 /* Same layout on the marketing header: links centred, actions pinned right */
 .nav:not(.nav--app) { gap: 20px; }
 .nav:not(.nav--app) .nav-links { flex: 1 1 0; min-width: 0; justify-content: center; gap: clamp(18px, 2.4vw, 32px); margin: 0 auto; }

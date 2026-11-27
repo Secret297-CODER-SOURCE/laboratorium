@@ -72,7 +72,7 @@ function ensureNavIndicator(list) {
   return indicator;
 }
 
-export function moveNavIndicatorTo(list, target, { scroll = false } = {}) {
+export function moveNavIndicatorTo(list, target, { instant = false } = {}) {
   if (!list) return;
   const indicator = ensureNavIndicator(list);
   if (!target) {
@@ -81,18 +81,21 @@ export function moveNavIndicatorTo(list, target, { scroll = false } = {}) {
   }
   const listRect = list.getBoundingClientRect();
   const rect = target.getBoundingClientRect();
+  const x = rect.left - listRect.left + list.scrollLeft - list.clientLeft;
+  const y = rect.top - listRect.top + list.scrollTop - list.clientTop;
+  if (instant) indicator.classList.add('is-instant');
+  indicator.style.width = `${Math.round(rect.width)}px`;
+  indicator.style.height = `${Math.round(rect.height)}px`;
+  indicator.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
   indicator.style.opacity = '1';
-  indicator.style.width = `${rect.width}px`;
-  indicator.style.height = `${rect.height}px`;
-  indicator.style.transform = `translate3d(${rect.left - listRect.left + list.scrollLeft}px, ${rect.top - listRect.top + list.scrollTop}px, 0)`;
-  if (scroll && typeof target.scrollIntoView === 'function') {
-    target.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  if (instant) {
+    requestAnimationFrame(() => indicator.classList.remove('is-instant'));
   }
 }
 
 export function moveNavIndicator(list, activeSelector = '.app-nav-link.active') {
   if (!list) return;
-  moveNavIndicatorTo(list, list.querySelector(activeSelector), { scroll: true });
+  moveNavIndicatorTo(list, list.querySelector(activeSelector));
 }
 
 function bindNavIndicatorHover(list) {
@@ -112,12 +115,16 @@ function bindNavIndicatorHover(list) {
       if (!list.contains(document.activeElement)) moveNavIndicator(list);
     });
   });
+  list.addEventListener('scroll', () => moveNavIndicator(list), { passive: true });
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => moveNavIndicator(list)).observe(list);
+  }
 }
 
 export function syncAppNavIndicator(root = document) {
   root.querySelectorAll('.app-nav-links').forEach((list) => {
     bindNavIndicatorHover(list);
-    moveNavIndicator(list);
+    moveNavIndicatorTo(list, list.querySelector('.app-nav-link.active'), { instant: true });
   });
 }
 

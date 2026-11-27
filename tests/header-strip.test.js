@@ -13,7 +13,11 @@ test('app nav renders a sliding indicator instead of bordered active pills', () 
   assert.match(nav, /class="app-nav-indicator"/);
   assert.match(nav, /export function syncAppNavIndicator/);
   assert.match(nav, /translate3d/);
-  assert.match(css, /\.app-nav-indicator\s*\{/);
+  assert.doesNotMatch(nav, /scrollIntoView/);
+  assert.match(css, /\.app-nav-links \.app-nav-indicator\s*\{/);
+  assert.match(css, /\.app-nav-links \.app-nav-indicator\s*\{[\s\S]*?position: absolute/);
+  assert.match(css, /\.app-nav-links > li:not\(\.app-nav-indicator\)/);
+  assert.match(css, /justify-content:\s*safe center/);
   assert.doesNotMatch(css, /\.app-nav-links \.app-nav-link\.active \{[\s\S]{0,180}border-color: color-mix/);
 });
 
