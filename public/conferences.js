@@ -152,17 +152,54 @@ function renderAll() {
     : '<p class="empty-state" style="padding:40px;text-align:center;color:var(--text-dim)">Конференцій поки немає</p>';
 }
 
+function moveConfTabIndicator(target) {
+  const tabs = document.querySelector('.conf-tabs');
+  const indicator = tabs?.querySelector('.conf-tab-indicator');
+  if (!tabs || !indicator) return;
+  if (!target) {
+    indicator.style.opacity = '0';
+    return;
+  }
+  const listRect = tabs.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
+  indicator.style.opacity = '1';
+  indicator.style.width = `${rect.width}px`;
+  indicator.style.height = `${rect.height}px`;
+  indicator.style.transform = `translate3d(${rect.left - listRect.left}px, ${rect.top - listRect.top}px, 0)`;
+}
+
+function syncConfTabIndicator() {
+  moveConfTabIndicator(document.querySelector('.conf-tab.active'));
+}
+
 document.querySelectorAll('.conf-tab').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.conf-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.conf-tab').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
     btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
     document.getElementById('tab-calendar').hidden = true;
     document.getElementById('tab-upcoming').hidden = true;
     document.getElementById('tab-all').hidden = true;
     const tab = btn.dataset.tab;
     document.getElementById(`tab-${tab}`).hidden = false;
+    syncConfTabIndicator();
   });
 });
+
+const confTabs = document.querySelector('.conf-tabs');
+if (confTabs) {
+  confTabs.addEventListener('pointerover', (e) => {
+    const tab = e.target.closest('.conf-tab');
+    if (tab) moveConfTabIndicator(tab);
+  });
+  confTabs.addEventListener('pointerleave', syncConfTabIndicator);
+}
+requestAnimationFrame(syncConfTabIndicator);
+window.addEventListener('resize', () => requestAnimationFrame(syncConfTabIndicator));
+document.fonts?.ready?.then?.(() => requestAnimationFrame(syncConfTabIndicator));
 
 const modal = document.getElementById('create-modal');
 const stepChoice = document.getElementById('create-step-choice');

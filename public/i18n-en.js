@@ -438,6 +438,7 @@ export const en = {
   "Розв'язані": 'Solved',
   'Останні події': 'Latest activity',
   'Розблокується після попередньої стадії': 'Unlocks after the previous stage',
+  'Умова етапу': 'Stage brief',
   'підказка -{cost}': 'hint -{cost}',
   'Здати flag': 'Submit flag',
   'Підказка (-{cost})': 'Hint (-{cost})',

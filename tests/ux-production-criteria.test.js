@@ -62,12 +62,17 @@ test('C5 Telegram keeps admin identity and adds a student user-bot surface', () 
 test('C6 site monitor never serializes bot tokens or passwords', () => {
   const bot = read('server/services/telegram-bot.service.js');
   const fn = bot.slice(bot.indexOf('export function getSiteMonitor'), bot.indexOf('export function formatMonitorText'));
-  assert.match(fn, /botEnabled: !!\(c.enabled && c.botToken\)/);
+  assert.match(fn, /botEnabled: !!\(c.enabled && c.session\)/);
   assert.doesNotMatch(fn, /^\s*botToken:/m);
+  assert.doesNotMatch(fn, /^\s*apiHash:/m);
+  assert.doesNotMatch(fn, /^\s*session:/m);
   assert.doesNotMatch(fn, /password/i);
   const panel = read('public/admin-telegram-panel.js');
   assert.match(panel, /User-bot \+ адмін-бот/);
   assert.match(panel, /tg-monitor-strip/);
+  assert.match(panel, /name="apiId"/);
+  assert.match(panel, /name="apiHash"/);
+  assert.doesNotMatch(panel, /BotFather/);
 });
 
 test('C7 student tools dock + lab subtabs are wired into the cabinet', () => {

@@ -206,6 +206,10 @@ router.patch('/homework-reminders', requireRole('owner', 'developer', 'teacher')
 router.get('/telegram', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.getOverview));
 router.get('/telegram/monitor', requireRole('owner', 'developer', 'teacher'), asyncHandler(telegramCtrl.getMonitor));
 router.patch('/telegram/settings', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.updateSettings));
+router.post('/telegram/login/code', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.sendLoginCode));
+router.post('/telegram/login/confirm', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.confirmLogin));
+router.post('/telegram/logout', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.logoutAccount));
+router.get('/telegram/dialogs', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.listDialogs));
 router.patch('/telegram/templates/:key', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.updateTemplate));
 router.post('/telegram/auto-replies', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.addAutoReply));
 router.post('/telegram/auto-replies/:id/disable', requireRole('owner', 'developer'), asyncHandler(telegramCtrl.disableAutoReply));

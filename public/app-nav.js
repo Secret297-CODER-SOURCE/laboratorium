@@ -61,11 +61,72 @@ export function getAppNavLinks(user = getUser()) {
   });
 }
 
+function ensureNavIndicator(list) {
+  let indicator = list.querySelector('.app-nav-indicator');
+  if (!indicator) {
+    indicator = document.createElement('li');
+    indicator.className = 'app-nav-indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    list.prepend(indicator);
+  }
+  return indicator;
+}
+
+export function moveNavIndicatorTo(list, target, { scroll = false } = {}) {
+  if (!list) return;
+  const indicator = ensureNavIndicator(list);
+  if (!target) {
+    indicator.style.opacity = '0';
+    return;
+  }
+  const listRect = list.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
+  indicator.style.opacity = '1';
+  indicator.style.width = `${rect.width}px`;
+  indicator.style.height = `${rect.height}px`;
+  indicator.style.transform = `translate3d(${rect.left - listRect.left + list.scrollLeft}px, ${rect.top - listRect.top + list.scrollTop}px, 0)`;
+  if (scroll && typeof target.scrollIntoView === 'function') {
+    target.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }
+}
+
+export function moveNavIndicator(list, activeSelector = '.app-nav-link.active') {
+  if (!list) return;
+  moveNavIndicatorTo(list, list.querySelector(activeSelector), { scroll: true });
+}
+
+function bindNavIndicatorHover(list) {
+  if (!list || list.dataset.indicatorBound === '1') return;
+  list.dataset.indicatorBound = '1';
+  list.addEventListener('pointerover', (e) => {
+    const link = e.target.closest('.app-nav-link');
+    if (link && list.contains(link)) moveNavIndicatorTo(list, link);
+  });
+  list.addEventListener('pointerleave', () => moveNavIndicator(list));
+  list.addEventListener('focusin', (e) => {
+    const link = e.target.closest('.app-nav-link');
+    if (link) moveNavIndicatorTo(list, link);
+  });
+  list.addEventListener('focusout', () => {
+    requestAnimationFrame(() => {
+      if (!list.contains(document.activeElement)) moveNavIndicator(list);
+    });
+  });
+}
+
+export function syncAppNavIndicator(root = document) {
+  root.querySelectorAll('.app-nav-links').forEach((list) => {
+    bindNavIndicatorHover(list);
+    moveNavIndicator(list);
+  });
+}
+
 export function renderAppNavLinks({ activePath = '', user = getUser() } = {}) {
   const path = activePath || (typeof location !== 'undefined' ? location.pathname : '');
   const search = typeof location !== 'undefined' ? location.search : '';
   const links = getAppNavLinks(user);
   return `<ul class="nav-links app-nav-links">
+    <li class="app-nav-indicator" aria-hidden="true"></li>
     ${links.map(link => {
       const active = linkIsActive(link, path, search) ? ' active' : '';
       return `<li><a href="${link.href}" class="app-nav-link${active}">${icon(link.icon, 'ico ico--sm')}<span class="app-nav-label">${t(link.label)}</span></a></li>`;
@@ -108,6 +169,7 @@ export function setAppNavActive(activePath = location.pathname) {
     const tab = href.includes('tab=lab') ? 'lab' : undefined;
     a.classList.toggle('active', linkIsActive({ href, tab }, activePath, search));
   });
+  syncAppNavIndicator();
 }
 
 export function refreshAppNav({ activePath = '', user = getUser() } = {}) {
@@ -119,4 +181,5 @@ export function refreshAppNav({ activePath = '', user = getUser() } = {}) {
   wrap.innerHTML = renderAppNavLinks({ activePath: activePath || location.pathname, user });
   oldLinks.replaceWith(wrap.firstElementChild);
   initBurger();
+  requestAnimationFrame(() => syncAppNavIndicator());
 }

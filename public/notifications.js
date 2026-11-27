@@ -49,8 +49,9 @@ function renderList() {
     return;
   }
   el.innerHTML = notifications.map((n) => `
-    <div class="notif-item${n.read ? '' : ' notif-item--unread'}" data-id="${n.id}" data-link="${esc(n.link || '')}">
-      <div class="notif-item-title">${esc(n.title)}</div>
+    <div class="notif-item${n.read ? ' notif-item--read' : ' notif-item--unread'}" data-id="${n.id}" data-link="${esc(n.link || '')}">
+      ${n.read ? '' : '<span class="notif-item-dot" aria-hidden="true"></span>'}
+      <div class="notif-item-title">${esc(n.title)}${n.read ? '' : ' <span class="notif-item-new">нове</span>'}</div>
       ${n.body ? `<div class="notif-item-body">${esc(n.body)}</div>` : ''}
       <div class="notif-item-time">${fmtTime(n.created_at)}</div>
     </div>`).join('')
@@ -65,7 +66,10 @@ function renderList() {
         unreadCount = Math.max(0, unreadCount - 1);
         setBadge();
         row.classList.remove('notif-item--unread');
-        api(`/notifications/${id}/read`, { method: 'POST' }).catch(() => {});
+        row.classList.add('notif-item--read');
+        try {
+          await api(`/notifications/${id}/read`, { method: 'POST', keepalive: true });
+        } catch { /* keep local read; next refresh will resync */ }
       }
       if (row.dataset.link) window.location.href = row.dataset.link;
     });
@@ -82,6 +86,7 @@ async function loadInitial() {
     notifications = rows;
     hasMore = rows.length === 20;
     renderList();
+    await refreshUnreadCount();
   } catch {
     if (el) el.innerHTML = '<p class="empty-state">Не вдалося завантажити</p>';
   }
@@ -139,6 +144,21 @@ function connectSocket() {
     setBadge();
     renderList();
     showTransientPopup(n);
+  });
+  socket.on('notification:read', ({ id } = {}) => {
+    const n = notifications.find((x) => x.id === id);
+    if (n && !n.read) {
+      n.read = true;
+      unreadCount = Math.max(0, unreadCount - 1);
+      setBadge();
+      renderList();
+    }
+  });
+  socket.on('notification:read-all', () => {
+    notifications.forEach((n) => { n.read = true; });
+    unreadCount = 0;
+    setBadge();
+    renderList();
   });
   socket.on('connect_error', () => { /* billing-suspended users can't connect — bell still works via REST */ });
 }
@@ -286,11 +306,13 @@ export function initNotificationBell(mountEl) {
     if (dropdown && !dropdown.hidden && wrap && !wrap.contains(e.target)) dropdown.hidden = true;
   });
   document.getElementById('notif-mark-all').addEventListener('click', async () => {
-    await api('/notifications/read-all', { method: 'POST' }).catch(() => {});
-    notifications.forEach((n) => { n.read = true; });
-    unreadCount = 0;
-    setBadge();
-    renderList();
+    try {
+      await api('/notifications/read-all', { method: 'POST' });
+      notifications.forEach((n) => { n.read = true; });
+      unreadCount = 0;
+      setBadge();
+      renderList();
+    } catch { /* leave unread if the server rejected the write */ }
   });
   document.getElementById('notif-announce-btn')?.addEventListener('click', openComposer);
 

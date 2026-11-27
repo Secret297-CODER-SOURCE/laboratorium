@@ -1,6 +1,6 @@
 import { updateNavAuth, initBurger, clearSession } from '/auth.js';
 import { LOGO_SVG, renderLogo } from '/logo.js';
-import { renderAppNavLinks, setAppNavActive, refreshAppNav, renderAppBottomNav } from '/app-nav.js';
+import { renderAppNavLinks, setAppNavActive, refreshAppNav, renderAppBottomNav, syncAppNavIndicator } from '/app-nav.js';
 import { t, renderLangSwitch, bindLangSwitch } from '/i18n.js';
 import { icon } from '/icons.js';
 import { initNotificationBell } from '/notifications.js';
@@ -102,19 +102,46 @@ export function renderSiteHeader({
   const searchEnabled = showSearch === undefined ? navMode === 'app' : Boolean(showSearch);
   const searchBlock = searchEnabled ? renderSearchBlock() : '';
 
-  return `<nav class="nav container${navMode === 'app' ? ' nav--app' : ''}">
+  const logout = showLogout
+    ? `<button type="button" id="logout-btn" class="nav-icon-btn nav-logout-btn" title="${t('Вийти')}" aria-label="${t('Вийти')}">${icon('logout', 'ico ico--sm')}<span class="visually-hidden">${t('Вийти')}</span></button>`
+    : '<span class="nav-logout-slot" aria-hidden="true"></span>';
+  const enroll = showEnroll
+    ? `<a href="${hashAnchors ? '#contact' : '/#contact'}" class="btn btn--outline btn--sm hide-mobile nav-enroll-btn">${t('Записатися')}</a>`
+    : '<span class="nav-enroll-slot hide-mobile" aria-hidden="true"></span>';
+
+  if (navMode === 'app') {
+    return `<nav class="nav container nav--app">
+    ${renderLogo(logoHref)}
+    ${navBlock}
+    <div class="nav-actions">
+      <div class="nav-tools">
+        ${searchBlock}
+        <span class="nav-extra-slot">${extraActions}</span>
+        <span id="notif-bell-mount"></span>
+        ${renderLangSwitch()}
+      </div>
+      <div class="nav-identity">
+        <div id="auth-nav" class="auth-nav"></div>
+        ${enroll}
+        ${logout}
+      </div>
+      <button type="button" class="burger" aria-label="${t('Меню')}" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>`;
+  }
+
+  return `<nav class="nav container">
     ${renderLogo(logoHref)}
     ${navBlock}
     <div class="nav-actions">
       ${searchBlock}
       <span class="nav-extra-slot">${extraActions}</span>
-      ${navMode === 'app' ? '<span id="notif-bell-mount"></span>' : ''}
       ${renderLangSwitch()}
       <div id="auth-nav" class="auth-nav"></div>
-      ${showEnroll ? `<a href="${hashAnchors ? '#contact' : '/#contact'}" class="btn btn--outline btn--sm hide-mobile nav-enroll-btn">${t('Записатися')}</a>` : '<span class="nav-enroll-slot hide-mobile" aria-hidden="true"></span>'}
-      ${showLogout
-    ? `<button type="button" id="logout-btn" class="btn btn--ghost btn--sm ico-inline nav-logout-btn" data-nav-icon="logout">${t('Вийти')}</button>`
-    : '<span class="nav-logout-slot" aria-hidden="true"></span>'}
+      ${enroll}
+      ${logout}
       <button type="button" class="burger" aria-label="${t('Меню')}" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -281,10 +308,12 @@ export function initSiteHeader(options = {}) {
     bindLangSwitch(document);
     bindSiteSearch(el);
     el.classList.add('is-ready');
+    bindHeaderMotion(el);
     if (options.navMode === 'app') {
       document.body.classList.add('has-app-shell');
       renderAppBottomNav({ activePath: options.activePath });
       initUserBot({ mode: 'app' });
+      requestAnimationFrame(() => syncAppNavIndicator());
     }
 
     const notifMount = document.getElementById('notif-bell-mount');
@@ -302,4 +331,18 @@ export function initSiteHeader(options = {}) {
 
   mount();
   window.addEventListener('localechange', mount);
+}
+
+function bindHeaderMotion(header) {
+  const onScroll = () => {
+    header.classList.toggle('is-scrolled', window.scrollY > 8);
+  };
+  onScroll();
+  if (!header.dataset.motionBound) {
+    header.dataset.motionBound = '1';
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', () => {
+      requestAnimationFrame(() => syncAppNavIndicator());
+    });
+  }
 }

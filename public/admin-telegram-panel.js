@@ -24,7 +24,7 @@ export function renderTelegramPanel(data = {}) {
     <div class="admin-panel-head">
       <div>
         <h2>${icon('chat', 'ico ico--md')}User-bot + адмін-бот</h2>
-        <p class="crm-panel-sub">Один Bot API: учні отримують user-bot команди, адмін — повний мануал і моніторинг. /link_me лишає цей чат адмінським.</p>
+        <p class="crm-panel-sub">Підключення через Telegram API (my.telegram.org): API ID + API Hash і вхід з акаунта. Чати обираються зі списку діалогів, не вручну.</p>
       </div>
       <span class="status-pill ${s.configured ? 'approved' : 'pending'}">${s.configured ? 'готовий' : 'не налаштовано'}</span>
     </div>
@@ -47,13 +47,30 @@ export function renderTelegramPanel(data = {}) {
 
     <form class="admin-inline-form tg-settings" id="tg-settings">
       <label class="admin-check"><input type="checkbox" name="enabled" ${s.enabled ? 'checked' : ''}> Увімкнено</label>
-      <input class="admin-inp" name="botToken" type="password" placeholder="${s.hasToken ? 'Токен збережено — введіть новий щоб змінити' : 'Bot token від @BotFather'}" autocomplete="off">
-      <input class="admin-inp" name="adminUsername" placeholder="@username адміна" value="${esc(s.adminUsername || '')}">
-      <input class="admin-inp" name="adminChatId" placeholder="Admin chat_id" value="${esc(s.adminChatId || '')}">
-      <input class="admin-inp" name="homeworkGroupChatId" placeholder="Chat_id групи для ДЗ" value="${esc(s.homeworkGroupChatId || '')}">
+      <input class="admin-inp" name="apiId" inputmode="numeric" placeholder="API ID" value="${esc(s.apiId || '')}" autocomplete="off">
+      <input class="admin-inp" name="apiHash" type="password" placeholder="${s.hasApiHash ? 'API Hash збережено — введіть новий щоб змінити' : 'API Hash'}" autocomplete="off">
+      <input class="admin-inp" name="adminUsername" placeholder="@username адміна (необовʼязково)" value="${esc(s.adminUsername || '')}">
+      <select class="admin-inp" name="adminChatId" id="tg-admin-chat" ${s.hasSession ? '' : 'disabled'}>
+        <option value="">Адмін-чат — оберіть зі списку</option>
+        ${s.adminChatId ? `<option value="${esc(s.adminChatId)}" selected>Збережено: ${esc(s.adminChatId)}</option>` : ''}
+      </select>
+      <select class="admin-inp" name="homeworkGroupChatId" id="tg-hw-chat" ${s.hasSession ? '' : 'disabled'}>
+        <option value="">Група для ДЗ — оберіть зі списку</option>
+        ${s.homeworkGroupChatId ? `<option value="${esc(s.homeworkGroupChatId)}" selected>Збережено: ${esc(s.homeworkGroupChatId)}</option>` : ''}
+      </select>
       <button type="submit" class="btn btn--primary btn--sm">Зберегти</button>
     </form>
-    <p class="billing-hint">Після /link_me в особистому чаті з ботом admin chat_id підставиться сам. У групі з ДЗ надішліть /set_hw_group.</p>
+    <form class="admin-inline-form tg-login" id="tg-login">
+      <input class="admin-inp" name="phone" placeholder="Телефон +380…" autocomplete="off">
+      <button type="submit" class="btn btn--outline btn--sm" id="tg-send-code">Надіслати код</button>
+      <input class="admin-inp" name="code" placeholder="Код з Telegram" autocomplete="one-time-code" inputmode="numeric">
+      <input class="admin-inp" name="password" type="password" placeholder="Пароль 2FA (якщо є)" autocomplete="off">
+      <button type="button" class="btn btn--outline btn--sm" id="tg-confirm-login">Увійти</button>
+      ${s.hasSession ? `<button type="button" class="btn btn--ghost btn--sm" id="tg-logout">Вийти з акаунта</button>` : ''}
+    </form>
+    <p class="billing-hint">${s.hasSession
+      ? `Сесія активна${s.phoneMasked ? ` · ${esc(s.phoneMasked)}` : ''}. Оберіть чати зі списку діалогів.`
+      : 'API ID і Hash беріть на my.telegram.org/apps, збережіть, потім увійдіть номером акаунта. Після входу зʼявиться список чатів.'}</p>
 
     <div class="admin-grid" style="margin-top:20px">
       <section class="admin-panel">
@@ -116,21 +133,106 @@ export function renderTelegramPanel(data = {}) {
   </section>`;
 }
 
+function fillChatSelect(sel, dialogs, currentId, emptyLabel) {
+  if (!sel) return;
+  const current = String(currentId || sel.value || '');
+  sel.disabled = false;
+  sel.innerHTML = `<option value="">${emptyLabel}</option>` + dialogs.map((d) => {
+    const label = `${d.title}${d.username ? ` @${d.username}` : ''} · ${d.type}`;
+    const selected = String(d.id) === current ? ' selected' : '';
+    return `<option value="${esc(d.id)}"${selected}>${esc(label)}</option>`;
+  }).join('');
+  if (current && ![...sel.options].some((o) => o.value === current)) {
+    sel.insertAdjacentHTML('beforeend', `<option value="${esc(current)}" selected>Збережено: ${esc(current)}</option>`);
+  }
+}
+
+async function hydrateTelegramDialogs(settings = {}) {
+  const adminSel = document.getElementById('tg-admin-chat');
+  const hwSel = document.getElementById('tg-hw-chat');
+  if (!adminSel || !settings.hasSession) return;
+  try {
+    const { dialogs } = await api('/admin/telegram/dialogs');
+    const list = dialogs || [];
+    fillChatSelect(adminSel, list, settings.adminChatId, 'Адмін-чат — оберіть зі списку');
+    fillChatSelect(hwSel, list, settings.homeworkGroupChatId, 'Група для ДЗ — оберіть зі списку');
+  } catch (err) {
+    adminSel.disabled = false;
+    if (!adminSel.options.length) {
+      adminSel.innerHTML = `<option value="">${esc(err.message || 'Не вдалося завантажити чати')}</option>`;
+    }
+  }
+}
+
 export function bindTelegramPanelEvents(showToast, reload) {
+  const adminSel = document.getElementById('tg-admin-chat');
+  hydrateTelegramDialogs({
+    hasSession: !!(adminSel && !adminSel.disabled),
+    adminChatId: adminSel?.value,
+    homeworkGroupChatId: document.getElementById('tg-hw-chat')?.value,
+  });
+
   document.getElementById('tg-settings')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const body = {
       enabled: fd.get('enabled') === 'on',
+      apiId: fd.get('apiId'),
       adminUsername: fd.get('adminUsername'),
       adminChatId: fd.get('adminChatId'),
       homeworkGroupChatId: fd.get('homeworkGroupChatId'),
     };
-    const token = String(fd.get('botToken') || '').trim();
-    if (token) body.botToken = token;
+    const apiHash = String(fd.get('apiHash') || '').trim();
+    if (apiHash) body.apiHash = apiHash;
     try {
       await api('/admin/telegram/settings', { method: 'PATCH', body: JSON.stringify(body) });
       showToast('Збережено');
+      reload();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('tg-login')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await api('/admin/telegram/login/code', {
+        method: 'POST',
+        body: JSON.stringify({ phone: fd.get('phone') }),
+      });
+      showToast('Код надіслано');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('tg-confirm-login')?.addEventListener('click', async () => {
+    const form = document.getElementById('tg-login');
+    const fd = new FormData(form);
+    const body = { code: fd.get('code') };
+    const password = String(fd.get('password') || '').trim();
+    if (password) body.password = password;
+    try {
+      const res = await api('/admin/telegram/login/confirm', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      if (res.needsPassword) {
+        showToast('Введіть пароль 2FA і натисніть Увійти ще раз', 'error');
+        return;
+      }
+      showToast('Увійшли в Telegram');
+      reload();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('tg-logout')?.addEventListener('click', async () => {
+    try {
+      await api('/admin/telegram/logout', { method: 'POST' });
+      showToast('Сесію скинуто');
       reload();
     } catch (err) {
       showToast(err.message, 'error');

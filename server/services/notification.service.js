@@ -72,16 +72,20 @@ export function getUnreadCount(userId) {
 }
 
 export function markRead(userId, id) {
-  const row = db.prepare('SELECT id FROM notifications WHERE id = ? AND user_id = ?').get(id, userId);
+  const row = db.prepare('SELECT id, read_at FROM notifications WHERE id = ? AND user_id = ?').get(id, userId);
   if (!row) throw new NotFoundError('Сповіщення не знайдено');
-  db.prepare(`UPDATE notifications SET read_at = datetime('now') WHERE id = ?`).run(id);
-  return { ok: true };
+  if (!row.read_at) {
+    db.prepare(`UPDATE notifications SET read_at = datetime('now') WHERE id = ? AND user_id = ? AND read_at IS NULL`).run(id, userId);
+  }
+  emitToUser(userId, 'notification:read', { id });
+  return { ok: true, read: true };
 }
 
 export function markAllRead(userId) {
   db.prepare(`
     UPDATE notifications SET read_at = datetime('now') WHERE user_id = ? AND read_at IS NULL
   `).run(userId);
+  emitToUser(userId, 'notification:read-all', {});
   return { ok: true };
 }
 

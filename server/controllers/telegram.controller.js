@@ -13,7 +13,34 @@ export async function getMonitor(req, res) {
 
 export async function updateSettings(req, res) {
   const settings = settingsService.saveTelegramSettings(req.body);
+  telegramBot.restartTelegramClient().catch(() => {});
   res.json({ settings, message: 'Telegram налаштування збережено' });
+}
+
+export async function sendLoginCode(req, res) {
+  const result = await telegramBot.sendLoginCode(req.body.phone);
+  res.json({ ...result, message: result.viaApp ? 'Код надіслано в Telegram' : 'Код надіслано SMS' });
+}
+
+export async function confirmLogin(req, res) {
+  const result = await telegramBot.confirmLogin({
+    code: req.body.code,
+    password: req.body.password,
+  });
+  if (result.ok) {
+    await telegramBot.restartTelegramClient().catch(() => {});
+  }
+  res.json(result);
+}
+
+export async function logoutAccount(req, res) {
+  const settings = await telegramBot.logoutAccount();
+  res.json({ settings, message: 'Сесію Telegram скинуто' });
+}
+
+export async function listDialogs(req, res) {
+  const dialogs = await telegramBot.listAccountDialogs();
+  res.json({ dialogs });
 }
 
 export async function updateTemplate(req, res) {

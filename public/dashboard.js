@@ -1414,6 +1414,20 @@ async function loadCtfActivity() {
   } catch { /* тиха відмова — стрічка не критична */ }
 }
 
+function renderCtfStageBrief(s, { open = false } = {}) {
+  const desc = s.description
+    ? `<p class="ctf-stage-desc">${escapeHtml(s.description)}</p>`
+    : '';
+  const hint = s.hint_unlocked && s.hint_text
+    ? `<p class="ctf-stage-hint-text ico-inline">${icon('lightbulb', 'ico ico--sm')}${escapeHtml(s.hint_text)}</p>`
+    : '';
+  if (!desc && !hint) return '';
+  return `<details class="ctf-stage-brief"${open ? ' open' : ''}>
+    <summary class="ctf-stage-brief-toggle">${icon('chevron-down', 'ico ico--sm')}${t('Умова етапу')}</summary>
+    ${desc}${hint}
+  </details>`;
+}
+
 function renderCtfStageChain(c) {
   return c.stages.map((s, i) => {
     if (s.completed) {
@@ -1422,6 +1436,7 @@ function renderCtfStageChain(c) {
         <div class="ctf-stage-body">
           <strong>${escapeHtml(s.title)}</strong>
           <span class="ctf-stage-pts">+${s.points_awarded ?? s.points} pts</span>
+          ${renderCtfStageBrief(s, { open: true })}
         </div>
       </div>`;
     }
@@ -1537,10 +1552,9 @@ function renderCtfList() {
         ) : ''}
         <div class="ctf-progress-bar"><div class="ctf-progress-fill" style="width:${progressPct}%"></div></div>
         <div class="ctf-progress-label">${t('{solved}/{total} стадій', { solved: solvedCount, total: c.stages.length })} · ${earnedPts}/${c.bounty_reward} pts</div>
+        ${c.completed ? `<p class="ctf-all-done ico-inline">${icon('check', 'ico ico--sm')}${t('Усі стадії пройдено 🎉')}</p>` : ''}
         <div class="ctf-stage-chain">
-          ${c.completed
-            ? `<div class="ctf-stage-item ctf-stage-item--done"><span class="ctf-stage-num">${icon('check', 'ico ico--sm')}</span><div class="ctf-stage-body"><strong>${t('Усі стадії пройдено 🎉')}</strong></div></div>`
-            : renderCtfStageChain(c)}
+          ${renderCtfStageChain(c)}
         </div>
       </article>`;
   }).join('');

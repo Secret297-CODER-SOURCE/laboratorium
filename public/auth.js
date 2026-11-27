@@ -1,6 +1,7 @@
 import { initTheme as startThemes, getAccentColor } from '/theme-engine.js';
 import { isAdminUser, isRestrictedUser } from '/roles.js';
 import { t, getLocale } from '/i18n.js';
+import { icon } from '/icons.js';
 import '/error-reporter.js';
 
 const TOKEN_KEY = 'lab_token';
@@ -222,15 +223,19 @@ export function updateNavAuth() {
     const onAdminPage = window.location.pathname.endsWith('/admin.html');
     if (logo) logo.setAttribute('href', marketingHome ? '/' : getSiteHome());
     const adminHtml = isAdmin && !onAdminPage
-      ? `<a href="/admin.html" class="btn btn--ghost btn--sm nav-admin-link">${t('Адмін')}</a>`
+      ? `<a href="/admin.html" class="nav-icon-btn nav-admin-link" title="${t('Адмін')}" aria-label="${t('Адмін')}">${icon('grid', 'ico ico--sm')}<span class="nav-icon-btn__label">${t('Адмін')}</span></a>`
       : '';
     const localeTag = { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU' }[getLocale()] || 'uk-UA';
     const pts = (user.bounty_points ?? 0).toLocaleString(localeTag);
+    const initial = String(user.handle || '?').slice(0, 1).toUpperCase();
     slot.innerHTML = `
       ${adminHtml}
-      <a href="${home}" class="btn btn--outline btn--sm nav-user" title="@${user.handle} · ${pts} pts">
-        <span class="nav-handle">@${user.handle}</span>
-        <span class="nav-pts"><span class="nav-pts-val">${pts}</span> pts</span>
+      <a href="${home}" class="nav-user" title="@${user.handle} · ${pts} pts">
+        <span class="nav-avatar" aria-hidden="true">${initial}</span>
+        <span class="nav-user-meta">
+          <span class="nav-handle">@${user.handle}</span>
+          <span class="nav-pts"><span class="nav-pts-val">${pts}</span> pts</span>
+        </span>
       </a>
     `;
   } else {

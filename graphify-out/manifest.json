@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1794698386.8766248,
-    "seen": 1794699528.218233,
-    "ast_hash": "2f2a2638a22a31219374c6a5d5d9b121",
+    "mtime": 1795817170.389022,
+    "seen": 1795817405.77466,
+    "ast_hash": "aca013eaf0c41c2762768ae2f4c7333c",
     "semantic_hash": ""
   },
   "public/achievement-cards.js": {
@@ -258,15 +258,15 @@
     "semantic_hash": ""
   },
   "public/app-nav.js": {
-    "mtime": 1795383344.8590488,
-    "seen": 1795383639.9604821,
-    "ast_hash": "aa53535ea2b686f8abdfa54031157d1c",
+    "mtime": 1795816817.5080109,
+    "seen": 1795817405.7746859,
+    "ast_hash": "315c75a75550b372a56f9de48a3ebb13",
     "semantic_hash": ""
   },
   "public/auth.js": {
-    "mtime": 1794698386.8808014,
-    "seen": 1794699528.218252,
-    "ast_hash": "6395807f8c2ff5d23cbea8f9361b7dfe",
+    "mtime": 1795816481.901472,
+    "seen": 1795816518.462367,
+    "ast_hash": "b069fc6aa40ee76c1c89fdbb5ff1ae45",
     "semantic_hash": ""
   },
   "public/chat-stickers.js": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "public/conferences.js": {
-    "mtime": 1794776354.1805394,
-    "seen": 1794776442.025711,
-    "ast_hash": "596604b829a2855cfe21490c21ba60a0",
+    "mtime": 1795816456.3042953,
+    "seen": 1795816518.462373,
+    "ast_hash": "6ba6c88416622541ce84b50dea0e6b77",
     "semantic_hash": ""
   },
   "public/content-builder.js": {
@@ -312,9 +312,9 @@
     "semantic_hash": ""
   },
   "public/dashboard.js": {
-    "mtime": 1795383528.0124605,
-    "seen": 1795383639.96049,
-    "ast_hash": "e549707779bcf964acba7252395529b6",
+    "mtime": 1795817849.224537,
+    "seen": 1795817935.420599,
+    "ast_hash": "f72d8ac3bfba270db3af82550fd0dd5f",
     "semantic_hash": ""
   },
   "public/dialog.js": {
@@ -342,9 +342,9 @@
     "semantic_hash": ""
   },
   "public/i18n-en.js": {
-    "mtime": 1795247325.7838585,
-    "seen": 1795247349.226649,
-    "ast_hash": "76ba7b7d1e2cc47cdfa16190b69cb663",
+    "mtime": 1795817851.3242536,
+    "seen": 1795817935.420604,
+    "ast_hash": "037e7e1ac946a77f50787262bb15aef4",
     "semantic_hash": ""
   },
   "public/i18n.js": {
@@ -402,9 +402,9 @@
     "semantic_hash": ""
   },
   "public/notifications.js": {
-    "mtime": 1794698386.8882654,
-    "seen": 1794699528.21827,
-    "ast_hash": "afaaee721532fa0586a1cc57fe6853d3",
+    "mtime": 1795817349.2117038,
+    "seen": 1795817405.774714,
+    "ast_hash": "b4e0923e24dff2782da7e8173394ef0f",
     "semantic_hash": ""
   },
   "public/number-inputs.js": {
@@ -450,9 +450,9 @@
     "semantic_hash": ""
   },
   "public/site-header.js": {
-    "mtime": 1795383476.95523,
-    "seen": 1795383639.960507,
-    "ast_hash": "87369acaa6753ea8a01d9ffb3ae3ff36",
+    "mtime": 1795816285.8508904,
+    "seen": 1795816518.462404,
+    "ast_hash": "9246af7343c1724f67af349899cea690",
     "semantic_hash": ""
   },
   "public/site-qr.js": {
@@ -750,9 +750,9 @@
     "semantic_hash": ""
   },
   "server/routes/admin.routes.js": {
-    "mtime": 1795383507.5844767,
-    "seen": 1795383639.960546,
-    "ast_hash": "0f1acc1d76ecc3ea8aa99e2fc06dabb6",
+    "mtime": 1795817265.4909034,
+    "seen": 1795817405.7747872,
+    "ast_hash": "1c71827af0d5ffa2a4b0c6ba174586a9",
     "semantic_hash": ""
   },
   "server/routes/api.routes.js": {
@@ -1008,9 +1008,9 @@
     "semantic_hash": ""
   },
   "server/services/notification.service.js": {
-    "mtime": 1794698386.9089146,
-    "seen": 1794699528.218349,
-    "ast_hash": "9b79124e5e502a14789df4efec3d7663",
+    "mtime": 1795817304.1009903,
+    "seen": 1795817405.774845,
+    "ast_hash": "4adbadce2f434e4c72f5286b5cb28873",
     "semantic_hash": ""
   },
   "server/services/password.service.js": {
@@ -1074,9 +1074,9 @@
     "semantic_hash": ""
   },
   "server/services/settings.service.js": {
-    "mtime": 1794766294.0406199,
-    "seen": 1794766638.922527,
-    "ast_hash": "988583756d727572c9d688b10f834534",
+    "mtime": 1795817222.457828,
+    "seen": 1795817405.774859,
+    "ast_hash": "947c2077c4ec155e826e8ba01dcba875",
     "semantic_hash": ""
   },
   "server/services/stats.service.js": {
@@ -1266,9 +1266,9 @@
     "semantic_hash": ""
   },
   "public/conferences.html": {
-    "mtime": 1794766245.316883,
-    "seen": 1794766638.922587,
-    "ast_hash": "7bcf267371df5c47a4e543d43ad2ea4b",
+    "mtime": 1795816292.8838193,
+    "seen": 1795816518.4625962,
+    "ast_hash": "0d1c3b2db47f6daec5b089e9862fe616",
     "semantic_hash": ""
   },
   "public/content-builder.html": {
@@ -1416,9 +1416,9 @@
     "semantic_hash": ""
   },
   "public/admin-telegram-panel.js": {
-    "mtime": 1795383514.0886455,
-    "seen": 1795383639.960479,
-    "ast_hash": "2d057adba24569ea719e51138c775bfd",
+    "mtime": 1795817291.9734395,
+    "seen": 1795817405.774682,
+    "ast_hash": "a3d007db123d27e547fbdf696ff57f26",
     "semantic_hash": ""
   },
   "public/timezone.js": {
@@ -1440,9 +1440,9 @@
     "semantic_hash": ""
   },
   "server/controllers/telegram.controller.js": {
-    "mtime": 1795383507.463993,
-    "seen": 1795383639.9605381,
-    "ast_hash": "7648a6331a970a8b75177c165bdc5ea3",
+    "mtime": 1795817261.3787794,
+    "seen": 1795817405.774774,
+    "ast_hash": "956079756665e5cb1685ad827fd71e0c",
     "semantic_hash": ""
   },
   "server/services/homework-reminder.service.js": {
@@ -1464,15 +1464,15 @@
     "semantic_hash": ""
   },
   "server/services/telegram-bot.service.js": {
-    "mtime": 1795383621.4604352,
-    "seen": 1795383639.960599,
-    "ast_hash": "1b1f387cf33e8fe2dd7b0b81e2cdb957",
+    "mtime": 1795817273.203424,
+    "seen": 1795817405.774868,
+    "ast_hash": "23ef7be6ab9d19879618fc9340ad6ca6",
     "semantic_hash": ""
   },
   "server/services/telegram.service.js": {
-    "mtime": 1794765527.1567247,
-    "seen": 1794766638.9225411,
-    "ast_hash": "5a88789806c82ff2706accbdcab570b9",
+    "mtime": 1795817392.265306,
+    "seen": 1795817405.774869,
+    "ast_hash": "dccfe49190f8bc90c1d4b5301a47b317",
     "semantic_hash": ""
   },
   "public/user-handle.js": {
@@ -1638,9 +1638,9 @@
     "semantic_hash": ""
   },
   "tests/ux-production-criteria.test.js": {
-    "mtime": 1795383613.3459837,
-    "seen": 1795383639.9606159,
-    "ast_hash": "f59adc1eb48348b2311d2368938617c9",
+    "mtime": 1795817340.3422651,
+    "seen": 1795817405.774904,
+    "ast_hash": "f01156d5211b0fd499c057cd992c8533",
     "semantic_hash": ""
   },
   "public/room-stage.js": {
@@ -1677,6 +1677,30 @@
     "mtime": 1795387235.1335626,
     "seen": 1795387261.953283,
     "ast_hash": "43d0e9ad298e85545df870dbbd7bf724",
+    "semantic_hash": ""
+  },
+  "tests/header-strip.test.js": {
+    "mtime": 1795816485.0688047,
+    "seen": 1795816518.462571,
+    "ast_hash": "df1f0484b7be78eb1bcaf783c2569168",
+    "semantic_hash": ""
+  },
+  "tests/notifications-read.test.js": {
+    "mtime": 1795817354.9124877,
+    "seen": 1795817405.7748961,
+    "ast_hash": "e5e02eabef6770b0c7f1bc0b1b8501d5",
+    "semantic_hash": ""
+  },
+  "tests/telegram-account.test.js": {
+    "mtime": 1795817350.5933683,
+    "seen": 1795817405.774903,
+    "ast_hash": "329a23c8e8f656cb2478a7ff51014d81",
+    "semantic_hash": ""
+  },
+  "tests/ctf-stage-brief.test.js": {
+    "mtime": 1795817914.021484,
+    "seen": 1795817935.4207869,
+    "ast_hash": "422cf3090035cf4d0ebefe899192a074",
     "semantic_hash": ""
   }
 }

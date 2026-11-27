@@ -330,11 +330,21 @@ function loadTelegramRaw() {
   }
 }
 
+function maskPhone(phone) {
+  const digits = String(phone || '').replace(/[^\d+]/g, '');
+  if (digits.length < 6) return '';
+  return `${digits.slice(0, 4)}***${digits.slice(-2)}`;
+}
+
 export function getTelegramConfig() {
   const stored = loadTelegramRaw();
+  const apiId = parseInt(stored.apiId, 10);
   return {
     enabled: !!stored.enabled,
-    botToken: stored.botToken || '',
+    apiId: Number.isFinite(apiId) && apiId > 0 ? apiId : 0,
+    apiHash: String(stored.apiHash || '').trim(),
+    session: String(stored.session || '').trim(),
+    phone: String(stored.phone || '').trim(),
     adminUsername: (stored.adminUsername || '').replace(/^@/, ''),
     adminChatId: stored.adminChatId ? String(stored.adminChatId) : '',
     homeworkGroupChatId: stored.homeworkGroupChatId ? String(stored.homeworkGroupChatId) : '',
@@ -345,21 +355,34 @@ export function getTelegramSettingsPublic() {
   const cfg = getTelegramConfig();
   return {
     enabled: cfg.enabled,
-    hasToken: !!cfg.botToken,
+    apiId: cfg.apiId || '',
+    hasApiHash: !!cfg.apiHash,
+    hasSession: !!cfg.session,
+    phoneMasked: maskPhone(cfg.phone),
     adminUsername: cfg.adminUsername,
     adminChatId: cfg.adminChatId,
     homeworkGroupChatId: cfg.homeworkGroupChatId,
-    configured: !!(cfg.enabled && cfg.botToken),
+    configured: !!(cfg.enabled && cfg.apiId && cfg.apiHash && cfg.session),
   };
 }
 
 export function saveTelegramSettings(data = {}) {
   const merged = getTelegramConfig();
+  const nextApiId = data.apiId !== undefined
+    ? parseInt(data.apiId, 10)
+    : merged.apiId;
   const payload = {
     enabled: data.enabled !== undefined ? !!data.enabled : merged.enabled,
-    botToken: data.botToken !== undefined
-      ? (String(data.botToken || '').trim() || merged.botToken)
-      : merged.botToken,
+    apiId: Number.isFinite(nextApiId) && nextApiId > 0 ? nextApiId : merged.apiId,
+    apiHash: data.apiHash !== undefined
+      ? (String(data.apiHash || '').trim() || merged.apiHash)
+      : merged.apiHash,
+    session: data.session !== undefined
+      ? String(data.session || '').trim()
+      : merged.session,
+    phone: data.phone !== undefined
+      ? String(data.phone || '').trim()
+      : merged.phone,
     adminUsername: data.adminUsername !== undefined
       ? String(data.adminUsername || '').replace(/^@/, '').trim()
       : merged.adminUsername,
@@ -370,8 +393,8 @@ export function saveTelegramSettings(data = {}) {
       ? String(data.homeworkGroupChatId || '').trim()
       : merged.homeworkGroupChatId,
   };
-  if (payload.enabled && !payload.botToken) {
-    throw new ValidationError('Вкажіть токен Telegram-бота');
+  if (payload.enabled && (!payload.apiId || !payload.apiHash)) {
+    throw new ValidationError('Вкажіть Telegram API ID і API Hash з my.telegram.org');
   }
   db.prepare(`
     INSERT INTO platform_settings (key, value, updated_at)

@@ -27,18 +27,20 @@
 
   <main class="conferences-page">
     <div class="container">
-      <div class="conf-header">
-        <div>
-          <span class="section-tag">// конференції</span>
-          <h1>Відеоконференції <span class="accent">laboratorium.</span></h1>
+      <div class="conf-stage">
+        <div class="conf-header">
+          <div class="conf-header-copy">
+            <span class="section-tag">// конференції</span>
+            <h1>Відеоконференції <span class="accent">laboratorium.</span></h1>
+          </div>
+          <button class="btn btn--primary ico-inline conf-create-btn" id="create-conf-btn" data-nav-icon="plus">Створити конференцію</button>
         </div>
-        <button class="btn btn--primary ico-inline" id="create-conf-btn" data-nav-icon="plus">Створити конференцію</button>
-      </div>
-
-      <div class="conf-tabs">
-        <button class="conf-tab active" data-tab="calendar" data-nav-icon="calendar">Календар</button>
-        <button class="conf-tab" data-tab="upcoming" data-nav-icon="clock">Майбутні</button>
-        <button class="conf-tab" data-tab="all" data-nav-icon="grid">Усі</button>
+        <div class="conf-tabs" role="tablist" aria-label="Розділи конференцій">
+          <span class="conf-tab-indicator" aria-hidden="true"></span>
+          <button class="conf-tab active" data-tab="calendar" data-nav-icon="calendar" role="tab" aria-selected="true">Календар</button>
+          <button class="conf-tab" data-tab="upcoming" data-nav-icon="clock" role="tab" aria-selected="false">Майбутні</button>
+          <button class="conf-tab" data-tab="all" data-nav-icon="grid" role="tab" aria-selected="false">Усі</button>
+        </div>
       </div>
 
       <div id="tab-calendar">

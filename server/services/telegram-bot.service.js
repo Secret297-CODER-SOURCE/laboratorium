@@ -7,8 +7,6 @@ import { listStudentLessons } from './schedule.service.js';
 import * as errorLog from './error-log.service.js';
 
 let polling = false;
-let offset = 0;
-let pollTimer = null;
 
 function siteBase() {
   return String(config.siteUrl || 'https://laboratorium.club').replace(/\/+$/, '');
@@ -150,22 +148,70 @@ async function handlePayAsk(adminChatId) {
     await reply(adminChatId, 'Немає учнів з наближенням/простроченням оплати.');
     return;
   }
-  const pending = db.prepare(`
+  db.prepare(`
     INSERT INTO telegram_pending (admin_chat_id, kind, payload, status)
     VALUES (?, 'payment_pick', ?, 'open')
-  `).run(String(adminChatId), JSON.stringify({ selected: [] }));
+  `).run(String(adminChatId), JSON.stringify({
+    selected: [],
+    students: list.map((s) => ({ id: s.id, name: s.name, handle: s.handle })),
+  }));
+  const lines = list.map((s, i) => `${i + 1}. ${s.name} (@${s.handle})`);
+  await reply(adminChatId, [
+    'Оберіть учнів номерами:',
+    lines.join('\n'),
+    '',
+    'Далі: /pay_sel 1 3',
+    'Надіслати: /pay_go',
+    'Скасувати: /pay_cancel',
+  ].join('\n'));
+}
 
-  const keyboard = {
-    inline_keyboard: [
-      ...list.map((s) => ([{
-        text: `${s.name} (@${s.handle})`,
-        callback_data: `pay:${pending.lastInsertRowid}:${s.id}`,
-      }])),
-      [{ text: '✅ Надіслати вибраним', callback_data: `pay_send:${pending.lastInsertRowid}` }],
-      [{ text: '❌ Скасувати', callback_data: `pay_cancel:${pending.lastInsertRowid}` }],
-    ],
-  };
-  await reply(adminChatId, 'Оберіть учнів для нагадування про оплату:', { reply_markup: keyboard });
+function openPayPending(adminChatId) {
+  return db.prepare(`
+    SELECT * FROM telegram_pending
+    WHERE admin_chat_id = ? AND kind = 'payment_pick' AND status = 'open'
+    ORDER BY id DESC LIMIT 1
+  `).get(String(adminChatId));
+}
+
+async function handlePayPickCommand(msg) {
+  const chatId = msg.chat.id;
+  const cmd = commandName(msg.text);
+  const row = openPayPending(chatId);
+  if (!row) {
+    await reply(chatId, 'Немає відкритого вибору оплати. /pay_ask');
+    return;
+  }
+  const payload = JSON.parse(row.payload || '{}');
+  const students = payload.students || [];
+  if (cmd === '/pay_cancel') {
+    db.prepare(`UPDATE telegram_pending SET status = 'cancelled', resolved_at = datetime('now') WHERE id = ?`)
+      .run(row.id);
+    await reply(chatId, 'Скасовано.');
+    return;
+  }
+  if (cmd === '/pay_go') {
+    const selected = payload.selected || [];
+    const sent = await sendPaymentToUsers(selected);
+    db.prepare(`UPDATE telegram_pending SET status = 'done', resolved_at = datetime('now') WHERE id = ?`)
+      .run(row.id);
+    await reply(chatId, `Надіслано нагадувань про оплату: ${sent} з ${selected.length}`);
+    return;
+  }
+  const nums = String(msg.text || '').replace(/^\/pay_sel\s*/i, '').match(/\d+/g) || [];
+  const selected = new Set(payload.selected || []);
+  for (const n of nums) {
+    const idx = parseInt(n, 10);
+    const student = students[idx - 1] || students.find((s) => s.id === idx);
+    if (student) {
+      if (selected.has(student.id)) selected.delete(student.id);
+      else selected.add(student.id);
+    }
+  }
+  payload.selected = [...selected];
+  db.prepare('UPDATE telegram_pending SET payload = ? WHERE id = ?')
+    .run(JSON.stringify(payload), row.id);
+  await reply(chatId, `Обрано: ${payload.selected.length}. /pay_go або /pay_cancel`);
 }
 
 async function sendPaymentToUsers(userIds) {
@@ -268,7 +314,7 @@ export function getSiteMonitor() {
       SELECT COUNT(*) AS n FROM telegram_message_log
       WHERE direction = 'in' AND created_at >= datetime('now', '-1 day')
     `),
-    botEnabled: !!(c.enabled && c.botToken),
+    botEnabled: !!(c.enabled && c.session),
     hasAdminChat: !!c.adminChatId,
     uptimeSec: Math.floor(process.uptime()),
     memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
@@ -401,7 +447,7 @@ async function handleAdminCommand(msg) {
   }
   if (cmd === '/status') {
     const c = cfg();
-    await reply(chatId, `Бот: ${c.enabled ? 'увімкнено' : 'вимкнено'}\nAdmin: @${c.adminUsername || '—'}\nAdmin chat: ${c.adminChatId || chatId}\nДЗ-група: ${c.homeworkGroupChatId || '—'}`);
+    await reply(chatId, `Telegram: ${c.enabled && c.session ? 'увімкнено' : 'вимкнено'}\nAdmin: @${c.adminUsername || '—'}\nAdmin chat: ${c.adminChatId || chatId}\nДЗ-група: ${c.homeworkGroupChatId || '—'}`);
     return;
   }
   if (cmd === '/monitor') {
@@ -450,6 +496,10 @@ async function handleAdminCommand(msg) {
   }
   if (cmd === '/pay_ask') {
     await handlePayAsk(chatId);
+    return;
+  }
+  if (cmd === '/pay_sel' || cmd === '/pay_go' || cmd === '/pay_cancel') {
+    await handlePayPickCommand(msg);
     return;
   }
   if (cmd === '/reply') {
@@ -593,35 +643,21 @@ async function handleUpdate(update) {
   }
 }
 
-async function pollOnce() {
-  const c = cfg();
-  if (!c.enabled || !c.botToken) return;
-  const res = await tg.getUpdates(offset, 20);
-  if (!res.ok) return;
-  for (const update of res.result || []) {
-    offset = update.update_id + 1;
-    try {
-      await handleUpdate(update);
-    } catch (err) {
-      console.error('[telegram-bot] update error:', err.message);
-    }
-  }
-}
-
 export function startTelegramBotPolling() {
   if (polling) return;
   polling = true;
-  const loop = async () => {
-    try {
-      await pollOnce();
-    } catch (err) {
-      console.error('[telegram-bot] poll error:', err.message);
-    }
-    pollTimer = setTimeout(loop, 1200);
-    pollTimer.unref?.();
-  };
-  loop();
-  console.log('[telegram-bot] polling started (enable + token in admin settings)');
+  tg.setUpdateHandler(handleUpdate);
+  tg.startClient().then((ok) => {
+    console.log(ok
+      ? '[telegram] MTProto client started'
+      : '[telegram] waiting for API ID/hash + session in admin settings');
+  });
+}
+
+export async function restartTelegramClient() {
+  polling = true;
+  tg.setUpdateHandler(handleUpdate);
+  return tg.restartClient();
 }
 
 export function getAdminOverview() {
@@ -634,3 +670,10 @@ export function getAdminOverview() {
     monitor: getSiteMonitor(),
   };
 }
+
+export {
+  sendLoginCode,
+  confirmLogin,
+  logoutAccount,
+  listAccountDialogs,
+} from './telegram.service.js';

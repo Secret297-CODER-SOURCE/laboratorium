@@ -5,43 +5,115 @@
   min-height: 100vh;
 }
 
+.conf-stage {
+  margin-bottom: 28px;
+  animation: confStageIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes confStageIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .conf-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 40px;
+  align-items: flex-end;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 16px 24px;
+}
+
+.conf-header-copy .section-tag {
+  margin-bottom: 8px;
+  opacity: 0.8;
 }
 
 .conf-header h1 {
-  font-size: 2rem;
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem);
   font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.conf-create-btn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  padding: 11px 20px;
+  isolation: isolate;
+}
+
+.conf-create-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.32) 50%, transparent 65%);
+  transform: translateX(-130%);
+}
+
+.conf-create-btn:hover::after {
+  transform: translateX(130%);
+  transition: transform 0.65s ease;
 }
 
 .conf-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 32px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 28px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--border-accent) 70%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-card) 88%, #000 12%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent);
+}
+
+.conf-tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
+  opacity: 0;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease;
 }
 
 .conf-tab {
-  padding: 12px 20px;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 18px;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
   font-size: 0.85rem;
   color: var(--text-muted);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
 }
 
-.conf-tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
+.conf-tab.active { color: var(--accent); }
 
 .conf-tab:hover { color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .conf-stage,
+  .conf-tab-indicator,
+  .conf-create-btn::after {
+    animation: none;
+    transition: none;
+  }
+}
 
 /* Calendar */
 .calendar-wrap {
@@ -393,4 +465,8 @@
   #create-modal .modal-form-row { grid-template-columns: 1fr; }
   #create-modal .modal { padding: 24px 20px; }
   #create-modal.modal-overlay { padding: 16px; }
+  .conf-header { align-items: flex-start; }
+  .conf-header .conf-create-btn { width: auto; align-self: flex-start; }
+  .conf-tabs { display: flex; width: 100%; }
+  .conf-tab { flex: 1 1 0; justify-content: center; padding-left: 10px; padding-right: 10px; }
 }
