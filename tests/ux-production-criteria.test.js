@@ -78,6 +78,8 @@ test('C6 site monitor never serializes bot tokens or passwords', () => {
 test('C7 student tools dock + lab subtabs are wired into the cabinet', () => {
   const html = read('public/dashboard.html');
   const js = read('public/dashboard.js');
+  const tools = read('public/lab-tools.js');
+  const css = read('public/dashboard.css');
   assert.match(html, /dash-tools-dock/);
   assert.match(html, /tab=lab&lab=tools/);
   assert.match(js, /function applyLabSubtab/);
@@ -85,6 +87,10 @@ test('C7 student tools dock + lab subtabs are wired into the cabinet', () => {
   assert.ok(ids.includes('timestamp'));
   assert.ok(ids.includes('case'));
   assert.ok(ids.includes('unicode'));
+  assert.ok(ids.includes('codec'));
+  assert.match(tools, /data-wb="codec-in"/);
+  assert.match(tools, /CODEC_FORMATS/);
+  assert.match(css, /\.lt-codec-panes/);
 });
 
 test('C8 in-app user-bot is an assistant, not a second Telegram identity', () => {

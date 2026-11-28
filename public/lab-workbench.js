@@ -44,6 +44,72 @@ export function rot13(value) {
   });
 }
 
+const HTML_NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' };
+
+export function htmlEncode(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function htmlDecode(value) {
+  return String(value).replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (match, body) => {
+    if (body[0] === '#') {
+      const hex = body[1] === 'x' || body[1] === 'X';
+      const cp = hex ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+      if (!Number.isFinite(cp) || cp < 0 || cp > 0x10ffff) return match;
+      try { return String.fromCodePoint(cp); } catch { return match; }
+    }
+    return HTML_NAMED[body.toLowerCase()] ?? match;
+  });
+}
+
+export function binaryEncode(value) {
+  return Array.from(new TextEncoder().encode(String(value)))
+    .map((byte) => byte.toString(2).padStart(8, '0'))
+    .join(' ');
+}
+
+export function binaryDecode(value) {
+  const bits = String(value).replace(/[^01]/g, '');
+  if (!bits.length || bits.length % 8 !== 0) {
+    throw new Error('очікується двійковий рядок, кратний 8 бітам');
+  }
+  const bytes = new Uint8Array(bits.length / 8);
+  for (let i = 0; i < bytes.length; i += 1) bytes[i] = parseInt(bits.substr(i * 8, 8), 2);
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+}
+
+export const CODEC_FORMATS = [
+  { id: 'base64', name: 'Base64' },
+  { id: 'hex', name: 'Hex' },
+  { id: 'url', name: 'URL' },
+  { id: 'html', name: 'HTML' },
+  { id: 'binary', name: 'Binary' },
+  { id: 'rot13', name: 'ROT13' },
+];
+
+export function codecConvert(value, format, direction = 'encode') {
+  const text = String(value ?? '');
+  if (!CODEC_FORMATS.some((item) => item.id === format)) {
+    throw new Error('невідомий формат');
+  }
+  if (text === '') return '';
+  const decode = direction === 'decode';
+  switch (format) {
+    case 'base64': return decode ? base64ToText(text) : textToBase64(text);
+    case 'hex': return decode ? hexDecode(text) : hexEncode(text);
+    case 'url': return decode ? decodeURIComponent(text.replace(/\+/g, ' ')) : encodeURIComponent(text);
+    case 'html': return decode ? htmlDecode(text) : htmlEncode(text);
+    case 'binary': return decode ? binaryDecode(text) : binaryEncode(text);
+    case 'rot13': return rot13(text);
+    default: throw new Error('невідомий формат');
+  }
+}
+
 export async function sha256Hex(value) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -538,6 +604,7 @@ export const TOOL_CATEGORIES = [
 ];
 
 export const WORKBENCH_TOOLS = [
+  { id: 'codec', category: 'encoding', name: 'Кодер / декодер', inputLabel: 'Текст' },
   { id: 'url', category: 'encoding', name: 'URL кодування', inputLabel: 'Текст або URL-компонент' },
   { id: 'base64', category: 'encoding', name: 'Base64', inputLabel: 'Текст' },
   { id: 'hex', category: 'encoding', name: 'Hex кодування', inputLabel: 'Текст' },

@@ -258,9 +258,9 @@
     "semantic_hash": ""
   },
   "public/app-nav.js": {
-    "mtime": 1795819178.5146518,
-    "seen": 1795819261.963565,
-    "ast_hash": "133816db8e923b858794acb4a7bcbf77",
+    "mtime": 1795820788.5029223,
+    "seen": 1795820923.63436,
+    "ast_hash": "cca4ec3431bfe74378e67a5e0ba3201c",
     "semantic_hash": ""
   },
   "public/auth.js": {
@@ -342,9 +342,9 @@
     "semantic_hash": ""
   },
   "public/i18n-en.js": {
-    "mtime": 1795817851.3242536,
-    "seen": 1795817935.420604,
-    "ast_hash": "037e7e1ac946a77f50787262bb15aef4",
+    "mtime": 1795859072.2042615,
+    "seen": 1795859143.349899,
+    "ast_hash": "22d75fd8ab097df8ba155fdaa15aa55b",
     "semantic_hash": ""
   },
   "public/i18n.js": {
@@ -366,15 +366,15 @@
     "semantic_hash": ""
   },
   "public/lab-tools.js": {
-    "mtime": 1795383321.7582154,
-    "seen": 1795383639.9604962,
-    "ast_hash": "18a387fdbbe24c56aaa629765df0c825",
+    "mtime": 1795859068.6917934,
+    "seen": 1795859143.349903,
+    "ast_hash": "d085b76b00c449d7abc4ce4903c11968",
     "semantic_hash": ""
   },
   "public/lab-workbench.js": {
-    "mtime": 1795383318.9566686,
-    "seen": 1795383639.960497,
-    "ast_hash": "23bc0f041ac5d0798aed12a8d9dfee2f",
+    "mtime": 1795859051.1240327,
+    "seen": 1795859143.3499038,
+    "ast_hash": "33b7b124ce44b58751306ae6584606ab",
     "semantic_hash": ""
   },
   "public/logo.js": {
@@ -1206,9 +1206,9 @@
     "semantic_hash": ""
   },
   "tests/lab-workbench.test.js": {
-    "mtime": 1795383549.9500434,
-    "seen": 1795383639.960613,
-    "ast_hash": "32bd3d4ba0eec017305f9c8adb67d9d7",
+    "mtime": 1795859074.789552,
+    "seen": 1795859143.35009,
+    "ast_hash": "e58cfa1f7e27da00bf5c5451f152140c",
     "semantic_hash": ""
   },
   "tests/marketing-referrals.test.js": {
@@ -1638,9 +1638,9 @@
     "semantic_hash": ""
   },
   "tests/ux-production-criteria.test.js": {
-    "mtime": 1795817340.3422651,
-    "seen": 1795817405.774904,
-    "ast_hash": "f01156d5211b0fd499c057cd992c8533",
+    "mtime": 1795859100.4116287,
+    "seen": 1795859143.3501,
+    "ast_hash": "7a5fad86c96756b2716492d6066103aa",
     "semantic_hash": ""
   },
   "public/room-stage.js": {
@@ -1680,9 +1680,9 @@
     "semantic_hash": ""
   },
   "tests/header-strip.test.js": {
-    "mtime": 1795819186.9962745,
-    "seen": 1795819261.963785,
-    "ast_hash": "e94482886727f7375ace2d0fd109b9d2",
+    "mtime": 1795820847.7138898,
+    "seen": 1795820923.6345978,
+    "ast_hash": "17158d5fe32abfb8efa290e3e72292df",
     "semantic_hash": ""
   },
   "tests/notifications-read.test.js": {

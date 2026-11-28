@@ -258,9 +258,9 @@
     "semantic_hash": ""
   },
   "public/app-nav.js": {
-    "mtime": 1795816817.5080109,
-    "seen": 1795817405.7746859,
-    "ast_hash": "315c75a75550b372a56f9de48a3ebb13",
+    "mtime": 1795820788.5029223,
+    "seen": 1795820923.63436,
+    "ast_hash": "cca4ec3431bfe74378e67a5e0ba3201c",
     "semantic_hash": ""
   },
   "public/auth.js": {
@@ -1680,9 +1680,9 @@
     "semantic_hash": ""
   },
   "tests/header-strip.test.js": {
-    "mtime": 1795816485.0688047,
-    "seen": 1795816518.462571,
-    "ast_hash": "df1f0484b7be78eb1bcaf783c2569168",
+    "mtime": 1795820847.7138898,
+    "seen": 1795820923.6345978,
+    "ast_hash": "17158d5fe32abfb8efa290e3e72292df",
     "semantic_hash": ""
   },
   "tests/notifications-read.test.js": {

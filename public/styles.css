@@ -556,8 +556,15 @@ input[type="number"]::-webkit-inner-spin-button {
   flex: 0 0 auto;
 }
 
-.nav--app {
-  gap: 12px;
+.nav.nav--app {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: none;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
 }
 
 .logo {
@@ -643,9 +650,11 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .app-nav-links {
   position: relative;
+  grid-column: 2;
   gap: 2px;
   flex-wrap: nowrap;
   min-width: 0;
+  max-width: 100%;
   justify-content: safe center;
   overflow-x: auto;
   overflow-y: hidden;
@@ -655,50 +664,26 @@ input[type="number"]::-webkit-inner-spin-button {
   background: color-mix(in srgb, var(--bg-card) 55%, transparent);
   scrollbar-width: none;
   -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
+  container-type: inline-size;
+  container-name: appnav;
 }
 
 .app-nav-links::-webkit-scrollbar {
   display: none;
 }
 
-.app-nav-links > li:not(.app-nav-indicator) {
+.app-nav-links > li {
   position: relative;
   z-index: 1;
-  flex-shrink: 0;
-}
-
-.app-nav-links .app-nav-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  width: 0;
-  height: 0;
-  padding: 0;
-  margin: 0;
-  flex: none;
-  overflow: visible;
-  list-style: none;
-  pointer-events: none;
-  border-radius: 11px;
-  background: var(--accent-subtle);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
-  opacity: 0;
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.18s ease;
-}
-
-.app-nav-links .app-nav-indicator.is-instant {
-  transition-duration: 0s !important;
+  flex: 0 0 auto;
 }
 
 .app-nav-links .app-nav-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  position: relative;
+  isolation: isolate;
   min-height: 40px;
   padding: 8px 13px;
   font-size: 0.88rem;
@@ -709,32 +694,57 @@ input[type="number"]::-webkit-inner-spin-button {
   background: transparent;
 }
 
+.app-nav-links .app-nav-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 11px;
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+}
+
 .app-nav-links .app-nav-link::after {
   display: none;
 }
 
 .app-nav-links .app-nav-link:hover,
+.app-nav-links .app-nav-link:focus-visible,
 .app-nav-links .app-nav-link.active {
   color: var(--accent);
   border-color: transparent;
   background: transparent;
 }
 
-.nav--app .nav-links {
-  flex: 1 1 0;
-  min-width: 0;
-  justify-content: safe center;
+.app-nav-links .app-nav-link:hover::before,
+.app-nav-links .app-nav-link:focus-visible::before,
+.app-nav-links .app-nav-link.active::before {
+  opacity: 1;
+  transform: none;
+}
+
+.nav--app > .logo {
+  grid-column: 1;
 }
 
 .nav--app .nav-actions {
+  grid-column: 3;
   flex: 0 0 auto;
-  margin-left: auto;
+  margin-left: 0;
   gap: 10px;
 }
 
-/* Wider bar for the app header so links never slide under the logo or actions */
-.nav.nav--app { gap: 20px; }
-.nav--app .nav-links { margin: 0; padding: 3px; }
+.nav--app .nav-links {
+  margin: 0;
+}
+
+@container appnav (max-width: 920px) {
+  .app-nav-label { display: none; }
+  .app-nav-link { padding: 10px 11px; }
+}
 /* Same layout on the marketing header: links centred, actions pinned right */
 .nav:not(.nav--app) { gap: 20px; }
 .nav:not(.nav--app) .nav-links { flex: 1 1 0; min-width: 0; justify-content: center; gap: clamp(18px, 2.4vw, 32px); margin: 0 auto; }
@@ -2904,7 +2914,6 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .mobile-menu.open { display: flex; }
-.mobile-menu .app-nav-indicator { display: none; }
 .mobile-menu .nav-icon-btn {
   width: 100%;
   height: auto;
@@ -3386,7 +3395,7 @@ body.search-open { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   .header.is-ready .nav,
-  .app-nav-indicator,
+  .app-nav-links .app-nav-link::before,
   .nav-icon-btn,
   .notif-bell-btn,
   .nav-user,

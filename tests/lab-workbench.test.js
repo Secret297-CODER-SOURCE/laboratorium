@@ -6,7 +6,8 @@ import {
   hexEncode, hexDecode, rot13, multiHash, identifyHash, parseHttpMessage, parseUrlParts, parseUserAgent,
   parseWhoisText, analyzeEmailHeaders, calcCidr, generateSubdomainWordlist, extractStrings, xorBruteforce,
   nestedDecode, testJwtWeakSecret, detectAttackPatterns, textToBase64,
-  unixTimestampConvert, caseConvert, unicodeInspect,
+  unixTimestampConvert, caseConvert, unicodeInspect, codecConvert, htmlEncode, htmlDecode,
+  binaryEncode, binaryDecode, CODEC_FORMATS,
 } from '../public/lab-workbench.js';
 
 function b64url(obj) {
@@ -74,6 +75,26 @@ test('workbench tools cover every declared category and have unique ids', () => 
   WORKBENCH_TOOLS.forEach((tool) => assert.ok(categoryIds.has(tool.category), `${tool.id} has an unknown category`));
   // every category should have at least one tool
   categoryIds.forEach((cat) => assert.ok(ids.some((id) => WORKBENCH_TOOLS.find((t) => t.id === id).category === cat)));
+});
+
+test('unified codec round-trips Base64, Hex, URL, HTML, Binary and ROT13', () => {
+  const sample = 'Hello, <lab> & "CTF" Ї';
+  for (const format of CODEC_FORMATS.map((item) => item.id)) {
+    if (format === 'rot13') {
+      assert.equal(codecConvert(codecConvert(sample, format, 'encode'), format, 'decode'), sample);
+      continue;
+    }
+    const encoded = codecConvert(sample, format, 'encode');
+    assert.notEqual(encoded, sample);
+    assert.equal(codecConvert(encoded, format, 'decode'), sample);
+    assert.equal(codecConvert('', format, 'encode'), '');
+  }
+  assert.equal(htmlEncode('<a>'), '&lt;a&gt;');
+  assert.equal(htmlDecode('&#65; &#x42;'), 'A B');
+  assert.equal(binaryEncode('A'), '01000001');
+  assert.equal(binaryDecode('01000001 01000010'), 'AB');
+  assert.throws(() => codecConvert('%%%', 'url', 'decode'));
+  assert.throws(() => codecConvert('zzz', 'hex', 'decode'));
 });
 
 test('hex encode/decode round trip', () => {

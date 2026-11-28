@@ -8,12 +8,18 @@ import {
   sha256Hex, multiHash, identifyHash, analyzeHeaders, parseHttpMessage, parseUrlParts, parseUserAgent,
   decodeJwt, testJwtWeakSecret, extractIocs, detectAttackPatterns, testRegex, parseWhoisText,
   analyzeEmailHeaders, calcCidr, generateSubdomainWordlist, extractStrings, xorBruteforce, nestedDecode,
-  unixTimestampConvert, caseConvert, unicodeInspect,
+  unixTimestampConvert, caseConvert, unicodeInspect, CODEC_FORMATS, codecConvert,
 } from '/lab-workbench.js';
 
 const DIFF = { beginner: 'Початковий', intermediate: 'Середній', advanced: 'Просунутий' };
 const refState = { query: '', category: 'all', difficulty: 'all' };
-const wb = { store: null, activeTool: WORKBENCH_TOOLS[0].id };
+const wb = {
+  store: null,
+  activeTool: 'codec',
+  codecFormat: 'base64',
+  codecDir: 'encode',
+  codecInput: '',
+};
 
 function esc(value) {
   const el = document.createElement('span');
@@ -158,13 +164,72 @@ function chainOptionsHtml() {
   return WORKBENCH_TOOLS.map((tool) => `<option value="${tool.id}">${esc(t(tool.name))}</option>`).join('');
 }
 
+function codecChip(kind, id, label, active) {
+  return `<button type="button" class="lt-codec-chip ${active ? 'active' : ''}" data-wb-codec-${kind}="${esc(id)}" aria-pressed="${active ? 'true' : 'false'}">${esc(label)}</button>`;
+}
+
+function renderCodecPanel() {
+  const formats = CODEC_FORMATS.map((fmt) => codecChip('format', fmt.id, fmt.name, fmt.id === wb.codecFormat)).join('');
+  const dirs = [
+    ['encode', t('Кодувати')],
+    ['decode', t('Декодувати')],
+  ].map(([id, label]) => codecChip('dir', id, label, id === wb.codecDir)).join('');
+  return `<div class="lt-codec">
+    <div class="lt-codec-toolbar">
+      <div class="lt-codec-formats" role="radiogroup" aria-label="${esc(t('Формат'))}">${formats}</div>
+      <div class="lt-codec-dir" role="radiogroup" aria-label="${esc(t('Напрямок'))}">${dirs}</div>
+    </div>
+    <div class="lt-codec-panes">
+      <label>${esc(t('Вхід'))}
+        <textarea data-wb="codec-in" rows="10" spellcheck="false">${esc(wb.codecInput)}</textarea>
+      </label>
+      <label>${esc(t('Вихід'))}
+        <textarea data-wb="codec-out" rows="10" spellcheck="false" readonly></textarea>
+      </label>
+    </div>
+  </div>`;
+}
+
+function applyCodecLive(root) {
+  const inputEl = root.querySelector('[data-wb="codec-in"]');
+  const outputEl = root.querySelector('[data-wb="codec-out"]');
+  const hidden = root.querySelector('[data-wb="tool-input"]');
+  if (!inputEl || !outputEl) return;
+  wb.codecInput = inputEl.value;
+  if (hidden) hidden.value = inputEl.value;
+  try {
+    outputEl.value = codecConvert(inputEl.value, wb.codecFormat, wb.codecDir);
+    outputEl.classList.remove('is-error');
+  } catch (err) {
+    outputEl.value = err.message;
+    outputEl.classList.add('is-error');
+  }
+}
+
 function renderToolForm(root) {
   const tool = WORKBENCH_TOOLS.find((x) => x.id === wb.activeTool);
   root.querySelector('[data-wb="tool-title"]').textContent = t(tool.name);
-  root.querySelector('[data-wb="tool-input-label"]').textContent = t(tool.inputLabel);
+  const label = root.querySelector('[data-wb="tool-input-label"]');
+  const input = root.querySelector('[data-wb="tool-input"]');
+  label.textContent = t(tool.inputLabel);
   const extra = root.querySelector('[data-wb="tool-extra"]');
   const actions = root.querySelector('[data-wb="tool-actions"]');
   const runBtn = `<button type="button" class="btn btn--outline btn--sm" data-wb-run="run">${esc(t('Виконати'))}</button>`;
+
+  if (tool.id === 'codec') {
+    input.hidden = true;
+    label.hidden = true;
+    extra.hidden = false;
+    extra.innerHTML = renderCodecPanel();
+    actions.innerHTML = `<button type="button" class="btn btn--outline btn--sm" data-wb-codec-swap>${esc(t('Поміняти місцями'))}</button>
+      <button type="button" class="btn btn--outline btn--sm" data-wb-codec-copy>${esc(t('Копіювати'))}</button>
+      <button type="button" class="btn btn--primary btn--sm" data-wb-run="run">${esc(t('Зберегти в знахідки'))}</button>`;
+    applyCodecLive(root);
+    return;
+  }
+
+  input.hidden = false;
+  label.hidden = false;
 
   if (tool.id === 'url' || tool.id === 'base64' || tool.id === 'hex') {
     extra.hidden = true;
@@ -202,6 +267,11 @@ function kvRows(pairs) {
 }
 
 const FINDERS = {
+  codec: {
+    summary: (r) => `${r.format.toUpperCase()} · ${r.direction === 'decode' ? t('Декодувати') : t('Кодувати')}`,
+    body: (r) => `<pre class="lab-tool-output">${esc(r.output)}</pre>`,
+    chain: (r) => r.output,
+  },
   ioc: {
     summary: (r) => t('Знайдено індикаторів: {n}', { n: r.ips.length + r.domains.length + r.emails.length + r.urls.length + r.hashes.md5.length + r.hashes.sha1.length + r.hashes.sha256.length }),
     body: (r) => {
@@ -387,7 +457,15 @@ async function runTool(root, action) {
   if (!project) { window.alert?.(t('Спочатку створіть або оберіть проєкт')); return; }
   try {
     let result;
-    if (tool === 'url') result = action === 'encode' ? encodeURIComponent(input) : decodeURIComponent(input);
+    if (tool === 'codec') {
+      const text = root.querySelector('[data-wb="codec-in"]')?.value ?? input;
+      result = {
+        format: wb.codecFormat,
+        direction: wb.codecDir,
+        output: codecConvert(text, wb.codecFormat, wb.codecDir),
+      };
+    }
+    else if (tool === 'url') result = action === 'encode' ? encodeURIComponent(input) : decodeURIComponent(input);
     else if (tool === 'base64') result = action === 'encode' ? textToBase64(input) : base64ToText(input);
     else if (tool === 'hex') result = action === 'encode' ? hexEncode(input) : hexDecode(input);
     else if (tool === 'rot13') result = rot13(input);
@@ -491,11 +569,43 @@ function initWorkbench(root) {
     renderToolList(root);
     renderToolForm(root);
   });
-  root.querySelector('[data-wb="tool-form"]').addEventListener('submit', (e) => e.preventDefault());
+  const form = root.querySelector('[data-wb="tool-form"]');
+  form.addEventListener('submit', (e) => e.preventDefault());
+  form.addEventListener('input', (e) => {
+    if (e.target.matches('[data-wb="codec-in"]')) applyCodecLive(root);
+  });
+  form.addEventListener('click', (e) => {
+    const formatBtn = e.target.closest('[data-wb-codec-format]');
+    const dirBtn = e.target.closest('[data-wb-codec-dir]');
+    if (formatBtn) {
+      wb.codecFormat = formatBtn.dataset.wbCodecFormat;
+      renderToolForm(root);
+    } else if (dirBtn) {
+      wb.codecDir = dirBtn.dataset.wbCodecDir;
+      renderToolForm(root);
+    }
+  });
   root.querySelector('[data-wb="tool-actions"]').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-wb-run]');
-    if (!btn) return;
-    runTool(root, btn.dataset.wbRun);
+    const swapBtn = e.target.closest('[data-wb-codec-swap]');
+    const copyBtn = e.target.closest('[data-wb-codec-copy]');
+    const runBtn = e.target.closest('[data-wb-run]');
+    if (swapBtn) {
+      const out = root.querySelector('[data-wb="codec-out"]');
+      if (!out || out.classList.contains('is-error')) return;
+      wb.codecInput = out.value;
+      wb.codecDir = wb.codecDir === 'decode' ? 'encode' : 'decode';
+      renderToolForm(root);
+      return;
+    }
+    if (copyBtn) {
+      const out = root.querySelector('[data-wb="codec-out"]');
+      if (!out || out.classList.contains('is-error') || !out.value) return;
+      navigator.clipboard?.writeText(out.value);
+      copyBtn.textContent = t('Скопійовано');
+      setTimeout(() => { copyBtn.textContent = t('Копіювати'); }, 1200);
+      return;
+    }
+    if (runBtn) runTool(root, runBtn.dataset.wbRun);
   });
   root.querySelector('[data-wb="findings"]').addEventListener('click', (e) => {
     const removeBtn = e.target.closest('[data-wb-remove]');
@@ -513,11 +623,19 @@ function initWorkbench(root) {
       if (!finding) return;
       const select = chainBtn.closest('.lt-finding').querySelector('[data-wb-chain-select]');
       wb.activeTool = select.value;
+      wb.codecInput = finding.chainText || '';
       renderToolList(root);
       renderToolForm(root);
+      const codecIn = root.querySelector('[data-wb="codec-in"]');
       const input = root.querySelector('[data-wb="tool-input"]');
-      input.value = finding.chainText || '';
-      input.focus();
+      if (codecIn) {
+        codecIn.value = finding.chainText || '';
+        applyCodecLive(root);
+        codecIn.focus();
+      } else {
+        input.value = finding.chainText || '';
+        input.focus();
+      }
     }
   });
 }

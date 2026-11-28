@@ -1816,7 +1816,32 @@
 .lt-tool-form { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
 .lt-tool-form textarea { width: 100%; min-height: 110px; padding: 10px; resize: vertical; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font: 0.82rem var(--mono); }
 .lt-tool-extra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lt-tool-extra:has(.lt-codec) { display: block; width: 100%; }
 .lt-tool-extra input, .lt-tool-extra textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font: 0.82rem var(--mono); flex: 1; min-width: 100px; }
+.lt-codec { display: grid; gap: 12px; }
+.lt-codec-toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: space-between; align-items: center; }
+.lt-codec-formats, .lt-codec-dir { display: flex; flex-wrap: wrap; gap: 6px; }
+.lt-codec-chip {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.lt-codec-chip:hover { color: var(--text); background: var(--bg-card); }
+.lt-codec-chip.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--accent-subtle);
+}
+.lt-codec-panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.lt-codec-panes label { display: grid; gap: 6px; min-width: 0; font-size: 0.78rem; color: var(--text-muted); }
+.lt-codec-panes textarea { min-height: 200px; resize: vertical; }
+.lt-codec-out.is-error, textarea.is-error { color: #ff6b7a; }
 .lt-findings { display: grid; gap: 10px; }
 .lt-finding { padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
 .lt-finding-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
@@ -1830,6 +1855,7 @@
   .lt-workbench { grid-template-columns: minmax(0, 1fr); }
   .lt-sidebar { position: static; grid-auto-flow: column; overflow-x: auto; max-height: none; }
   .lt-cat-head { grid-row: span 1; }
+  .lt-codec-panes { grid-template-columns: minmax(0, 1fr); }
 }
 
 

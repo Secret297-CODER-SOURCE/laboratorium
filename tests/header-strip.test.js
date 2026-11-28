@@ -7,18 +7,18 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
 
-test('app nav renders a sliding indicator instead of bordered active pills', () => {
+test('app nav keeps a per-link pill and never slides items under the logo', () => {
   const nav = read('public/app-nav.js');
   const css = read('public/styles.css');
-  assert.match(nav, /class="app-nav-indicator"/);
-  assert.match(nav, /export function syncAppNavIndicator/);
-  assert.match(nav, /translate3d/);
+  assert.doesNotMatch(nav, /app-nav-indicator/);
+  assert.doesNotMatch(nav, /translate3d/);
   assert.doesNotMatch(nav, /scrollIntoView/);
-  assert.match(css, /\.app-nav-links \.app-nav-indicator\s*\{/);
-  assert.match(css, /\.app-nav-links \.app-nav-indicator\s*\{[\s\S]*?position: absolute/);
-  assert.match(css, /\.app-nav-links > li:not\(\.app-nav-indicator\)/);
-  assert.match(css, /justify-content:\s*safe center/);
-  assert.doesNotMatch(css, /\.app-nav-links \.app-nav-link\.active \{[\s\S]{0,180}border-color: color-mix/);
+  assert.match(css, /\.nav\.nav--app\s*\{[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\) auto/);
+  assert.match(css, /\.app-nav-links \.app-nav-link::before/);
+  assert.match(css, /\.app-nav-links \.app-nav-link\.active::before/);
+  assert.match(css, /container-name: appnav/);
+  assert.match(css, /justify-content: safe center/);
+  assert.doesNotMatch(css, /\.app-nav-indicator/);
 });
 
 test('app header groups tools and identity and animates on scroll', () => {
